@@ -1,0 +1,14 @@
+build/
+app/build/
+dist/
+*.elf
+*.nso
+*.nsp
+*.npdm
+*.nro
+*.nacp
+*.zip
+test/test_engine
+test/lgcheck
+test/ui/ui_host
+test/*.tmp

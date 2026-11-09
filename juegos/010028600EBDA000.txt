@@ -1,0 +1,131 @@
+# Super Mario 3D World + Bowser's Fury v1.1.0 (modo 3D World)
+# Va en  sdmc:/config/greeny/games/010028600EBDA000.txt
+#
+# Todas las direcciones cuelgan del mismo puntero: main+0x1386C00->0x18->0x0
+# (en la v1.0.0 estaba en main+0x137EAA0; el scan lo reubico en la 1.1.0).
+# Las tres estan verificadas en consola:
+#   monedas           (...->0x138->0x48)  0..99, vuelve a 0 al llegar a 100
+#   vidas             (...->0x78->0x20)
+#   objeto en reserva (...->0x228->0x90)  1 hongo, 2 gato, 3 flor de fuego,
+#                     4 tanuki, 5 bumeran, 6 hoja dorada, 7 campana de la suerte
+#
+# Para depurar pon debug = 1: anota en log.txt el valor que lee cada condicion.
+
+game    = Super Mario 3D World
+version = 1.1.0
+build   = 891687F016A18F17
+
+[prueba_de_vida]
+name = Estamos vivos
+desc = El sistema de logros lee la memoria del juego
+name.en = We're alive
+desc.en = The achievement system can read the game's memory
+points = 5
+when = main+0x4 u32 != 0
+
+# ---------- monedas ----------
+# El contador va de 0 a 99 y vuelve a 0 al llegar a 100.
+
+[monedas_5]
+name = Cinco cheles
+desc = Ten 5 monedas
+name.en = Pocket change
+desc.en = Have 5 coins
+points = 5
+when = main+0x1386C00->0x18->0x0->0x138->0x48 u32 >= 5
+when = main+0x1386C00->0x18->0x0->0x138->0x48 u32 <= 99
+
+[monedas_50]
+name = Medio camino
+desc = Ten 50 monedas
+name.en = Halfway there
+desc.en = Have 50 coins
+points = 10
+when = main+0x1386C00->0x18->0x0->0x138->0x48 u32 >= 50
+when = main+0x1386C00->0x18->0x0->0x138->0x48 u32 <= 99
+
+[monedas_90]
+name = Casi una vida
+desc = Ten 90 monedas sin gastarlas en una vida
+name.en = Almost a life
+desc.en = Have 90 coins without cashing them in for a life
+points = 20
+when = main+0x1386C00->0x18->0x0->0x138->0x48 u32 >= 90
+when = main+0x1386C00->0x18->0x0->0x138->0x48 u32 <= 99
+
+# ---------- vidas ----------
+# El juego llega hasta 1110 vidas; el tope evita falsos positivos.
+
+[vidas_10]
+name = Siete vidas tiene el gato
+desc = Acumula 10 vidas
+name.en = Nine lives and then some
+desc.en = Stock up 10 lives
+points = 10
+when = main+0x1386C00->0x18->0x0->0x78->0x20 u32 >= 10
+when = main+0x1386C00->0x18->0x0->0x78->0x20 u32 <= 1110
+
+[vidas_30]
+name = Bien cubierto
+desc = Acumula 30 vidas
+name.en = Well covered
+desc.en = Stock up 30 lives
+points = 25
+when = main+0x1386C00->0x18->0x0->0x78->0x20 u32 >= 30
+when = main+0x1386C00->0x18->0x0->0x78->0x20 u32 <= 1110
+
+[vidas_99]
+name = Inmortal
+desc = Acumula 99 vidas
+name.en = Immortal
+desc.en = Stock up 99 lives
+points = 50
+when = main+0x1386C00->0x18->0x0->0x78->0x20 u32 >= 99
+when = main+0x1386C00->0x18->0x0->0x78->0x20 u32 <= 1110
+
+# ---------- objeto en reserva ----------
+
+[reserva_gato]
+name = Miau
+desc = Guarda una Supercampana en la reserva
+name.en = Meow
+desc.en = Keep a Super Bell in reserve
+points = 10
+hold = 1000
+when = main+0x1386C00->0x18->0x0->0x228->0x90 u32 == 2
+
+[reserva_fuego]
+name = Candela
+desc = Guarda una Flor de Fuego en la reserva
+name.en = Fired up
+desc.en = Keep a Fire Flower in reserve
+points = 10
+hold = 1000
+when = main+0x1386C00->0x18->0x0->0x228->0x90 u32 == 3
+
+[reserva_tanuki]
+name = Rabo de mapache
+desc = Guarda una Superhoja en la reserva
+name.en = Raccoon tail
+desc.en = Keep a Super Leaf in reserve
+points = 10
+hold = 1000
+when = main+0x1386C00->0x18->0x0->0x228->0x90 u32 == 4
+
+[reserva_bumeran]
+name = Va y viene
+desc = Guarda una Flor Bumerán en la reserva
+name.en = Comes right back
+desc.en = Keep a Boomerang Flower in reserve
+points = 10
+hold = 1000
+when = main+0x1386C00->0x18->0x0->0x228->0x90 u32 == 5
+
+[reserva_suerte]
+name = Con suerte
+desc = Guarda una Campana de la Suerte en la reserva
+name.en = Feeling lucky
+desc.en = Keep a Lucky Bell in reserve
+points = 25
+hold = 1000
+when = main+0x1386C00->0x18->0x0->0x228->0x90 u32 == 7

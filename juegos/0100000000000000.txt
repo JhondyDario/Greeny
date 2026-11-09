@@ -1,0 +1,55 @@
+# PLANTILLA - este juego no existe y estas direcciones son inventadas.
+# Copia este archivo a  sdmc:/config/greeny/games/<TITLE ID DE TU JUEGO>.txt
+# y cambia las direcciones por las que encuentres con EdiZon SE / Breeze.
+#
+# Valida el archivo en PC antes de copiarlo:   test/lgcheck <archivo>
+
+game    = Juego de Ejemplo
+
+# Version del juego para la que sirven estas direcciones. La app la muestra.
+version = 1.0.0
+
+# Primeros digitos del build id del juego (sale en log.txt la primera vez que
+# se engancha). Si lo pones y el juego se actualiza, los logros se desactivan
+# solos en vez de leer direcciones que ya no sirven. Recomendado.
+build   = 0123456789ABCDEF
+
+# ---------------------------------------------------------------------------
+# Condicion:   when = <direccion> <tipo> <operador> <valor>
+#
+#   direccion  main+0xOFFSET  o  heap+0xOFFSET
+#              punteros: main+0x1A2B3C->0x10->0x48
+#              (lee un puntero en main+0x1A2B3C, le suma 0x10, lee otro
+#               puntero ahi, le suma 0x48, y ESE es el dato)
+#   tipo       u8 u16 u32 u64   s8 s16 s32 s64   f32 f64
+#   operador   == != > >= < <=
+#              &   todos esos bits encendidos     !&  todos apagados
+#   valor      decimal o 0xHEX (decimales con punto para f32/f64)
+#
+# Varios when = se tienen que cumplir TODOS a la vez.
+# points = puntos que da el logro (por defecto 10).
+# name.en / desc.en = traduccion al ingles (opcional).
+# hold = milisegundos seguidos que debe cumplirse (por defecto 500).
+# ---------------------------------------------------------------------------
+
+[monedas_100]
+name = Bolsillo lleno
+desc = Junta 100 monedas
+name.en = Full pockets
+desc.en = Collect 100 coins
+points = 10
+when = main+0x1A2B3C40 u32 >= 100
+
+[jefe_1]
+name = El primero de muchos
+desc = Derrota al primer jefe
+# bit 0x04 de un byte de banderas, llegando por un puntero
+when = main+0x2F00A8->0x18->0x3C u8 & 0x04
+
+[sin_danio]
+name = Ni un rasguño
+desc = Termina el nivel 3 con la vida completa
+hold = 1000
+when = heap+0x4410 u8 == 3
+when = heap+0x4414 f32 >= 100.0
+when = heap+0x4420 u8 == 1
