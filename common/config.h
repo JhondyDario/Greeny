@@ -5,6 +5,8 @@
 typedef enum { GR_LANG_AUTO, GR_LANG_ES, GR_LANG_EN, GR_LANG_COUNT } gr_lang;
 typedef enum { GR_THEME_AUTO, GR_THEME_LIGHT, GR_THEME_DARK, GR_THEME_COUNT } gr_theme;
 typedef enum { GR_VIEW_LIST, GR_VIEW_GRID, GR_VIEW_COUNT } gr_view;
+typedef enum { GR_SCOPE_ACTIVE, GR_SCOPE_PLAYED, GR_SCOPE_COUNT } gr_scope;
+typedef enum { GR_SHOW_ALL, GR_SHOW_PENDING, GR_SHOW_DONE, GR_SHOW_COUNT } gr_show;
 typedef enum { GR_START_TROPHIES, GR_START_PROFILE, GR_START_COUNT } gr_start;
 
 typedef struct {
@@ -17,6 +19,8 @@ typedef struct {
     bool animated_bg; /* fondo animado en la app */
     bool intro_done;  /* ya se mostro la introduccion de la app */
     int  start_page;  /* gr_start: que pantalla abre la app */
+    int  games_scope; /* gr_scope: solo los juegos instalados, o tambien los ya jugados */
+    int  games_show;  /* gr_show: todos, por completar o completados */
 } gr_config;
 
 void gr_config_defaults(gr_config *c);

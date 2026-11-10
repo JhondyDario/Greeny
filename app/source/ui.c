@@ -351,7 +351,14 @@ void ui_home(gfx_canvas *c, const ui_assets *a, const gr_model *m, const gr_conf
     else snprintf(tagline, sizeof(tagline), "%s", T("Logros para tu Switch", "Achievements for your Switch"));
     gfx_text_fit(c, 122 + gfx_text_width(46, UI_APP_NAME) + 14, 44, 22, C_GREEN_LT, tagline, 520);
 
-    if (m->ngames == 0) {
+    if (m->ngames == 0 && m->hidden > 0) {
+        card(c, MARGIN, 150, 920, 150, false);
+        gfx_text(c, MARGIN + 32, 176, 30, P->ink, T("No hay juegos con este filtro", "No games match this filter"));
+        char line[160];
+        snprintf(line, sizeof(line), T("Hay %d juego(s) oculto(s). Cámbialo en Opciones (X), pestaña Vista.",
+                                       "%d game(s) hidden. Change it in Options (X), View tab."), m->hidden);
+        gfx_text(c, MARGIN + 32, 232, 22, P->gray, line);
+    } else if (m->ngames == 0) {
         card(c, MARGIN, 150, 920, 200, false);
         gfx_text(c, MARGIN + 32, 176, 30, P->ink, T("Todavía no hay juegos con logros", "No games with achievements yet"));
         gfx_text(c, MARGIN + 32, 228, 22, P->gray,
@@ -389,9 +396,9 @@ static void icon_locked(gfx_canvas *c, int cx, int cy) {
     gfx_round_rect(c, cx - 12, cy - 4, 24, 18, 4, P->gray);
 }
 
-/* Icono del logro con su marco: de color si ya lo tienes, gris si no. Si no hay
+/* Icono del logro con su marco: bronce, plata u oro si ya lo tienes, gris si no. Si no hay
  * icono guardado, el circulo con check o candado de siempre. */
-static void ach_icon(gfx_canvas *c, const ui_assets *a, int index, int cx, int cy, bool unlocked) {
+static void ach_icon(gfx_canvas *c, const ui_assets *a, int index, int cx, int cy, bool unlocked, gfx_color frame) {
     const uint8_t *img = unlocked ? a->ach_icons[index] : a->ach_icons_gray[index];
     if (!img) {
         if (unlocked) icon_unlocked(c, cx, cy);
@@ -400,8 +407,24 @@ static void ach_icon(gfx_canvas *c, const ui_assets *a, int index, int cx, int c
     }
     const int s = GR_ICON_SIZE, x = cx - s / 2, y = cy - s / 2;
     gfx_round_rect(c, x - 5, y - 5, s + 10, s + 10, 16, P->shadow);
-    gfx_round_rect(c, x - 4, y - 4, s + 8, s + 8, 15, unlocked ? C_YELLOW : P->gray_lt);
+    gfx_round_rect(c, x - 4, y - 4, s + 8, s + 8, 15, unlocked ? frame : P->gray_lt);
     gfx_image(c, x, y, img, s, s);
+}
+
+/* colores de bronce, plata y oro: fondo y texto encima */
+static gfx_color tier_bg(const lg_ach *ac) {
+    switch (lg_ach_tier(ac)) {
+        case LG_TIER_GOLD:   return GFX_RGB(0xF7, 0xC9, 0x1E);
+        case LG_TIER_SILVER: return GFX_RGB(0xB4, 0xBC, 0xC6);
+        default:             return GFX_RGB(0xB5, 0x6A, 0x2C);
+    }
+}
+static const char *tier_name(const lg_ach *ac) {
+    switch (lg_ach_tier(ac)) {
+        case LG_TIER_GOLD:   return T("Oro", "Gold");
+        case LG_TIER_SILVER: return T("Plata", "Silver");
+        default:             return T("Bronce", "Bronze");
+    }
 }
 
 static void unlock_date(const lg_ach *ac, char *buf, size_t cap) {
@@ -413,12 +436,13 @@ static void unlock_date(const lg_ach *ac, char *buf, size_t cap) {
 }
 
 /* etiquetas de estado y puntos, alineadas a la derecha */
-static void status_pills(gfx_canvas *c, int right, int y, const lg_ach *ac) {
+static void status_pills(gfx_canvas *c, int right, int y, const lg_ach *ac, bool compact) {
     char buf[24];
     int w = ac->unlocked ? pill(c, right, y, C_GREEN, C_WHITE, T("DESBLOQUEADO", "UNLOCKED"))
                          : pill(c, right, y, C_RED, C_WHITE, T("BLOQUEADO", "LOCKED"));
-    snprintf(buf, sizeof(buf), "%u pts", ac->points);
-    pill(c, right - w - 10, y, C_YELLOW, C_ON_YELLOW, buf);
+    if (compact) snprintf(buf, sizeof(buf), "%u pts", ac->points); /* en la cuadricula no cabe el nombre: queda el color */
+    else snprintf(buf, sizeof(buf), "%s · %u", tier_name(ac), ac->points);
+    pill(c, right - w - 10, y, tier_bg(ac), lg_ach_tier(ac) == LG_TIER_BRONZE ? C_WHITE : C_ON_YELLOW, buf);
 }
 
 static void detail_list(gfx_canvas *c, const ui_assets *a, const lg_game *gm, int cursor, int top, int rows) {
@@ -428,7 +452,7 @@ static void detail_list(gfx_canvas *c, const ui_assets *a, const lg_game *gm, in
         int y = 116 + (i - top) * (h + 8);
         card(c, x, y, w, h, i == cursor);
         zone(x, y, w, h, UI_ZONE_ITEM, i);
-        ach_icon(c, a, i, x + 48, y + h / 2, ac->unlocked);
+        ach_icon(c, a, i, x + 48, y + h / 2, ac->unlocked, tier_bg(ac));
 
         int tx = x + 96, tw = w - 96 - 300;
         const char *desc = lg_ach_desc(ac, g_en);
@@ -436,7 +460,7 @@ static void detail_list(gfx_canvas *c, const ui_assets *a, const lg_game *gm, in
         gfx_text_fit(c, tx, y + 46, 20, P->gray, desc[0] ? desc : T("Sin descripción", "No description"), tw);
 
         int right = x + w - 24;
-        status_pills(c, right, y + 12, ac);
+        status_pills(c, right, y + 12, ac, false);
         char buf[48];
         if (ac->unlocked) unlock_date(ac, buf, sizeof(buf));
         else snprintf(buf, sizeof(buf), "%s", T("Aún no lo tienes", "Not earned yet"));
@@ -452,11 +476,11 @@ static void detail_grid(gfx_canvas *c, const ui_assets *a, const lg_game *gm, in
         int x = MARGIN + (i % l.cols) * (w + gx), y = 116 + (i / l.cols - top) * (h + gy);
         card(c, x, y, w, h, i == cursor);
         zone(x, y, w, h, UI_ZONE_ITEM, i);
-        ach_icon(c, a, i, x + 44, y + 44, ac->unlocked);
+        ach_icon(c, a, i, x + 44, y + 44, ac->unlocked, tier_bg(ac));
 
         const char *desc = lg_ach_desc(ac, g_en);
         gfx_text_fit(c, x + 92, y + 14, 23, ac->unlocked ? P->ink : P->gray, lg_ach_name(ac, g_en), w - 92 - 14);
-        status_pills(c, x + w - 14, y + 46, ac);
+        status_pills(c, x + w - 14, y + 46, ac, true);
         text_2lines(c, x + 18, y + 84, 18, P->gray, desc[0] ? desc : T("Sin descripción", "No description"), w - 36, 23);
 
         char buf[48];
@@ -503,7 +527,7 @@ void ui_detail(gfx_canvas *c, const ui_assets *a, const gr_model *m, const gr_co
 
 static const struct { const char *es, *en; int n; int opt[4]; } k_tabs[UI_TABS] = {
     { "General",     "General",  4, { UI_OPT_LANG, UI_OPT_THEME, UI_OPT_ANIM, UI_OPT_START } },
-    { "Vista",       "View",     2, { UI_OPT_GAMES_VIEW, UI_OPT_ACH_VIEW } },
+    { "Vista",       "View",     4, { UI_OPT_SCOPE, UI_OPT_SHOW, UI_OPT_GAMES_VIEW, UI_OPT_ACH_VIEW } },
     { "En el juego", "In-game",  2, { UI_OPT_SOUND, UI_OPT_POPUP } },
     { "Cuenta",      "Account",  0, { 0 } },  /* sus filas dependen de si la consola esta vinculada */
     { "Ayuda",       "Help",     2, { UI_OPT_DIAG, UI_OPT_ABOUT } },
@@ -640,6 +664,19 @@ void ui_settings(gfx_canvas *c, const ui_assets *a, const gr_config *cfg, int ta
                            T("Mensajes en pantalla mientras juegas. Se aplica al abrir un juego.",
                              "On-screen messages while you play. Applies when a game starts."),
                            cfg->popup ? on : off, cfg->popup ? C_GREEN : C_NEUTRAL);
+                break;
+            case UI_OPT_SCOPE:
+                option_row(c, y, sel, T("Juegos en el inicio", "Games on the home screen"),
+                           T("Activos: los instalados en esta consola. Jugados: además, los que ya tienen logros tuyos.",
+                             "Active: installed on this console. Played: also the ones where you already have achievements."),
+                           cfg->games_scope == GR_SCOPE_PLAYED ? T("Todos los jugados", "All played") : T("Solo activos", "Active only"), C_GREEN);
+                break;
+            case UI_OPT_SHOW:
+                option_row(c, y, sel, T("Mostrar", "Show"),
+                           T("Filtra los juegos según te falten logros o ya los tengas todos.",
+                             "Filters games by whether you still have achievements left."),
+                           cfg->games_show == GR_SHOW_PENDING ? T("Por completar", "In progress")
+                           : cfg->games_show == GR_SHOW_DONE ? T("Completados", "Completed") : T("Todos", "All"), C_GREEN);
                 break;
             case UI_OPT_START:
                 option_row(c, y, sel, T("Página de inicio", "Start page"),

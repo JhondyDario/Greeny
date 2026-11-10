@@ -214,6 +214,11 @@ lg_ach *lg_find(lg_game *g, const char *id) {
     return NULL;
 }
 
+lg_tier lg_ach_tier(const lg_ach *a) {
+    if (a->tier != LG_TIER_AUTO) return (lg_tier)a->tier;
+    return a->points <= 10 ? LG_TIER_BRONZE : a->points <= 25 ? LG_TIER_SILVER : LG_TIER_GOLD;
+}
+
 const char *lg_ach_name(const lg_ach *a, bool english) {
     return english && a->name_en[0] ? a->name_en : a->name;
 }
@@ -300,12 +305,17 @@ int lg_parse(lg_game *g, char *text, char *err, size_t errlen) {
             uint64_t pts;
             if (!parse_u64(val, &pts) || pts > 1000) FAIL("points invalido (0..1000)");
             cur->points = (uint16_t)pts;
+        } else if (!strcmp(key, "tier")) {
+            if (!strcmp(val, "bronce") || !strcmp(val, "bronze")) cur->tier = LG_TIER_BRONZE;
+            else if (!strcmp(val, "plata") || !strcmp(val, "silver")) cur->tier = LG_TIER_SILVER;
+            else if (!strcmp(val, "oro") || !strcmp(val, "gold")) cur->tier = LG_TIER_GOLD;
+            else FAIL("tier invalido (bronce, plata u oro)");
         } else if (!strcmp(key, "when")) {
             if (cur->ncond >= LG_MAX_COND) FAIL("demasiadas condiciones en un logro (max 6)");
             const char *e = parse_cond(val, &cur->cond[cur->ncond]);
             if (e) FAIL(e);
             cur->ncond++;
-        } else FAIL("clave desconocida (name, desc, name.en, desc.en, points, hold, when)");
+        } else FAIL("clave desconocida (name, desc, name.en, desc.en, points, tier, hold, when)");
     }
 
     lineno++;

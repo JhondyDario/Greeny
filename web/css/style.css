@@ -199,3 +199,11 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fo
 /* frases sugeridas (Desarrollador) */
 .preset-row { display: grid; grid-template-columns: 1fr 1fr auto auto; gap: 8px; align-items: center; }
 @media (max-width: 620px) { .preset-row { grid-template-columns: 1fr; } }
+.btn.small { padding: 4px 12px; font-size: .85rem; }
+.pill.tier-bronce { background: #b56a2c; color: #fff; }
+.pill.tier-plata { background: #b4bcc6; color: #1e2a1f; }
+.pill.tier-oro { background: var(--yellow); color: var(--on-yellow); }
+.tier-select { padding: 4px 8px; border-radius: 999px; font-weight: 700; border: 0; }
+.tier-select.tier-bronce { background: #b56a2c; color: #fff; }
+.tier-select.tier-plata { background: #b4bcc6; color: #1e2a1f; }
+.tier-select.tier-oro { background: var(--yellow); color: var(--on-yellow); }

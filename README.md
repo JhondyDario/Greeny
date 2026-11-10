@@ -133,6 +133,8 @@ make -C test
 | Código de amigo y soporte táctil en la app | Falta probarlos en consola |
 | App: instala el sysmodule y baja los logros de los juegos instalados | Descarga probada contra el servidor real desde PC; falta probarlo en consola |
 | Web: página Desarrollador (datos y estado del juego, frases), foto de perfil | Probada en navegador con servidor simulado |
+| Logros de bronce, plata y oro (archivo, app y web) | Revisado en PC y en navegador; falta probarlo en consola |
+| App: filtro de juegos del inicio (activos o jugados; todos, por completar o completados) | Revisado en PC; falta probarlo en consola |
 | Foto de perfil en la app (verla y cambiarla desde la SD) | Pendiente |
 | Buscador de juegos del catálogo en la app | Pendiente |
 | Iconos por logro, música y animaciones en la app | Pendiente ([docs/RECURSOS.md](docs/RECURSOS.md)) |

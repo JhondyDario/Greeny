@@ -177,6 +177,7 @@ static void refresh_greeting(void);
 static void rescan(void) {
     trace("leyendo archivos de logros");
     gr_scan(&g_model, ROOT);
+    gr_filter(&g_model, g_config.games_scope == GR_SCOPE_ACTIVE, g_config.games_show, g_titles, g_ntitles);
     load_covers();
     refresh_greeting(); /* los numeros del perfil salen de aqui */
 }
@@ -790,6 +791,8 @@ int main(int argc, char *argv[]) {
                     case UI_OPT_ACH_VIEW:   g_config.ach_view = (g_config.ach_view + 1) % GR_VIEW_COUNT; break;
                     case UI_OPT_SOUND:      g_config.sound = !g_config.sound; break;
                     case UI_OPT_POPUP:      g_config.popup = !g_config.popup; break;
+                    case UI_OPT_SCOPE:      g_config.games_scope = (g_config.games_scope + 1) % GR_SCOPE_COUNT; rescan(); cursor = top = 0; break;
+                    case UI_OPT_SHOW:       g_config.games_show = (g_config.games_show + 1) % GR_SHOW_COUNT; rescan(); cursor = top = 0; break;
                     case UI_OPT_START:      g_config.start_page = (g_config.start_page + 1) % GR_START_COUNT; break;
                     case UI_OPT_ABOUT:      screen = SCREEN_ABOUT; break;
                     case UI_OPT_DIAG:       run_diag(); screen = SCREEN_DIAG; break;

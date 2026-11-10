@@ -170,6 +170,16 @@ create table if not exists public.achievements (
     constraint achievements_points_range check (points between 0 and 1000)
 );
 
+-- bronce, plata u oro: que tan dificil es el logro
+alter table public.achievements add column if not exists tier text;
+update public.achievements
+   set tier = case when points <= 10 then 'bronce' when points <= 25 then 'plata' else 'oro' end
+ where tier is null;
+alter table public.achievements alter column tier set default 'bronce';
+alter table public.achievements alter column tier set not null;
+alter table public.achievements drop constraint if exists achievements_tier_valid;
+alter table public.achievements add constraint achievements_tier_valid check (tier in ('bronce', 'plata', 'oro'));
+
 -- cada cambio a un juego actualiza su fecha, para que la app sepa si tiene que volver a bajarlo
 create or replace function public.touch_updated_at()
 returns trigger language plpgsql set search_path = ''

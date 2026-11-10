@@ -212,6 +212,10 @@ int main(int argc, char **argv) {
         memset(bare.covers_big, 0, sizeof(bare.covers_big));
         ui_home(&c, &bare, &empty, &cfg, 0, 0);
         save(&c, out, "home_empty", sfx);
+        empty.hidden = 3; /* hay juegos, pero el filtro los deja fuera */
+        ui_home(&c, &bare, &empty, &cfg, 0, 0);
+        save(&c, out, "home_filtro", sfx);
+        empty.hidden = 0;
     }
     printf("%d juego(s), %d comprobaciones de diagnostico\n", m.ngames, nitems);
     for (int i = 0; i < nitems; i++) printf("  [%d] %s: %s\n", items[i].state, items[i].title_es, items[i].detail_es);

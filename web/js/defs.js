@@ -21,7 +21,7 @@
         if (!/^[A-Za-z0-9_-]{1,31}$/.test(id)) throw new Error(where + "id inválido");
         if (seen.has(id)) throw new Error(where + "id repetido: " + id);
         seen.add(id);
-        cur = { id, name: id, desc: "", name_en: null, desc_en: null, points: 10, conditions: 0 };
+        cur = { id, name: id, desc: "", name_en: null, desc_en: null, points: 10, tier: null, conditions: 0 };
         game.achievements.push(cur);
         continue;
       }
@@ -42,6 +42,11 @@
       else if (key === "name.en") cur.name_en = val;
       else if (key === "desc.en") cur.desc_en = val;
       else if (key === "when") cur.conditions++;
+      else if (key === "tier") {
+        const t = TIER_NAMES[val];
+        if (!t) throw new Error(where + "tier inválido (bronce, plata u oro)");
+        cur.tier = t;
+      }
       else if (key === "points") {
         const p = Number(val);
         if (!Number.isInteger(p) || p < 0 || p > 1000) throw new Error(where + "points inválido");
@@ -52,8 +57,27 @@
     if (!game.achievements.length) throw new Error("el archivo no define ningún logro");
     const empty = game.achievements.find((a) => a.conditions === 0);
     if (empty) throw new Error("el logro [" + empty.id + "] no tiene ninguna condición when");
+    for (const a of game.achievements) if (!a.tier) a.tier = tierFromPoints(a.points);
     return game;
   }
 
-  window.GreenyDefs = { parseDefinition };
+  // Igual que lg_ach_tier en common/engine.c.
+  const TIER_NAMES = { bronce: "bronce", bronze: "bronce", plata: "plata", silver: "plata", oro: "oro", gold: "oro" };
+  function tierFromPoints(p) { return p <= 10 ? "bronce" : p <= 25 ? "plata" : "oro"; }
+
+  // Devuelve el archivo con `tier = ...` puesto en el logro [id]; si ya tenia uno, lo cambia.
+  function setTier(text, id, tier) {
+    const lines = String(text).split(/\r?\n/);
+    const start = lines.findIndex((l) => { const t = l.trim(); return t.startsWith("[") && t.endsWith("]") && t.slice(1, -1).trim() === id; });
+    if (start < 0) throw new Error("el archivo no tiene el logro [" + id + "]");
+    let end = start + 1;
+    while (end < lines.length && !lines[end].trim().startsWith("[")) end++;
+    for (let i = start + 1; i < end; i++) {
+      if (/^\s*tier\s*=/.test(lines[i])) { lines[i] = "tier = " + tier; return lines.join("\n"); }
+    }
+    lines.splice(start + 1, 0, "tier = " + tier);
+    return lines.join("\n");
+  }
+
+  window.GreenyDefs = { parseDefinition, setTier, tierFromPoints };
 })();

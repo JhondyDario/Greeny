@@ -58,7 +58,7 @@ static int cmp_games(const void *a, const void *b) {
 
 void gr_scan(gr_model *m, const char *root) {
     m->ngames = m->total = m->unlocked = m->points = m->points_got = 0;
-    m->games_played = m->platinums = 0;
+    m->games_played = m->platinums = m->hidden = 0;
 
     char path[160];
     snprintf(path, sizeof(path), "%s/games", root);
@@ -89,6 +89,27 @@ void gr_scan(gr_model *m, const char *root) {
     }
     closedir(d);
     qsort(m->games, (size_t)m->ngames, sizeof(m->games[0]), cmp_games);
+}
+
+void gr_filter(gr_model *m, bool only_installed, int show, const char (*installed)[17], int ninstalled) {
+    int kept = 0;
+    for (int i = 0; i < m->ngames; i++) {
+        const gr_game_entry *e = &m->games[i];
+        bool keep = true;
+        if (!e->broken) { /* un archivo con error se ve siempre, para que se note */
+            bool done = e->total > 0 && e->unlocked == e->total;
+            if (show == 1 && done) keep = false;
+            if (show == 2 && !done) keep = false;
+            if (keep && ninstalled > 0) {
+                bool here = false;
+                for (int k = 0; k < ninstalled && !here; k++) here = !strcasecmp(installed[k], e->tid);
+                keep = here || (!only_installed && e->unlocked > 0);
+            }
+        }
+        if (keep) m->games[kept++] = *e;
+    }
+    m->hidden = m->ngames - kept;
+    m->ngames = kept;
 }
 
 bool gr_open(gr_model *m, int idx, const char *root) {

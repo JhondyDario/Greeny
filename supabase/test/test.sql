@@ -372,4 +372,16 @@ begin
     assert n = 0, 'consolas borradas en cascada';
 end $$;
 
+-- bronce, plata y oro
+do $$
+begin
+    assert (select tier from public.achievements where ach_id = 'monedas_5') = 'bronce', 'tier por defecto';
+    begin
+        update public.achievements set tier = 'diamante' where ach_id = 'monedas_5';
+        assert false, 'acepto un tier que no existe';
+    exception when check_violation then null;
+    end;
+    update public.achievements set tier = 'oro' where ach_id = 'monedas_5';
+end $$;
+
 select 'TODAS LAS PRUEBAS PASARON' as resultado;

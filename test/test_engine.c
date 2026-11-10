@@ -90,6 +90,15 @@ static void test_parse(void) {
     CHECK(!strcmp(g.version, "1.1.0"));
     CHECK(g.ach[0].points == 25 && g.ach[1].points == LG_DEFAULT_POINTS);
     CHECK(bad("[a]\npoints=1001\nwhen=main+0 u8 == 1\n", "points invalido"));
+    /* bronce, plata y oro: sale de los puntos si el archivo no lo dice */
+    CHECK(lg_ach_tier(&g.ach[0]) == LG_TIER_SILVER && lg_ach_tier(&g.ach[1]) == LG_TIER_BRONZE);
+    {
+        static lg_game t;
+        CHECK(parse(&t, "[a]\npoints=50\nwhen=main+0 u8 == 1\n[b]\npoints=50\ntier=bronce\nwhen=main+0 u8 == 1\n"
+                        "[c]\ntier = gold\nwhen=main+0 u8 == 1\n", err, sizeof(err)) == 0);
+        CHECK(lg_ach_tier(&t.ach[0]) == LG_TIER_GOLD && lg_ach_tier(&t.ach[1]) == LG_TIER_BRONZE && lg_ach_tier(&t.ach[2]) == LG_TIER_GOLD);
+    }
+    CHECK(bad("[a]\ntier=diamante\nwhen=main+0 u8 == 1\n", "tier invalido"));
     CHECK(!strcmp(g.ach[0].id, "monedas_100"));
     CHECK(!strcmp(g.ach[0].name, "Rico"));
     CHECK(!strcmp(g.ach[0].desc, "Junta 100 monedas"));
@@ -418,10 +427,11 @@ static void test_i18n_config(void) {
     CHECK(c2.animated_bg && !c2.intro_done && c2.start_page == GR_START_TROPHIES);
 
     /* valores fuera de rango no escriben basura */
-    gr_config bad_cfg = { 99, -4, 7, 2, true, true, true, false, 42 };
+    gr_config bad_cfg = { 99, -4, 7, 2, true, true, true, false, 42, 9, -1 };
     CHECK(gr_config_save(&bad_cfg, path) == 0);
     gr_config_load(&c2, path);
     CHECK(c2.lang == GR_LANG_AUTO && c2.theme == GR_THEME_AUTO && c2.games_view == GR_VIEW_LIST);
+    CHECK(c2.games_scope == GR_SCOPE_ACTIVE && c2.games_show == GR_SHOW_ALL);
 
     c.lang = GR_LANG_ES; c.sound = true; c.popup = false;
     CHECK(gr_config_save(&c, path) == 0);

@@ -49,6 +49,8 @@ typedef struct {
     bool     dbg_dirty;  /* cambio desde la ultima vez que se reporto */
 } lg_cond;
 
+typedef enum { LG_TIER_AUTO, LG_TIER_BRONZE, LG_TIER_SILVER, LG_TIER_GOLD } lg_tier;
+
 typedef struct {
     char     id[LG_ID_LEN];
     char     name[LG_NAME_LEN];
@@ -57,6 +59,7 @@ typedef struct {
     char     desc_en[LG_DESC_LEN];
     uint32_t hold_ms;
     uint16_t points;
+    uint8_t  tier;        /* lg_tier; LG_TIER_AUTO = sale de los puntos */
     uint8_t  ncond;
     bool     unlocked;
     uint64_t unlocked_at; /* timestamp unix del desbloqueo; 0 = desconocido */
@@ -115,6 +118,8 @@ lg_ach *lg_find(lg_game *g, const char *id);
 
 /* Nombre/descripcion en ingles si existe la traduccion; si no, el texto base. */
 const char *lg_ach_name(const lg_ach *a, bool english);
+/* Bronce, plata u oro. Si el archivo no trae `tier`, sale de los puntos: hasta 10 bronce, hasta 25 plata, mas es oro. */
+lg_tier lg_ach_tier(const lg_ach *a);
 const char *lg_ach_desc(const lg_ach *a, bool english);
 
 /* Ejecuta una busqueda. Llena `hits` (hasta max_hits) y devuelve el total de

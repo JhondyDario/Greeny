@@ -28,6 +28,7 @@ build   = 0123456789ABCDEF
 #
 # Varios when = se tienen que cumplir TODOS a la vez.
 # points = puntos que da el logro (por defecto 10).
+# tier   = bronce, plata u oro. Si falta, sale de los puntos (hasta 10, hasta 25, mas).
 # name.en / desc.en = traduccion al ingles (opcional).
 # hold = milisegundos seguidos que debe cumplirse (por defecto 500).
 # ---------------------------------------------------------------------------

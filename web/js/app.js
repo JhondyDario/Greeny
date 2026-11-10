@@ -96,6 +96,27 @@
     return res.data;
   }
 
+  // Bronce, plata u oro con los puntos. Con la base de datos vieja no hay tier: sale de los puntos.
+  const TIER_LABEL = { bronce: "Bronce", plata: "Plata", oro: "Oro" };
+  function tierOf(a) { return TIER_LABEL[a.tier] ? a.tier : window.GreenyDefs.tierFromPoints(a.points); }
+  function ptsPill(a) {
+    const t = tierOf(a);
+    return h("span", { class: "pill tier-" + t }, TIER_LABEL[t] + " · " + a.points + " pts");
+  }
+
+  function copyButton(text) {
+    return h("button", { type: "button", class: "btn alt small", style: "vertical-align:middle", onclick: async (ev) => {
+      const b = ev.currentTarget;
+      try { await navigator.clipboard.writeText(text); }
+      catch (e) { // sin permiso de portapapeles: se copia con un campo temporal
+        const t = h("textarea", { style: "position:fixed;opacity:0" }, text);
+        document.body.append(t); t.select(); document.execCommand("copy"); t.remove();
+      }
+      b.textContent = "Copiado";
+      setTimeout(() => { b.textContent = "Copiar"; }, 1500);
+    } }, "Copiar");
+  }
+
   function avatar(p, size) {
     const el = h("span", { class: "avatar " + (size || ""), "aria-hidden": "true" });
     if (p && p.avatar_url) el.append(h("img", { src: p.avatar_url, alt: "", loading: "lazy", referrerpolicy: "no-referrer" }));
@@ -220,7 +241,7 @@
     const [players, unlocks, games, recent] = await Promise.all([
       count("profiles"), count("unlocks"), count("games"),
       sb.from("unlocks")
-        .select("unlocked_at,title_id,ach_id,profiles(username,display_name,avatar_url),achievements(name_es,points,icon_path,games(name))")
+        .select("unlocked_at,title_id,ach_id,profiles(username,display_name,avatar_url),achievements(*,games(name))")
         .order("unlocked_at", { ascending: false }).limit(10),
     ]);
 
@@ -244,7 +265,7 @@
       h("div", { class: "card row" },
         achIcon(u.achievements, true),
         h("div", { class: "grow" },
-          h("div", { class: "clip" }, h("strong", {}, u.achievements.name_es), " ", h("span", { class: "pill pts" }, u.achievements.points + " pts")),
+          h("div", { class: "clip" }, h("strong", {}, u.achievements.name_es), " ", ptsPill(u.achievements)),
           h("div", { class: "muted small clip" },
             h("a", { href: "#/u/" + encodeURIComponent(u.profiles.username) }, shownName(u.profiles)),
             " en ", h("a", { href: "#/juego/" + u.title_id }, (u.achievements.games && u.achievements.games.name) || u.title_id))),
@@ -334,7 +355,7 @@
         return h("div", { class: "card row" + (session && !done ? " locked" : "") },
           achIcon(a, done),
           h("div", { class: "grow" },
-            h("div", {}, h("strong", { class: "ach-name" }, a.name_es), " ", h("span", { class: "pill pts" }, a.points + " pts")),
+            h("div", {}, h("strong", { class: "ach-name" }, a.name_es), " ", ptsPill(a)),
             h("div", { class: "muted small" }, a.desc_es || "Sin descripción")),
           h("div", { class: "right small" },
             session ? h("div", {}, done ? h("span", { class: "pill ok" }, "Desbloqueado") : h("span", { class: "pill no" }, "Bloqueado")) : null,
@@ -352,7 +373,7 @@
 
     const [statRes, unlockRes] = await Promise.all([
       sb.from("profile_stats").select("*").eq("id", profile.id).maybeSingle(),
-      sb.from("unlocks").select("title_id,ach_id,unlocked_at,achievements(name_es,points,icon_path)")
+      sb.from("unlocks").select("title_id,ach_id,unlocked_at,achievements(*)")
         .eq("user_id", profile.id).order("unlocked_at", { ascending: false }),
     ]);
     // platinums, followers y following solo existen con el esquema nuevo de la base de datos
@@ -399,7 +420,7 @@
           h("h1", { style: "margin-bottom:2px" }, shownName(profile)),
           h("div", { class: "muted" }, "@" + profile.username, profile.discord_username ? " · Discord: " + profile.discord_username : ""),
           profile.caption ? h("p", { style: "margin:8px 0 0;font-size:1.1rem" }, "“" + profile.caption + "”") : null,
-          profile.friend_code ? h("div", { class: "small", style: "margin-top:8px" }, "Código de amigo: ", h("code", {}, profile.friend_code)) : null,
+          profile.friend_code ? h("div", { class: "small", style: "margin-top:8px" }, "Código de amigo: ", h("code", {}, profile.friend_code), " ", copyButton(profile.friend_code)) : null,
           h("div", { class: "muted small", style: "margin-top:6px" }, "En Greeny desde " + fmtDate(profile.created_at))),
         isMe ? h("a", { class: "btn alt", href: "#/cuenta" }, "Editar") : followBtn),
       h("section", { class: "card level", style: "margin-top:14px" },
@@ -444,7 +465,7 @@
         ? h("div", { class: "stack" }, unlocks.slice(0, 12).map((u) =>
             h("div", { class: "card row" }, achIcon(u.achievements, true),
               h("div", { class: "grow" },
-                h("div", { class: "clip" }, h("strong", {}, u.achievements.name_es), " ", h("span", { class: "pill pts" }, u.achievements.points + " pts")),
+                h("div", { class: "clip" }, h("strong", {}, u.achievements.name_es), " ", ptsPill(u.achievements)),
                 h("div", { class: "muted small clip" }, (games[u.title_id] || {}).name || u.title_id)),
               h("span", { class: "muted small nowrap" }, fmtDate(u.unlocked_at)))))
         : null,
@@ -663,8 +684,9 @@
       h("div", { class: "card stack" },
         me.friend_code
           ? h("p", { style: "margin:0" }, "Tu código: ", h("code", { style: "font-size:1.15rem" }, me.friend_code), " ",
+              copyButton(me.friend_code), " ",
               h("span", { class: "muted small" }, "Compártelo para que te sigan."))
-          : h("p", { class: "muted", style: "margin:0" }, "Tu código aparecerá aquí cuando se actualice la base de datos."),
+          : h("p", { class: "muted", style: "margin:0" }, "Tu código aparecerá aquí cuando se actualice la base de datos (falta volver a correr schema.sql en Supabase)."),
         form([
           h("label", {}, "Seguir a alguien con su código", h("span", { class: "hint" }, "6 números. El GR y el guion son opcionales."),
             h("input", { name: "friend_code", required: true, inputmode: "numeric", autocomplete: "off", placeholder: "GR-000000", maxlength: 12, style: "max-width:200px" })),
@@ -726,7 +748,7 @@
       }));
       // upsert: no toca icon_path de los logros que ya existian
       must(await sb.from("achievements").upsert(def.achievements.map((a, i) => ({
-        title_id: tid, ach_id: a.id, name_es: a.name, desc_es: a.desc, name_en: a.name_en, desc_en: a.desc_en, points: a.points, sort: i,
+        title_id: tid, ach_id: a.id, name_es: a.name, desc_es: a.desc, name_en: a.name_en, desc_en: a.desc_en, points: a.points, tier: a.tier, sort: i,
       }))));
       setTimeout(render, 2000);
       return "Publicado: " + (def.name || tid) + " con " + def.achievements.length + " logros." +
@@ -748,18 +770,26 @@
       await up.cleanup();
     }
 
+    async function setTier(tid, achId, tier) {
+      const g = must(await sb.from("games").select("definition").eq("title_id", tid).single());
+      const text = window.GreenyDefs.setTier(g.definition, achId, tier);
+      window.GreenyDefs.parseDefinition(text); // si quedara mal, que falle antes de guardar
+      must(await sb.from("achievements").update({ tier }).eq("title_id", tid).eq("ach_id", achId));
+      must(await sb.from("games").update({ definition: text }).eq("title_id", tid));
+    }
+
     // Lista de logros del juego elegido: asi se sabe como nombrar cada icono.
     const achList = h("div", { class: "ach-list", "aria-live": "polite" });
     async function showAchievements(tid) {
       if (!tid) { achList.replaceChildren(); return; }
       achList.replaceChildren(h("p", { class: "muted small" }, "Cargando logros…"));
-      const rows = (await sb.from("achievements").select("ach_id,name_es,icon_path").eq("title_id", tid).order("sort")).data || [];
+      const rows = (await sb.from("achievements").select("*").eq("title_id", tid).order("sort")).data || [];
       const missing = rows.filter((a) => !a.icon_path).length;
       achList.replaceChildren(
         h("p", { class: "small", style: "margin:0 0 6px" },
           h("strong", {}, rows.length + " logros"), missing ? " · faltan " + missing + " iconos" : " · todos tienen icono"),
         h("table", {},
-          h("thead", {}, h("tr", {}, h("th", {}, ""), h("th", {}, "Nombre del archivo"), h("th", {}, "Logro"), h("th", {}, "Icono"), h("th", {}, ""))),
+          h("thead", {}, h("tr", {}, h("th", {}, ""), h("th", {}, "Nombre del archivo"), h("th", {}, "Logro"), h("th", {}, "Dificultad"), h("th", {}, "Icono"), h("th", {}, ""))),
           h("tbody", {}, rows.map((a) => {
             // boton para poner o cambiar el icono de este logro, sin importar como se llame el archivo
             const input = h("input", { type: "file", accept: "image/*", hidden: true, "aria-label": "Icono de " + a.name_es });
@@ -771,10 +801,19 @@
               try { await setIcon(tid, a.ach_id, input.files[0], a.icon_path); await showAchievements(tid); }
               catch (err) { alert(explain(err)); btn.disabled = false; btn.textContent = a.icon_path ? "Cambiar" : "Subir"; }
             });
+            // bronce, plata u oro: se guarda en el logro y en el archivo, para que la consola lo vuelva a bajar
+            const tierSel = h("select", { "aria-label": "Dificultad de " + a.name_es, class: "tier-select tier-" + tierOf(a) },
+              Object.keys(TIER_LABEL).map((t) => h("option", { value: t, selected: t === tierOf(a) ? "" : null }, TIER_LABEL[t])));
+            tierSel.addEventListener("change", async () => {
+              tierSel.disabled = true;
+              try { await setTier(tid, a.ach_id, tierSel.value); await showAchievements(tid); }
+              catch (err) { alert(explain(err)); tierSel.disabled = false; tierSel.value = tierOf(a); }
+            });
             return h("tr", {},
               h("td", {}, achIcon(a, false)),
               h("td", {}, h("code", {}, a.ach_id + ".png")),
               h("td", {}, a.name_es),
+              h("td", {}, tierSel),
               h("td", {}, a.icon_path ? h("span", { class: "pill ok" }, "Subido") : h("span", { class: "pill no" }, "Falta")),
               h("td", {}, btn, input));
           }))));
@@ -907,7 +946,7 @@
       h("p", { class: "muted" }, "Publicar de nuevo un juego actualiza sus textos y puntos. No borra logros que ya no estén en el archivo, porque eso borraría el progreso de la gente."),
       h("h2", {}, "1. Juego y logros"), h("div", { class: "card" }, publish),
       h("h2", {}, "2. Datos del juego"), h("div", { class: "card" }, games.length ? infoForm : h("p", { class: "muted", style: "margin:0" }, "Primero publica un juego.")),
-      h("h2", {}, "3. Iconos de logros"), h("div", { class: "card" }, icons),
+      h("h2", {}, "3. Logros: dificultad e iconos"), h("div", { class: "card" }, icons),
       h("h2", {}, "4. Carátula"), h("div", { class: "card" }, coverForm),
       h("h2", {}, "Frases sugeridas del perfil"),
       h("p", { class: "muted" }, "Son las que salen en el desplegable de Cuenta. Tu propia frase la cambias en Cuenta → Perfil."),
