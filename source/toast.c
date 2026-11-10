@@ -8,7 +8,6 @@
 #include <string.h>
 #include <switch.h>
 
-#include "font.h"
 
 #define FB_W 448
 #define FB_H 128
@@ -20,11 +19,13 @@
 
 #define SHOW_MS 5000
 #define QUEUE_LEN 4
-#define LINE_CHARS 26
 
 extern u64 __nx_vi_layer_id;
 
 typedef struct {
+    toast_kind kind;
+    int tier, points;
+    bool dark;
     char title[32];
     char name[64];
     char desc[128];
@@ -141,72 +142,20 @@ static void fill(int x0, int y0, int w, int h, u16 c) {
             put_px(x, y, c);
 }
 
-/* UTF-8 -> Latin-1 (lo que cubre la fuente). Devuelve cuantos caracteres escribio. */
-static int to_latin1(const char *s, u8 *out, int cap) {
-    int n = 0;
-    const u8 *p = (const u8 *)s;
-    while (*p && n < cap) {
-        u32 cp;
-        if (*p < 0x80) cp = *p++;
-        else if ((*p & 0xE0) == 0xC0 && (p[1] & 0xC0) == 0x80) { cp = ((*p & 0x1Fu) << 6) | (p[1] & 0x3Fu); p += 2; }
-        else {
-            /* fuera de Latin-1: saltar la secuencia completa */
-            p++;
-            while ((*p & 0xC0) == 0x80) p++;
-            cp = '?';
-        }
-        out[n++] = cp < 256 ? (u8)cp : '?';
-    }
-    return n;
-}
-
-/* texto a doble tamaño (16x16 por caracter) */
-static void draw_chars(int x, int y, const u8 *s, int n, u16 c) {
-    for (int i = 0; i < n; i++) {
-        const unsigned char *gl = lg_font[s[i]];
-        for (int row = 0; row < 8; row++)
-            for (int col = 0; col < 8; col++)
-                if (gl[row] & (1 << col))
-                    fill(x + i * 16 + col * 2, y + row * 2, 2, 2, c);
-    }
-}
-
-/* Dibuja hasta `max_lines` lineas cortando por palabras. */
-static void draw_wrapped(int x, int y, const char *text, int max_lines, u16 c) {
-    u8 buf[128];
-    int n = to_latin1(text, buf, sizeof(buf));
-    int pos = 0;
-    for (int line = 0; line < max_lines && pos < n; line++) {
-        while (pos < n && buf[pos] == ' ') pos++;
-        int len = n - pos;
-        if (len > LINE_CHARS) {
-            len = LINE_CHARS;
-            if (line < max_lines - 1) {
-                int cut = len;
-                while (cut > 0 && buf[pos + cut] != ' ') cut--;
-                if (cut > 0) len = cut;
-            } else {
-                buf[pos + len - 1] = '.';
-                buf[pos + len - 2] = '.';
-            }
-        }
-        draw_chars(x, y + line * 20, buf + pos, len, c);
-        pos += len;
-    }
+/* toast_draw entrega 8 bits por componente; la capa usa 4 */
+static void put_rgba8(int x, int y, unsigned r, unsigned g, unsigned b, unsigned a) {
+    put_px(x, y, rgba4((u8)(r >> 4), (u8)(g >> 4), (u8)(b >> 4), (u8)(a >> 4)));
 }
 
 static void present(const toast_msg *m) {
     g_px = (u16 *)framebufferBegin(&g_fb, NULL);
     if (!g_px) return;
 
-    fill(0, 0, FB_W, FB_H, 0); /* transparente */
     if (m) {
-        const u16 bg = rgba4(1, 1, 2, 14), gold = rgba4(15, 12, 2, 15);
-        fill(0, 0, FB_W, FB_H, bg);
-        fill(0, 0, 6, FB_H, gold);
-        draw_wrapped(18, 12, m->title, 1, gold);
-        draw_wrapped(18, 40, m->name, 1, rgba4(15, 15, 15, 15));
-        draw_wrapped(18, 68, m->desc, 2, rgba4(11, 11, 12, 15));
+        toast_view v = { m->kind, m->tier, m->points, m->dark, m->title, m->name, m->desc };
+        toast_draw(&v, put_rgba8);
+    } else {
+        fill(0, 0, FB_W, FB_H, 0); /* transparente */
     }
 
     eventWait(&g_vsync, 100000000ull);
@@ -226,9 +175,13 @@ static void copy_trunc(char *dst, size_t cap, const char *src) {
     dst[n] = 0;
 }
 
-void toast_push(const char *title, const char *name, const char *desc) {
+void toast_push(toast_kind kind, int tier, int points, bool dark, const char *title, const char *name, const char *desc) {
     if (g_failed || g_count >= QUEUE_LEN) return;
     toast_msg *m = &g_queue[(g_head + g_count) % QUEUE_LEN];
+    m->kind = kind;
+    m->tier = tier;
+    m->points = points;
+    m->dark = dark;
     copy_trunc(m->title, sizeof(m->title), title);
     copy_trunc(m->name, sizeof(m->name), name);
     copy_trunc(m->desc, sizeof(m->desc), desc);

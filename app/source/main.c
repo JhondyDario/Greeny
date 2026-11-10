@@ -50,7 +50,7 @@
 
 typedef enum {
     SCREEN_HOME, SCREEN_DETAIL, SCREEN_SETTINGS, SCREEN_DIAG, SCREEN_ABOUT, SCREEN_INTRO, SCREEN_LINK, SCREEN_MSG,
-    SCREEN_PROFILE, SCREEN_BADGES
+    SCREEN_PROFILE, SCREEN_BADGES, SCREEN_ACH
 } screen_t;
 
 static gr_model g_model;
@@ -759,7 +759,7 @@ int main(int argc, char *argv[]) {
         } else if (screen == SCREEN_DETAIL) {
             ui_layout l = ui_detail_layout(&g_config);
             int n = g_model.games[cursor].broken ? 0 : g_model.cur.nach;
-            if (tap_item >= 0 && tap_item < n && dcursor != tap_item) { dcursor = tap_item; dirty = true; sfx_play(SFX_NAV); }
+            TAP_SELECT(dcursor, n);
             if (n > 0) moved = move_cursor(&dcursor, n, l.cols, nav);
             if ((down & HidNpadButton_Minus) && n > 0) {
                 g_config.ach_view = (g_config.ach_view + 1) % GR_VIEW_COUNT;
@@ -769,7 +769,18 @@ int main(int argc, char *argv[]) {
                 accepted_alt = true;
             }
             follow(dcursor, &dtop, l);
+            if ((down & HidNpadButton_A) && n > 0) { screen = SCREEN_ACH; opened = true; }
             if (down & HidNpadButton_B) { screen = SCREEN_HOME; back = true; }
+        } else if (screen == SCREEN_ACH) {
+            int n = g_model.cur.nach, step = 0;
+            if (down & (HidNpadButton_R | HidNpadButton_AnyRight)) step = 1;
+            if (down & (HidNpadButton_L | HidNpadButton_AnyLeft)) step = -1;
+            if (step && dcursor + step >= 0 && dcursor + step < n) { dcursor += step; moved = true; }
+            if (down & HidNpadButton_B) {
+                follow(dcursor, &dtop, ui_detail_layout(&g_config));
+                screen = SCREEN_DETAIL;
+                back = true;
+            }
         } else if (screen == SCREEN_SETTINGS) {
             bool linked = g_account.linked;
             if (tap_tab >= 0 && tap_tab < UI_TABS && tap_tab != stab) { stab = tap_tab; srow = 0; accepted_alt = true; }
@@ -914,7 +925,7 @@ int main(int argc, char *argv[]) {
         else if (moved) sfx_play(SFX_NAV);
         if (moved || accepted || accepted_alt || opened || back) dirty = true;
         if (sync_collect()) dirty = true;
-        if (icons_collect(screen == SCREEN_DETAIL ? g_model.games[cursor].tid : NULL)) {
+        if (icons_collect(screen == SCREEN_DETAIL || screen == SCREEN_ACH ? g_model.games[cursor].tid : NULL)) {
             load_icons(g_model.games[cursor].tid);
             dirty = true;
         }
@@ -925,6 +936,7 @@ int main(int argc, char *argv[]) {
         bool redraw = dirty;
         if (dirty) {
             if (screen == SCREEN_DETAIL) ui_detail(&layer, &g_assets, &g_model, &g_config, cursor, dcursor, dtop);
+            else if (screen == SCREEN_ACH) ui_achievement(&layer, &g_assets, &g_model, cursor, dcursor);
             else if (screen == SCREEN_SETTINGS) {
                 ui_account acc = { .linked = g_account.linked, .username = g_account.username, .caption = g_account.caption };
                 sync_text(&acc.sync_es, &acc.sync_en);

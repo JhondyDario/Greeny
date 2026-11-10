@@ -13,7 +13,7 @@
 #define UI_COVER_BIG  150  /* caratula en la cuadricula */
 
 #define UI_APP_NAME    "Greeny"
-#define UI_APP_VERSION "0.0.10"
+#define UI_APP_VERSION "0.0.11"
 
 /* opciones, agrupadas en pestañas que se cambian con L y R */
 enum {
@@ -98,6 +98,8 @@ void ui_background(gfx_canvas *c, float t);
  * `top` es la primera fila visible (en filas, no en elementos). */
 void ui_home(gfx_canvas *c, const ui_assets *a, const gr_model *m, const gr_config *cfg, int cursor, int top);
 void ui_detail(gfx_canvas *c, const ui_assets *a, const gr_model *m, const gr_config *cfg, int game, int cursor, int top);
+/* Un logro al detalle: imagen grande, puntos, dificultad y fecha. */
+void ui_achievement(gfx_canvas *c, const ui_assets *a, const gr_model *m, int game, int index);
 void ui_settings(gfx_canvas *c, const ui_assets *a, const gr_config *cfg, int tab, int row, bool system_spanish,
                  bool system_dark, const ui_account *acc);
 /* Codigo de vinculacion en grande, con las instrucciones. */

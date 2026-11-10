@@ -45,6 +45,8 @@ void __libnx_init_time(void);
 static bool g_has_time;
 static bool g_system_spanish = true;
 static gr_config g_config;
+/* El aviso sale oscuro solo si el tema oscuro esta elegido a mano: el sysmodule no consulta el tema de la consola. */
+#define g_cfg_dark (g_config.theme == GR_THEME_DARK)
 
 static bool use_english(void) {
     if (g_config.lang == GR_LANG_EN) return true;
@@ -231,7 +233,7 @@ static defs_result load_defs(u64 tid) {
 static void warn_disabled(const char *reason_es, const char *reason_en) {
     if (!g_config.popup) return;
     bool en = use_english();
-    toast_push(en ? "ACHIEVEMENTS OFF" : "LOGROS DESACTIVADOS", g_game.game[0] ? g_game.game : "Greeny",
+    toast_push(TOAST_WARN, 0, -1, g_cfg_dark, en ? "ACHIEVEMENTS OFF" : "LOGROS DESACTIVADOS", g_game.game[0] ? g_game.game : "Greeny",
                en ? reason_en : reason_es);
 }
 
@@ -364,7 +366,7 @@ int main(int argc, char *argv[]) {
                     snprintf(msg, sizeof(msg), en ? "%d of %d unlocked" : "%d de %d desbloqueados", count_unlocked(),
                              g_game.nach);
                     if (g_config.popup)
-                        toast_push(en ? "ACHIEVEMENTS ON" : "LOGROS ACTIVOS", g_game.game[0] ? g_game.game : "Greeny", msg);
+                        toast_push(TOAST_INFO, 0, -1, g_cfg_dark, en ? "ACHIEVEMENTS ON" : "LOGROS ACTIVOS", g_game.game[0] ? g_game.game : "Greeny", msg);
                     if (g_config.sound) sound_play(SOUND_LOADED);
                     log_line("%016lX: %d logros cargados, %s", cur_tid, g_game.nach, msg);
                 } else if (r == ATTACH_RETRY) {
@@ -385,7 +387,7 @@ int main(int argc, char *argv[]) {
                 log_line("%016lX: LOGRO %s (%s)", cur_tid, a->id, a->name);
                 bool en = use_english();
                 if (g_config.popup)
-                    toast_push(en ? "ACHIEVEMENT UNLOCKED" : "LOGRO DESBLOQUEADO", lg_ach_name(a, en), lg_ach_desc(a, en));
+                    toast_push(TOAST_UNLOCK, (int)lg_ach_tier(a), a->points, g_cfg_dark, en ? "ACHIEVEMENT UNLOCKED" : "LOGRO DESBLOQUEADO", lg_ach_name(a, en), lg_ach_desc(a, en));
                 if (g_config.sound) sound_play(SOUND_UNLOCK);
             }
             if (g_game.debug) debug_report(cur_tid);

@@ -207,3 +207,7 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fo
 .tier-select.tier-bronce { background: #b56a2c; color: #fff; }
 .tier-select.tier-plata { background: #b4bcc6; color: #1e2a1f; }
 .tier-select.tier-oro { background: var(--yellow); color: var(--on-yellow); }
+.icon.tier-bronce { border-color: #b56a2c; }
+.icon.tier-plata { border-color: #b4bcc6; }
+.icon.tier-oro { border-color: var(--yellow); }
+.locked .icon.tier-bronce, .locked .icon.tier-plata, .locked .icon.tier-oro { border-color: var(--line); }

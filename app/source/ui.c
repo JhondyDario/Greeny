@@ -436,15 +436,16 @@ static void unlock_date(const lg_ach *ac, char *buf, size_t cap) {
 }
 
 /* etiquetas de estado y puntos, alineadas a la derecha */
-static void status_pills(gfx_canvas *c, int right, int y, const lg_ach *ac, bool compact) {
+static void status_pills(gfx_canvas *c, int right, int y, const lg_ach *ac) {
     char buf[24];
     int w = ac->unlocked ? pill(c, right, y, C_GREEN, C_WHITE, T("DESBLOQUEADO", "UNLOCKED"))
                          : pill(c, right, y, C_RED, C_WHITE, T("BLOQUEADO", "LOCKED"));
-    if (compact) snprintf(buf, sizeof(buf), "%u pts", ac->points); /* en la cuadricula no cabe el nombre: queda el color */
-    else snprintf(buf, sizeof(buf), "%s · %u", tier_name(ac), ac->points);
-    pill(c, right - w - 10, y, tier_bg(ac), lg_ach_tier(ac) == LG_TIER_BRONZE ? C_WHITE : C_ON_YELLOW, buf);
+    snprintf(buf, sizeof(buf), "%u pts", ac->points);
+    pill(c, right - w - 10, y, C_YELLOW, C_ON_YELLOW, buf);
 }
 
+/* La lista solo trae lo esencial: estado, titulo, puntos y como se consigue.
+ * La fecha y la dificultad con nombre salen al abrir el logro (ui_achievement). */
 static void detail_list(gfx_canvas *c, const ui_assets *a, const lg_game *gm, int cursor, int top, int rows) {
     const int x = MARGIN, w = CONTENT_W - 24, h = 82;
     for (int i = top; i < gm->nach && i < top + rows; i++) {
@@ -458,13 +459,7 @@ static void detail_list(gfx_canvas *c, const ui_assets *a, const lg_game *gm, in
         const char *desc = lg_ach_desc(ac, g_en);
         gfx_text_fit(c, tx, y + 11, 26, ac->unlocked ? P->ink : P->gray, lg_ach_name(ac, g_en), tw);
         gfx_text_fit(c, tx, y + 46, 20, P->gray, desc[0] ? desc : T("Sin descripción", "No description"), tw);
-
-        int right = x + w - 24;
-        status_pills(c, right, y + 12, ac, false);
-        char buf[48];
-        if (ac->unlocked) unlock_date(ac, buf, sizeof(buf));
-        else snprintf(buf, sizeof(buf), "%s", T("Aún no lo tienes", "Not earned yet"));
-        gfx_text_right(c, right, y + 48, 18, P->gray, buf);
+        status_pills(c, x + w - 24, y + 27, ac);
     }
     scrollbar(c, 116, rows * (h + 8) - 8, top, rows, gm->nach);
 }
@@ -480,15 +475,111 @@ static void detail_grid(gfx_canvas *c, const ui_assets *a, const lg_game *gm, in
 
         const char *desc = lg_ach_desc(ac, g_en);
         gfx_text_fit(c, x + 92, y + 14, 23, ac->unlocked ? P->ink : P->gray, lg_ach_name(ac, g_en), w - 92 - 14);
-        status_pills(c, x + w - 14, y + 46, ac, true);
-        text_2lines(c, x + 18, y + 84, 18, P->gray, desc[0] ? desc : T("Sin descripción", "No description"), w - 36, 23);
-
-        char buf[48];
-        if (ac->unlocked) unlock_date(ac, buf, sizeof(buf));
-        else snprintf(buf, sizeof(buf), "%s", T("Aún no lo tienes", "Not earned yet"));
-        gfx_text(c, x + 18, y + 138, 16, P->gray, buf);
+        status_pills(c, x + w - 14, y + 46, ac);
+        text_2lines(c, x + 18, y + 92, 19, P->gray, desc[0] ? desc : T("Sin descripción", "No description"), w - 36, 26);
     }
     scrollbar(c, 116, l.rows * (h + gy) - gy, top, l.rows, (gm->nach + l.cols - 1) / l.cols);
+}
+
+/* ---------- un logro al detalle ---------- */
+
+/* Amplia un icono de GR_ICON_SIZE al doble, suavizando entre pixeles. */
+static void icon_double(const uint8_t *src, uint8_t *dst) {
+    const int s = GR_ICON_SIZE, d = s * 2;
+    for (int y = 0; y < d; y++) {
+        int fy = y * 2 > 1 ? (y * 2 - 1) : 0; /* posicion en cuartos de pixel de origen */
+        int y0 = fy / 4, wy = fy % 4, y1 = y0 + 1 < s ? y0 + 1 : y0;
+        for (int x = 0; x < d; x++) {
+            int fx = x * 2 > 1 ? (x * 2 - 1) : 0;
+            int x0 = fx / 4, wx = fx % 4, x1 = x0 + 1 < s ? x0 + 1 : x0;
+            for (int k = 0; k < 4; k++) {
+                int p00 = src[(y0 * s + x0) * 4 + k], p01 = src[(y0 * s + x1) * 4 + k];
+                int p10 = src[(y1 * s + x0) * 4 + k], p11 = src[(y1 * s + x1) * 4 + k];
+                int topv = p00 * (4 - wx) + p01 * wx, bot = p10 * (4 - wx) + p11 * wx;
+                dst[(y * d + x) * 4 + k] = (uint8_t)((topv * (4 - wy) + bot * wy + 8) / 16);
+            }
+        }
+    }
+}
+
+static int fact(gfx_canvas *c, int x, int y, const char *label, const char *value, gfx_color col) {
+    gfx_text(c, x, y, 19, P->gray, label);
+    gfx_text(c, x, y + 26, 27, col, value);
+    return y + 74;
+}
+
+void ui_achievement(gfx_canvas *c, const ui_assets *a, const gr_model *m, int game, int index) {
+    const gr_game_entry *g = &m->games[game];
+    const lg_ach *ac = &m->cur.ach[index];
+    begin(c);
+    char sub[96];
+    snprintf(sub, sizeof(sub), T("Logro %d de %d", "Achievement %d of %d"), index + 1, m->cur.nach);
+    header(c, a, a->covers[game], g->name, sub);
+
+    const int x = MARGIN, y = 150, w = CONTENT_W, h = 400;
+    card(c, x, y, w, h, false);
+
+    /* imagen grande con el marco de su dificultad */
+    const int big = GR_ICON_SIZE * 2, ix = x + 44, iy = y + 44;
+    const uint8_t *img = ac->unlocked ? a->ach_icons[index] : a->ach_icons_gray[index];
+    gfx_color frame = ac->unlocked ? tier_bg(ac) : P->gray_lt;
+    gfx_round_rect(c, ix - 9, iy - 9, big + 18, big + 18, 28, P->shadow);
+    gfx_round_rect(c, ix - 8, iy - 8, big + 16, big + 16, 27, frame);
+    if (img) {
+        static uint8_t zoom[GR_ICON_SIZE * 2 * GR_ICON_SIZE * 2 * 4];
+        icon_double(img, zoom);
+        gfx_round_corners(zoom, big, big, 20);
+        gfx_image(c, ix, iy, zoom, big, big);
+    } else {
+        gfx_round_rect(c, ix, iy, big, big, 20, P->card);
+        int cx = ix + big / 2, cy = iy + big / 2;
+        if (ac->unlocked) {
+            gfx_circle(c, cx, cy, 44, C_GREEN);
+            gfx_line(c, cx - 20, cy + 2, cx - 6, cy + 16, 9, C_WHITE);
+            gfx_line(c, cx - 6, cy + 16, cx + 20, cy - 14, 9, C_WHITE);
+        } else {
+            gfx_circle(c, cx, cy, 44, P->gray_lt);
+            gfx_circle(c, cx, cy - 10, 15, P->gray);
+            gfx_circle(c, cx, cy - 10, 8, P->gray_lt);
+            gfx_round_rect(c, cx - 20, cy - 6, 40, 30, 6, P->gray);
+        }
+    }
+    if (ac->unlocked) pill(c, ix + big / 2 + 78, iy + big + 28, C_GREEN, C_WHITE, T("DESBLOQUEADO", "UNLOCKED"));
+    else pill(c, ix + big / 2 + 62, iy + big + 28, C_RED, C_WHITE, T("BLOQUEADO", "LOCKED"));
+
+    /* titulo y como se consigue */
+    const int tx = x + 44 + big + 52, tw = w - (tx - x) - 44;
+    const char *desc = lg_ach_desc(ac, g_en);
+    gfx_text_fit(c, tx, y + 34, 40, P->ink, lg_ach_name(ac, g_en), tw);
+    gfx_text(c, tx, y + 96, 19, P->gray, T("Cómo se consigue", "How to get it"));
+    text_2lines(c, tx, y + 122, 25, P->ink, desc[0] ? desc : T("Sin descripción", "No description"), tw, 34);
+
+    /* datos */
+    char buf[64];
+    int fy = y + 218;
+    snprintf(buf, sizeof(buf), T("%u puntos", "%u points"), ac->points);
+    fact(c, tx, fy, T("Puntos", "Points"), buf, P->points);
+
+    gfx_text(c, tx + 300, fy, 19, P->gray, T("Dificultad", "Difficulty"));
+    gfx_circle(c, tx + 300 + 14, fy + 44, 14, P->shadow);
+    gfx_circle(c, tx + 300 + 14, fy + 44, 13, tier_bg(ac));
+    gfx_text(c, tx + 300 + 38, fy + 26, 27, P->ink, tier_name(ac));
+
+    fy += 84;
+    if (ac->unlocked) {
+        unlock_date(ac, buf, sizeof(buf));
+        fact(c, tx, fy, T("Lo conseguiste el", "Earned on"), buf[0] ? buf : T("Fecha sin registrar", "Date not recorded"), P->ink);
+    } else {
+        fact(c, tx, fy, T("Estado", "Status"), T("Aún no lo tienes", "Not earned yet"), P->gray);
+    }
+
+    footer_bar(c);
+    int hx = hint(c, MARGIN, "B", T("Volver", "Back"));
+    if (m->cur.nach > 1) {
+        hx = hint(c, hx, "L", T("Anterior", "Previous"));
+        hx = hint(c, hx, "R", T("Siguiente", "Next"));
+    }
+    hint(c, hx, "+", T("Salir", "Exit"));
 }
 
 void ui_detail(gfx_canvas *c, const ui_assets *a, const gr_model *m, const gr_config *cfg, int game, int cursor, int top) {
@@ -518,7 +609,9 @@ void ui_detail(gfx_canvas *c, const ui_assets *a, const gr_model *m, const gr_co
     }
 
     footer_bar(c);
-    int hx = hint(c, MARGIN, "B", T("Volver", "Back"));
+    int hx = MARGIN;
+    if (!g->broken && m->cur.nach > 0) hx = hint(c, hx, "A", T("Ver detalle", "View details"));
+    hx = hint(c, hx, "B", T("Volver", "Back"));
     if (!g->broken) hx = hint(c, hx, "−", cfg->ach_view == GR_VIEW_GRID ? T("Lista", "List") : T("Cuadrícula", "Grid"));
     hint(c, hx, "+", T("Salir", "Exit"));
 }

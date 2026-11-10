@@ -17,3 +17,4 @@ app/data/sysmodule.bin
 app/data/snd_cargado.bin
 app/data/snd_logro.bin
 test/net/test_catalog
+test/toast/toast_host

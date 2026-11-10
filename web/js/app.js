@@ -96,12 +96,12 @@
     return res.data;
   }
 
-  // Bronce, plata u oro con los puntos. Con la base de datos vieja no hay tier: sale de los puntos.
+  // Bronce, plata u oro: se ve en el borde del icono. Con la base de datos vieja no hay tier: sale de los puntos.
   const TIER_LABEL = { bronce: "Bronce", plata: "Plata", oro: "Oro" };
   function tierOf(a) { return TIER_LABEL[a.tier] ? a.tier : window.GreenyDefs.tierFromPoints(a.points); }
   function ptsPill(a) {
     const t = tierOf(a);
-    return h("span", { class: "pill tier-" + t }, TIER_LABEL[t] + " · " + a.points + " pts");
+    return h("span", { class: "pill pts", title: "Dificultad: " + TIER_LABEL[t] }, a.points + " pts");
   }
 
   function copyButton(text) {
@@ -126,7 +126,8 @@
 
   function achIcon(ach, done) {
     const url = imgUrl("icons", ach.icon_path);
-    const el = h("span", { class: "icon" + (done ? " done" : ""), "aria-hidden": "true" });
+    // el borde dice la dificultad: bronce, plata u oro
+    const el = h("span", { class: "icon" + (done ? " done" : "") + (ach.points != null ? " tier-" + tierOf(ach) : ""), title: ach.points != null ? TIER_LABEL[tierOf(ach)] : null });
     if (url) el.append(h("img", { src: url, alt: "", loading: "lazy" }));
     else el.textContent = done ? "✓" : "?";
     return el;

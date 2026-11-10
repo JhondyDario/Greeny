@@ -132,6 +132,15 @@ int main(int argc, char **argv) {
                 snprintf(name, sizeof(name), grid ? "detail%d_grid" : "detail%d", g);
                 ui_detail(&c, &a, &m, &cfg, g, 1, 0);
                 save(&c, out, name, sfx);
+                if (!grid && !m.games[g].broken && m.cur.nach > 0) {
+                    /* un logro al detalle: uno que ya se tiene y el ultimo */
+                    snprintf(name, sizeof(name), "ach%d_a", g);
+                    ui_achievement(&c, &a, &m, g, m.cur.nach > 3 ? 3 : 0);
+                    save(&c, out, name, sfx);
+                    snprintf(name, sizeof(name), "ach%d_b", g);
+                    ui_achievement(&c, &a, &m, g, m.cur.nach - 1);
+                    save(&c, out, name, sfx);
+                }
                 ui_layout l = ui_detail_layout(&cfg);
                 int rows = (m.cur.nach + l.cols - 1) / l.cols;
                 if (rows > l.rows) {

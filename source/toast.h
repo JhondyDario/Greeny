@@ -3,8 +3,11 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "toast_draw.h"
+
 /* Encola un popup. Si la cola esta llena se descarta (el logro igual se guarda). */
-void toast_push(const char *title, const char *name, const char *desc);
+/* tier (1 bronce, 2 plata, 3 oro) y points solo cuentan en TOAST_UNLOCK; points < 0 no se muestra. */
+void toast_push(toast_kind kind, int tier, int points, bool dark, const char *title, const char *name, const char *desc);
 
 /* Llamar en cada vuelta del loop principal. */
 void toast_update(uint64_t now_ms);

@@ -135,6 +135,8 @@ make -C test
 | Web: página Desarrollador (datos y estado del juego, frases), foto de perfil | Probada en navegador con servidor simulado |
 | Logros de bronce, plata y oro (archivo, app y web) | Revisado en PC y en navegador; falta probarlo en consola |
 | App: filtro de juegos del inicio (activos o jugados; todos, por completar o completados) | Revisado en PC; falta probarlo en consola |
+| Aviso nuevo dentro del juego (tarjeta clara u oscura, medalla por dificultad, puntos) | Revisado en PC; falta probarlo en consola |
+| App: logro al detalle (A sobre un logro) | Revisado en PC; falta probarlo en consola |
 | Foto de perfil en la app (verla y cambiarla desde la SD) | Pendiente |
 | Buscador de juegos del catálogo en la app | Pendiente |
 | Iconos por logro, música y animaciones en la app | Pendiente ([docs/RECURSOS.md](docs/RECURSOS.md)) |
@@ -154,6 +156,6 @@ make -C test
 GPLv2 (ver [LICENSE](LICENSE)). Incluye código derivado de
 [Atmosphère](https://github.com/Atmosphere-NX/Atmosphere) (`dmntcht`) y sigue el
 procedimiento de capa de [libtesla](https://github.com/WerWolv/libtesla), ambos
-GPLv2. Fuente del aviso: [font8x8](https://github.com/dhepper/font8x8) (dominio
-público). Carga de imágenes: [stb_image](https://github.com/nothings/stb)
+GPLv2. Letras del aviso dentro del juego: [Inter](https://github.com/rsms/inter)
+(SIL Open Font License). Carga de imágenes: [stb_image](https://github.com/nothings/stb)
 (dominio público). La mascota y el nombre Greeny son de Jhondy.

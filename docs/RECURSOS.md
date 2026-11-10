@@ -26,6 +26,21 @@ tipografías ni personajes de Nintendo.
 | Cara de la mascota | PNG transparente, 512×512 | Introducción y Acerca de en la app, portada de la web | Listo (`assets/cara.png`) |
 | Fotogramas de animación de la mascota (saltando, 8 a 12 cuadros) | PNG transparente, mismo tamaño todos | Animación en inicio y al desbloquear | Opcional, para cuando haya animaciones |
 
+### Lo que más ayudaría ahora (app y web)
+
+Todo en PNG transparente. Hoy cada cosa de esta lista se dibuja con formas simples o no existe.
+
+| Recurso | Tamaño | Dónde se usa |
+|---|---|---|
+| Marco o medalla de bronce, plata y oro (3) | 256×256 | Borde del icono de cada logro, detalle del logro y aviso dentro del juego |
+| Icono genérico de logro bloqueado y desbloqueado (2) | 256×256 | Logros que todavía no tienen icono propio |
+| Trofeo de juego completado | 128×128 | Sobre la carátula del juego al 100 % |
+| Iconos de las estadísticas del perfil: juegos, logros, completados, puntos, seguidores (5) | 96×96 | Perfil en la app y en la web |
+| Iconos de las pestañas de Opciones: General, Vista, En el juego, Cuenta, Ayuda (5) | 64×64 | Opciones de la app |
+| Iconos de estado del juego: sin empezar, prueba, jugable, perfecto (4) | 64×64 | Web y buscador de juegos |
+| Carátula de relleno | 512×512 | Juegos sin carátula |
+| Foto de perfil por defecto | 256×256 | Cuentas sin foto |
+
 ### Medallas del perfil
 
 Once medallas, PNG transparente de 256×256, con el id como nombre. Hoy se dibujan
