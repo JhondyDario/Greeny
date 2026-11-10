@@ -2,6 +2,16 @@
 
 **Estado: diseño. Todavía no hay código de esta parte.**
 
+## Proyecto
+
+| Dato | Valor |
+|---|---|
+| Project URL | `https://mlwzlirkjgpyyldbtoci.supabase.co` |
+| Publishable key | `sb_publishable_r4Y8LjTEzu7A2Z9ecr2hEw_Jr-OT8RC` |
+
+Estos dos datos son públicos por diseño: van dentro de la web y de la app. Lo
+que protege los datos son las reglas de seguridad por fila de la base de datos.
+
 ## Cómo va a funcionar
 
 ```
@@ -59,8 +69,21 @@ Dos formas, las dos en la app:
 Cada usuario solo puede escribir su propio progreso (reglas de seguridad por
 fila de Supabase). Los perfiles se pueden ver públicamente.
 
-## Carátulas en la web
+## Catálogo en línea: logros, iconos y carátulas
 
-En la consola la carátula sale del propio juego instalado, sin internet. La web
-no tiene eso: la app puede subir la carátula una vez por juego al sincronizar, o
-se suben a mano por juego. Queda por decidir.
+La app no trae dentro los logros ni las imágenes de todos los juegos. Los baja
+cuando hay red y los guarda en la SD:
+
+- **Archivo de logros** de cada juego: la app mira qué juegos tienes instalados
+  y baja solo los de esos. Así se añaden juegos nuevos sin sacar otra versión de
+  la app.
+- **Iconos de logros**: se bajan al abrir un juego por primera vez y quedan en
+  `config/greeny/cache/`. Sin red se ven los que ya estén guardados; el resto
+  muestra el check o el candado de siempre.
+- **Carátulas**: en la consola salen del propio juego instalado, sin internet.
+  Las del catálogo solo hacen falta para la web.
+
+Las imágenes van en Supabase Storage (archivos), no dentro de las tablas; las
+tablas guardan la ruta. Para el aviso dentro del juego, la app deja cada icono
+ya convertido a un formato mínimo, porque el sysmodule no tiene memoria para
+decodificar PNG.

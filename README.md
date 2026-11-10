@@ -23,7 +23,7 @@ carátula real del juego.*
 | Parte | Qué hace |
 |---|---|
 | **Sysmodule** (`source/`) | Detecta el juego, lee su memoria por `dmnt:cht`, desbloquea logros, muestra el aviso y reproduce el sonido. |
-| **App Greeny** (`app/`) | Lista tus juegos con carátula, progreso y puntos; muestra cada logro, cómo se consigue y si ya lo tienes. Español e inglés, tema claro y oscuro, vista de lista o cuadrícula, sonidos y una pantalla de diagnóstico. |
+| **App Greeny** (`app/`) | Lista tus juegos con carátula, progreso y puntos; muestra cada logro, cómo se consigue y si ya lo tienes. Español e inglés, tema claro y oscuro, fondo animado, vista de lista o cuadrícula, sonidos y una pantalla de diagnóstico. |
 | **Motor** (`common/`) | Formato de logros y evaluación de condiciones. Portable: se prueba en PC. |
 | **Logros** (`juegos/`) | Un archivo por juego. Por ahora: Super Mario 3D World + Bowser's Fury v1.1.0 (12 logros). |
 
@@ -117,7 +117,7 @@ make -C test
 | Logros de Mario 3D World 1.1.0 | Probados en consola |
 | Buscador de punteros (`scan`) | Probado en consola |
 | App: interfaz gráfica, idiomas, opciones, carátulas | Revisada en PC; falta probarla en consola |
-| App: tema oscuro, cuadrícula, diagnóstico, sonidos | Revisada en PC; falta probarla en consola |
+| App: tema oscuro, cuadrícula, diagnóstico, sonidos, fondo animado | Revisada en PC; falta probarla en consola |
 | Cuentas, web y sincronización | Pendiente ([docs/SUPABASE.md](docs/SUPABASE.md)) |
 | Iconos por logro, música y animaciones en la app | Pendiente ([docs/RECURSOS.md](docs/RECURSOS.md)) |
 
