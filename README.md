@@ -12,6 +12,8 @@ crear los de su juego favorito.
 
 ![Pantalla de inicio](docs/img/inicio.png)
 ![Logros de un juego](docs/img/logros.png)
+![Logros en cuadrícula, tema oscuro](docs/img/logros-cuadricula-oscuro.png)
+![Diagnóstico](docs/img/diagnostico.png)
 
 *Capturas renderizadas en PC; en la consola se usa la fuente del sistema y la
 carátula real del juego.*
@@ -21,7 +23,7 @@ carátula real del juego.*
 | Parte | Qué hace |
 |---|---|
 | **Sysmodule** (`source/`) | Detecta el juego, lee su memoria por `dmnt:cht`, desbloquea logros, muestra el aviso y reproduce el sonido. |
-| **App Greeny** (`app/`) | Lista tus juegos con carátula, progreso y puntos; muestra cada logro, cómo se consigue y si ya lo tienes. Español e inglés. Opciones de idioma, sonido y aviso. |
+| **App Greeny** (`app/`) | Lista tus juegos con carátula, progreso y puntos; muestra cada logro, cómo se consigue y si ya lo tienes. Español e inglés, tema claro y oscuro, vista de lista o cuadrícula, sonidos y una pantalla de diagnóstico. |
 | **Motor** (`common/`) | Formato de logros y evaluación de condiciones. Portable: se prueba en PC. |
 | **Logros** (`juegos/`) | Un archivo por juego. Por ahora: Super Mario 3D World + Bowser's Fury v1.1.0 (12 logros). |
 
@@ -39,7 +41,21 @@ config/greeny/games/                    archivos de logros, uno por juego
 config/greeny/unlocked/                 tu progreso
 config/greeny/config.ini                opciones
 config/greeny/log.txt                   registro del sysmodule
+config/greeny/app-log.txt               pasos de arranque de la app
 ```
+
+## Si algo no funciona
+
+Abre **Greeny → Opciones (X) → Diagnóstico**. Revisa que el sysmodule esté
+instalado y corriendo, que los archivos de logros no tengan errores y qué dijo
+el sysmodule la última vez (aviso, sonido, versión del juego).
+
+Si la app se congela al abrir, `config/greeny/app-log.txt` dice cuál fue el
+último paso que alcanzó.
+
+Al abrir un juego, Greeny avisa en pantalla si sus logros quedaron activos o si
+no van a funcionar (versión distinta del juego, archivo con error o no se pudo
+leer la memoria).
 
 Si venías de una versión anterior (`config/logros`), tu progreso se pasa solo a
 `config/greeny` la primera vez. Puedes borrar `switch/logros.nro` y `switch/gree.nro`.
@@ -96,10 +112,12 @@ make -C test
 | Función | Estado |
 |---|---|
 | Lectura de memoria, desbloqueo, guardado | Probado en consola |
-| Aviso en pantalla y sonido | Probado en consola |
+| Aviso en pantalla y sonido | Probado en consola (con el sonido generado; los sonidos nuevos faltan por probar) |
+| Avisos de "logros desactivados" al abrir un juego | Falta probar en consola |
 | Logros de Mario 3D World 1.1.0 | Probados en consola |
 | Buscador de punteros (`scan`) | Probado en consola |
 | App: interfaz gráfica, idiomas, opciones, carátulas | Revisada en PC; falta probarla en consola |
+| App: tema oscuro, cuadrícula, diagnóstico, sonidos | Revisada en PC; falta probarla en consola |
 | Cuentas, web y sincronización | Pendiente ([docs/SUPABASE.md](docs/SUPABASE.md)) |
 | Iconos por logro, música y animaciones en la app | Pendiente ([docs/RECURSOS.md](docs/RECURSOS.md)) |
 

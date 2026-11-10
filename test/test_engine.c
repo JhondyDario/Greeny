@@ -396,12 +396,28 @@ static void test_i18n_config(void) {
     remove(path);
     gr_config_load(&c, path); /* no existe: valores por defecto */
     CHECK(c.lang == GR_LANG_AUTO && c.sound && c.popup);
+    CHECK(c.theme == GR_THEME_AUTO && c.games_view == GR_VIEW_LIST && c.ach_view == GR_VIEW_LIST);
 
     c.lang = GR_LANG_EN; c.sound = false; c.popup = true;
+    c.theme = GR_THEME_DARK; c.games_view = GR_VIEW_GRID; c.ach_view = GR_VIEW_LIST;
     CHECK(gr_config_save(&c, path) == 0);
     gr_config c2;
     gr_config_load(&c2, path);
     CHECK(c2.lang == GR_LANG_EN && !c2.sound && c2.popup);
+    CHECK(c2.theme == GR_THEME_DARK && c2.games_view == GR_VIEW_GRID && c2.ach_view == GR_VIEW_LIST);
+
+    /* un config.ini viejo (sin las claves nuevas) se lee con los valores por defecto en lo que falta */
+    FILE *old = fopen(path, "w");
+    fputs("lang = es\nsound = 0\npopup = 1\n", old);
+    fclose(old);
+    gr_config_load(&c2, path);
+    CHECK(c2.lang == GR_LANG_ES && !c2.sound && c2.theme == GR_THEME_AUTO && c2.ach_view == GR_VIEW_LIST);
+
+    /* valores fuera de rango no escriben basura */
+    gr_config bad_cfg = { 99, -4, 7, 2, true, true };
+    CHECK(gr_config_save(&bad_cfg, path) == 0);
+    gr_config_load(&c2, path);
+    CHECK(c2.lang == GR_LANG_AUTO && c2.theme == GR_THEME_AUTO && c2.games_view == GR_VIEW_LIST);
 
     c.lang = GR_LANG_ES; c.sound = true; c.popup = false;
     CHECK(gr_config_save(&c, path) == 0);
@@ -410,7 +426,7 @@ static void test_i18n_config(void) {
 
     /* basura y valores invalidos no rompen nada: queda el valor por defecto */
     FILE *f = fopen(path, "w");
-    fputs("lang = klingon\nsound = 7\n# popup = 0\nsin igual\npopup=0\n", f);
+    fputs("lang = klingon\ntheme = neon\nach_view = mosaic\nsound = 7\n# popup = 0\nsin igual\npopup=0\n", f);
     fclose(f);
     gr_config_load(&c2, path);
     CHECK(c2.lang == GR_LANG_AUTO && c2.sound && !c2.popup);

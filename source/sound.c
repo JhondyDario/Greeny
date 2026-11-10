@@ -1,22 +1,20 @@
 /*
  * El audio se abre solo mientras suena y se cierra despues, para no quedarse
  * con una sesion de audren y memoria que el juego podria necesitar.
- * El sonido se sintetiza (dos notas con caida), no hay ningun archivo.
+ * Los sonidos van dentro del ejecutable: PCM 16 bit mono a 32 kHz
+ * (se generan con scripts/assets.py a partir de assets/sounds/).
  */
 #include "sound.h"
 
 #include <malloc.h>
-#include <math.h>
 #include <string.h>
 #include <switch.h>
 
-#define RATE        48000
-#define NOTE1_MS    110
-#define NOTE2_MS    420
-#define TOTAL_SAMPLES ((NOTE1_MS + NOTE2_MS) * RATE / 1000)
-#define POOL_SIZE   ((TOTAL_SAMPLES * 2 + 0xFFF) & ~0xFFF)
-#define CLOSE_AFTER_MS 900
-#define PI 3.14159265358979f
+#include "snd_cargado_bin.h"
+#include "snd_logro_bin.h"
+
+#define RATE 32000
+#define TAIL_MS 250 /* margen despues del ultimo sample antes de cerrar el audio */
 
 static const AudioRendererConfig k_config = {
     .output_rate     = AudioRendererOutputRate_48kHz,
@@ -27,7 +25,8 @@ static const AudioRendererConfig k_config = {
     .num_mix_buffers = 2,
 };
 
-static bool g_pending, g_active, g_failed;
+static bool g_queued[SOUND_COUNT];
+static bool g_active, g_failed;
 static Result g_fail_rc;
 static u64 g_close_at;
 static AudioDriver g_drv;
@@ -37,32 +36,28 @@ static void *g_pool;
 bool sound_failed(void) { return g_failed; }
 uint32_t sound_fail_rc(void) { return g_fail_rc; }
 
-void sound_play(void) {
-    if (!g_failed) g_pending = true;
+void sound_play(sound_id id) {
+    if (!g_failed && id >= 0 && id < SOUND_COUNT) g_queued[id] = true;
 }
 
-/* una nota: fundamental + un poco de octava, con ataque corto y caida exponencial */
-static void synth_note(s16 *out, int n, float freq, float decay) {
-    for (int i = 0; i < n; i++) {
-        float t = (float)i / RATE;
-        float env = expf(-t * decay);
-        float attack = i < 96 ? (float)i / 96.0f : 1.0f;
-        float release = n - i < 480 ? (float)(n - i) / 480.0f : 1.0f; /* sin chasquido al final */
-        float v = sinf(2 * PI * freq * t) + 0.3f * sinf(4 * PI * freq * t);
-        out[i] = (s16)(v * env * attack * release * 0.28f * 32767.0f);
-    }
+static void get_pcm(sound_id id, const u8 **data, size_t *size) {
+    if (id == SOUND_LOADED) { *data = snd_cargado_bin; *size = snd_cargado_bin_size; }
+    else { *data = snd_logro_bin; *size = snd_logro_bin_size; }
+    *size &= ~(size_t)1;
 }
 
-static Result start(void) {
-    g_pool = memalign(0x1000, POOL_SIZE);
+static Result start(sound_id id, u32 *out_ms) {
+    const u8 *pcm;
+    size_t size;
+    get_pcm(id, &pcm, &size);
+    size_t pool_size = (size + 0xFFF) & ~(size_t)0xFFF;
+
+    /* audren necesita memoria alineada a pagina que pueda mapear: se copia al heap */
+    g_pool = memalign(0x1000, pool_size);
     if (!g_pool) return MAKERESULT(Module_Libnx, LibnxError_OutOfMemory);
-    memset(g_pool, 0, POOL_SIZE);
-
-    s16 *pcm = (s16 *)g_pool;
-    int n1 = NOTE1_MS * RATE / 1000;
-    synth_note(pcm, n1, 1318.5f, 9.0f);                       /* Mi6 */
-    synth_note(pcm + n1, TOTAL_SAMPLES - n1, 2093.0f, 7.0f);  /* Do7 */
-    armDCacheFlush(g_pool, POOL_SIZE);
+    memcpy(g_pool, pcm, size);
+    memset((u8 *)g_pool + size, 0, pool_size - size);
+    armDCacheFlush(g_pool, pool_size);
 
     Result rc = smInitialize();
     if (R_FAILED(rc)) goto fail_pool;
@@ -73,7 +68,7 @@ static Result start(void) {
     rc = audrvCreate(&g_drv, &k_config, 2);
     if (R_FAILED(rc)) goto fail_audren;
 
-    int mpid = audrvMemPoolAdd(&g_drv, g_pool, POOL_SIZE);
+    int mpid = audrvMemPoolAdd(&g_drv, g_pool, pool_size);
     audrvMemPoolAttach(&g_drv, mpid);
     static const u8 sink_channels[] = { 0, 1 };
     audrvDeviceSinkAdd(&g_drv, AUDREN_DEFAULT_DEVICE_NAME, 2, sink_channels);
@@ -85,18 +80,20 @@ static Result start(void) {
 
     memset(&g_wave, 0, sizeof(g_wave));
     g_wave.data_raw = g_pool;
-    g_wave.size = TOTAL_SAMPLES * 2;
+    g_wave.size = size;
     g_wave.start_sample_offset = 0;
-    g_wave.end_sample_offset = TOTAL_SAMPLES;
+    g_wave.end_sample_offset = (s32)(size / 2);
 
     audrvVoiceInit(&g_drv, 0, 1, PcmFormat_Int16, RATE);
     audrvVoiceSetDestinationMix(&g_drv, 0, AUDREN_FINAL_MIX_ID);
-    audrvVoiceSetMixFactor(&g_drv, 0, 1.0f, 0, 0);
-    audrvVoiceSetMixFactor(&g_drv, 0, 1.0f, 0, 1);
+    audrvVoiceSetMixFactor(&g_drv, 0, 0.8f, 0, 0);
+    audrvVoiceSetMixFactor(&g_drv, 0, 0.8f, 0, 1);
     audrvVoiceAddWaveBuf(&g_drv, 0, &g_wave);
     audrvVoiceStart(&g_drv, 0);
     rc = audrvUpdate(&g_drv);
     if (R_FAILED(rc)) goto fail_drv;
+
+    *out_ms = (u32)(size / 2 * 1000 / RATE) + TAIL_MS;
     return 0;
 
 fail_drv:
@@ -122,23 +119,24 @@ void sound_update(uint64_t now_ms) {
     if (g_failed) return;
 
     if (g_active) {
-        if (now_ms >= g_close_at) {
-            stop();
-            g_active = false;
-        } else {
-            audrvUpdate(&g_drv);
-        }
-        return;
+        if (now_ms < g_close_at) { audrvUpdate(&g_drv); return; }
+        stop();
+        g_active = false;
     }
-    if (!g_pending) return;
-    g_pending = false;
 
-    Result rc = start();
-    if (R_FAILED(rc)) {
-        g_failed = true;
-        g_fail_rc = rc;
+    for (int id = 0; id < SOUND_COUNT; id++) {
+        if (!g_queued[id]) continue;
+        g_queued[id] = false;
+
+        u32 ms = 0;
+        Result rc = start((sound_id)id, &ms);
+        if (R_FAILED(rc)) {
+            g_failed = true;
+            g_fail_rc = rc;
+            return;
+        }
+        g_active = true;
+        g_close_at = now_ms + ms;
         return;
     }
-    g_active = true;
-    g_close_at = now_ms + CLOSE_AFTER_MS;
 }

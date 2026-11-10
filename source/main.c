@@ -202,15 +202,17 @@ static int count_unlocked(void) {
 }
 
 /* Lee y parsea el archivo de definiciones. false si no hay archivo o esta malo. */
-static bool load_defs(u64 tid) {
+typedef enum { DEFS_NONE, DEFS_OK, DEFS_BAD } defs_result;
+
+static defs_result load_defs(u64 tid) {
     char path[96];
     snprintf(path, sizeof(path), DIR_GAMES "/%016lX.txt", tid);
 
     FILE *f = fopen(path, "rb");
-    if (!f) return false; /* juego sin logros definidos: no se toca */
+    if (!f) return DEFS_NONE; /* juego sin logros definidos: no se toca */
 
     char *buf = malloc(DEFS_MAX);
-    if (!buf) { fclose(f); log_line("%016lX: sin memoria para leer definiciones", tid); return false; }
+    if (!buf) { fclose(f); log_line("%016lX: sin memoria para leer definiciones", tid); return DEFS_BAD; }
     size_t n = fread(buf, 1, DEFS_MAX - 1, f);
     bool too_big = !feof(f);
     fclose(f);
@@ -222,7 +224,15 @@ static bool load_defs(u64 tid) {
     else if (lg_parse(&g_game, buf, err, sizeof(err)) != 0) log_line("%016lX: %s", tid, err);
     else ok = true;
     free(buf);
-    return ok;
+    return ok ? DEFS_OK : DEFS_BAD;
+}
+
+/* Aviso de que los logros de este juego no van a funcionar, y por que. */
+static void warn_disabled(const char *reason_es, const char *reason_en) {
+    if (!g_config.popup) return;
+    bool en = use_english();
+    toast_push(en ? "ACHIEVEMENTS OFF" : "LOGROS DESACTIVADOS", g_game.game[0] ? g_game.game : "Greeny",
+               en ? reason_en : reason_es);
 }
 
 typedef enum { ATTACH_OK, ATTACH_RETRY, ATTACH_GIVE_UP } attach_result;
@@ -256,6 +266,15 @@ static attach_result attach(u64 pid, u64 tid) {
     if (g_game.build[0] && strncmp(build, g_game.build, strlen(g_game.build)) != 0) {
         log_line("%016lX: build id %.16s no coincide con el del archivo (%s); logros desactivados", tid, build,
                  g_game.build);
+        char es[96], en[96];
+        if (g_game.version[0]) {
+            snprintf(es, sizeof(es), "Son para la version %s del juego y tienes otra", g_game.version);
+            snprintf(en, sizeof(en), "They are for game version %s, you have another", g_game.version);
+        } else {
+            snprintf(es, sizeof(es), "Son para otra version del juego");
+            snprintf(en, sizeof(en), "They are for a different game version");
+        }
+        warn_disabled(es, en);
         return ATTACH_GIVE_UP;
     }
 
@@ -290,7 +309,7 @@ int main(int argc, char *argv[]) {
 
     u64 cur_pid = 0, cur_tid = 0, attach_at = 0, scan_at = 0;
     int retries = 0;
-    bool pending = false, toast_fail_logged = false, sound_fail_logged = false;
+    bool pending = false, bad_defs = false, toast_fail_logged = false, sound_fail_logged = false;
 
     while (true) {
         u64 now = now_ms();
@@ -303,11 +322,24 @@ int main(int argc, char *argv[]) {
             cur_tid = 0;
             g_loaded = false;
             pending = false;
-            if (pid && R_SUCCEEDED(pminfoGetProgramId(&cur_tid, pid)) && load_defs(cur_tid)) {
-                pending = true;
-                retries = 0;
-                attach_at = now + ATTACH_DELAY_MS;
+            bad_defs = false;
+            if (pid && R_SUCCEEDED(pminfoGetProgramId(&cur_tid, pid))) {
+                defs_result d = load_defs(cur_tid);
+                if (d != DEFS_NONE) {
+                    gr_config_load(&g_config, CONFIG_PATH); /* la app pudo cambiarla */
+                    pending = d == DEFS_OK;
+                    bad_defs = d == DEFS_BAD;
+                    retries = 0;
+                    attach_at = now + ATTACH_DELAY_MS; /* los avisos tambien esperan a que el juego arranque */
+                }
             }
+        }
+
+        if (bad_defs && now >= attach_at) {
+            bad_defs = false;
+            g_game.game[0] = 0; /* el archivo no se pudo leer: no hay nombre fiable */
+            warn_disabled("El archivo de logros tiene un error (ver log.txt)",
+                          "The achievement file has an error (see log.txt)");
         }
 
         if (pending && now >= attach_at) {
@@ -326,7 +358,6 @@ int main(int argc, char *argv[]) {
                     memset(g_scan_prev, 0, sizeof(g_scan_prev));
                     for (int i = 0; i < LG_MAX_SCAN; i++) g_scan_prev_total[i] = -1;
 
-                    gr_config_load(&g_config, CONFIG_PATH); /* la app pudo cambiarla */
                     bool en = use_english();
 
                     char msg[64];
@@ -334,9 +365,11 @@ int main(int argc, char *argv[]) {
                              g_game.nach);
                     if (g_config.popup)
                         toast_push(en ? "ACHIEVEMENTS ON" : "LOGROS ACTIVOS", g_game.game[0] ? g_game.game : "Greeny", msg);
+                    if (g_config.sound) sound_play(SOUND_LOADED);
                     log_line("%016lX: %d logros cargados, %s", cur_tid, g_game.nach, msg);
                 } else if (r == ATTACH_RETRY) {
                     log_line("%016lX: no se pudo abrir el proceso con dmnt:cht, me rindo", cur_tid);
+                    warn_disabled("No se pudo leer la memoria del juego", "Could not read the game's memory");
                 }
             }
         }
@@ -353,7 +386,7 @@ int main(int argc, char *argv[]) {
                 bool en = use_english();
                 if (g_config.popup)
                     toast_push(en ? "ACHIEVEMENT UNLOCKED" : "LOGRO DESBLOQUEADO", lg_ach_name(a, en), lg_ach_desc(a, en));
-                if (g_config.sound) sound_play();
+                if (g_config.sound) sound_play(SOUND_UNLOCK);
             }
             if (g_game.debug) debug_report(cur_tid);
             if (g_game.nscan && now >= scan_at) {

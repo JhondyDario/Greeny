@@ -10,7 +10,7 @@ tipografías ni personajes de Nintendo.
 
 | Recurso | Formato | Para qué | Estado |
 |---|---|---|---|
-| Mascota de cuerpo entero | PNG transparente, 1024×1536 | Inicio de la app y web | Listo (`assets/mascot.png`) |
+| Mascota de cuerpo entero | PNG transparente, 1024×1536 | Cabecera de la app, icono y web | Listo (`assets/mascot.png`) |
 | Mascota en poses: celebrando, triste, durmiendo, saludando | PNG transparente, 1024×1536 cada una | Logro desbloqueado, lista vacía, errores, bienvenida | Falta |
 | Cara de la mascota | PNG transparente, 512×512 | Aviso en el juego, avatar por defecto, favicon | Falta |
 | Logo "Greeny" | PNG transparente, ~1200×400 | Cabecera de la app y de la web | Falta |
@@ -35,10 +35,11 @@ Dibujos propios. No uses arte sacado del juego.
 
 | Recurso | Formato | Para qué | Estado |
 |---|---|---|---|
-| Logro desbloqueado | WAV 48 kHz mono 16 bit, menos de 1 s | Suena dentro del juego | Provisional (generado por código) |
-| Juego completado al 100 % | WAV 48 kHz mono 16 bit, 1 a 2 s | Al sacar el último logro | Falta |
-| Música de fondo de la app | Bucle sin corte, WAV u OGG 48 kHz estéreo, 30 a 60 s, suave | Solo en la app, con opción de apagarla | Falta |
-| Navegación: mover, aceptar, volver, error | WAV 48 kHz mono 16 bit, muy cortos | La app | Falta |
+| Logro desbloqueado | WAV 48 kHz 16 bit | Suena dentro del juego. También se usa al completar un juego | Listo (`assets/sounds/logro.wav`) |
+| Logros cargados | WAV 48 kHz 16 bit | Al abrir un juego, con el aviso inicial | Listo (`assets/sounds/cargado.wav`) |
+| Música de fondo de la app | Bucle sin corte, WAV u OGG 48 kHz estéreo, 30 a 60 s, suave | Solo en la app, con opción de apagarla | Aplazado |
+| Navegación: mover, aceptar, volver | WAV 48 kHz 16 bit, muy cortos | La app | Listo (`navegar.wav`, `aceptar.wav`, `regresar.wav`) |
 
 Los sonidos que suenan dentro del juego, mejor cortos y suaves: van encima del
-audio del juego.
+audio del juego. Además se guardan dentro del sysmodule, que tiene muy poca
+memoria: `scripts/assets.py` los pasa a mono y 32 kHz y les recorta el silencio.
