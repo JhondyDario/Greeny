@@ -88,3 +88,31 @@ int net_http(const char *url, const char *bearer, const char *json_body, char *o
     curl_easy_cleanup(c);
     return rc == CURLE_OK ? 0 : -1;
 }
+
+int net_get(const char *url, void *out, size_t cap, size_t *len, long *status) {
+    *len = 0;
+    *status = 0;
+    if (!net_online()) return -1;
+
+    CURL *c = curl_easy_init();
+    if (!c) return -1;
+    struct curl_slist *h = curl_slist_append(NULL, "apikey: " GR_BACKEND_KEY);
+    /* on_data deja sitio para un 0 final que aqui no hace falta: se le da un byte de mas de margen */
+    sink s = { out, cap, 0 };
+    curl_easy_setopt(c, CURLOPT_URL, url);
+    curl_easy_setopt(c, CURLOPT_HTTPHEADER, h);
+    curl_easy_setopt(c, CURLOPT_WRITEFUNCTION, on_data);
+    curl_easy_setopt(c, CURLOPT_WRITEDATA, &s);
+    curl_easy_setopt(c, CURLOPT_USERAGENT, "Greeny/" UI_APP_VERSION);
+    curl_easy_setopt(c, CURLOPT_FOLLOWLOCATION, 1L);
+    curl_easy_setopt(c, CURLOPT_CONNECTTIMEOUT, 8L);
+    curl_easy_setopt(c, CURLOPT_TIMEOUT, 25L);
+    curl_easy_setopt(c, CURLOPT_NOSIGNAL, 1L);
+
+    CURLcode rc = curl_easy_perform(c);
+    if (rc == CURLE_OK) curl_easy_getinfo(c, CURLINFO_RESPONSE_CODE, status);
+    *len = s.len;
+    curl_slist_free_all(h);
+    curl_easy_cleanup(c);
+    return rc == CURLE_OK ? 0 : -1;
+}

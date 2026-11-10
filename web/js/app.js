@@ -54,6 +54,10 @@
       [/rate limit|too many/i, "Demasiados intentos. Espera un momento y prueba de nuevo."],
       [/failed to fetch|networkerror/i, "No se pudo conectar. Revisa tu conexión."],
       // mensajes de nuestras funciones de la base de datos (van sin acentos)
+      [/no hay nadie con ese codigo/i, "No hay nadie con ese código de amigo."],
+      [/12 numeros/i, "El código de amigo tiene 12 números."],
+      [/tu propio codigo/i, "Ese es tu propio código."],
+      [/could not find the function/i, "El servidor todavía no tiene esta función. Hay que actualizar la base de datos."],
       [/codigo incorrecto o vencido/i, "Código incorrecto o vencido. Pide uno nuevo en la consola."],
       [/hay que iniciar sesion/i, "Tienes que iniciar sesión."],
       [/row-level security|permission denied/i, "No tienes permiso para hacer eso."],
@@ -363,6 +367,7 @@
           h("h1", { style: "margin-bottom:2px" }, shownName(profile)),
           h("div", { class: "muted" }, "@" + profile.username, profile.discord_username ? " · Discord: " + profile.discord_username : ""),
           profile.caption ? h("p", { style: "margin:8px 0 0;font-size:1.1rem" }, "“" + profile.caption + "”") : null,
+          profile.friend_code ? h("div", { class: "small", style: "margin-top:8px" }, "Código de amigo: ", h("code", {}, profile.friend_code)) : null,
           h("div", { class: "muted small", style: "margin-top:6px" }, "En Greeny desde " + fmtDate(profile.created_at))),
         isMe ? h("a", { class: "btn alt", href: "#/cuenta" }, "Editar") : followBtn),
       h("section", { class: "card level", style: "margin-top:14px" },
@@ -579,6 +584,20 @@
               const { error } = await sb.auth.linkIdentity({ provider: "discord", options: { redirectTo: here } });
               if (error) { alert(explain(error)); ev.target.disabled = false; }
             } }, "Vincular Discord")),
+      h("h3", { style: "margin-top:22px" }, "Código de amigo"),
+      h("div", { class: "card stack" },
+        me.friend_code
+          ? h("p", { style: "margin:0" }, "Tu código: ", h("code", { style: "font-size:1.15rem" }, me.friend_code), " ",
+              h("span", { class: "muted small" }, "Compártelo para que te sigan."))
+          : h("p", { class: "muted", style: "margin:0" }, "Tu código aparecerá aquí cuando se actualice la base de datos."),
+        form([
+          h("label", {}, "Seguir a alguien con su código", h("span", { class: "hint" }, "12 números. Los guiones y el GR son opcionales."),
+            h("input", { name: "friend_code", required: true, inputmode: "numeric", autocomplete: "off", placeholder: "GR-0000-0000-0000", maxlength: 20, style: "max-width:260px" })),
+        ], "Seguir", async (fd, el) => {
+          const who = must(await sb.rpc("follow_by_code", { code: fd.get("friend_code") }));
+          el.reset();
+          return "Ahora sigues a @" + who + ".";
+        })),
       h("h3", { style: "margin-top:22px" }, "Consola"),
       h("div", { class: "card stack" },
         h("p", { class: "muted", style: "margin:0" }, "En tu Switch, abre Greeny y elige vincular cuenta. Te mostrará un código de 6 caracteres que dura 10 minutos."),
@@ -632,6 +651,24 @@
       return "Publicado: " + (def.name || tid) + " con " + def.achievements.length + " logros.";
     });
 
+    // Lo que se sube se convierte aqui a una imagen cuadrada del tamaño justo.
+    // Asi da igual si el archivo era WebP, AVIF o JPEG con nombre .png, o si no
+    // era cuadrado: la consola solo sabe abrir PNG y JPEG de verdad.
+    async function squareImage(file, size, type) {
+      let bitmap;
+      try { bitmap = await createImageBitmap(file); }
+      catch (e) { throw new Error("No se pudo abrir " + file.name + " como imagen."); }
+      const side = Math.min(bitmap.width, bitmap.height);
+      const canvas = document.createElement("canvas");
+      canvas.width = canvas.height = size;
+      const ctx = canvas.getContext("2d");
+      ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(bitmap, (bitmap.width - side) / 2, (bitmap.height - side) / 2, side, side, 0, 0, size, size);
+      const blob = await new Promise((done) => canvas.toBlob(done, type, 0.9));
+      if (!blob) throw new Error("No se pudo convertir " + file.name + ".");
+      return blob;
+    }
+
     // Cada subida usa un nombre nuevo: si se reusara el mismo, el navegador y la
     // consola seguirian mostrando la imagen vieja que tienen guardada.
     async function uploadImage(bucket, base, file, oldPath) {
@@ -641,8 +678,8 @@
       return { path, cleanup: async () => { if (oldPath && oldPath !== path) await sb.storage.from(bucket).remove([oldPath]); } };
     }
     async function setIcon(tid, achId, file, oldPath) {
-      if (file.type !== "image/png") throw new Error("El icono tiene que ser un PNG.");
-      const up = await uploadImage("icons", tid + "/" + achId, file, oldPath);
+      const png = await squareImage(file, 128, "image/png");
+      const up = await uploadImage("icons", tid + "/" + achId, png, oldPath);
       must(await sb.from("achievements").update({ icon_path: up.path }).eq("title_id", tid).eq("ach_id", achId));
       await up.cleanup();
     }
@@ -661,7 +698,7 @@
           h("thead", {}, h("tr", {}, h("th", {}, ""), h("th", {}, "Nombre del archivo"), h("th", {}, "Logro"), h("th", {}, "Icono"), h("th", {}, ""))),
           h("tbody", {}, rows.map((a) => {
             // boton para poner o cambiar el icono de este logro, sin importar como se llame el archivo
-            const input = h("input", { type: "file", accept: "image/png", hidden: true, "aria-label": "Icono de " + a.name_es });
+            const input = h("input", { type: "file", accept: "image/*", hidden: true, "aria-label": "Icono de " + a.name_es });
             const btn = h("button", { type: "button", class: "btn alt mini", onclick: () => input.click() }, a.icon_path ? "Cambiar" : "Subir");
             input.addEventListener("change", async () => {
               if (!input.files.length) return;
@@ -685,14 +722,14 @@
     const icons = form([
       h("label", {}, "Juego", iconGame),
       achList,
-      h("label", {}, "Subir varios a la vez", h("span", { class: "hint" }, "PNG cuadrados (128×128). Cada archivo se llama como dice la lista de arriba. Para uno solo, usa su botón Subir o Cambiar."),
-        h("input", { name: "files", type: "file", accept: "image/png", multiple: true, required: true })),
+      h("label", {}, "Subir varios a la vez", h("span", { class: "hint" }, "Cada archivo se llama como dice la lista de arriba. Se convierten solos a PNG cuadrado de 128×128; si la imagen no es cuadrada, se recorta al centro."),
+        h("input", { name: "files", type: "file", accept: "image/*", multiple: true, required: true })),
     ], "Subir iconos", async (fd) => {
       const tid = fd.get("title_id");
       const current = Object.fromEntries(((await sb.from("achievements").select("ach_id,icon_path").eq("title_id", tid)).data || []).map((a) => [a.ach_id, a.icon_path]));
       const done = [], skipped = [];
       for (const file of fd.getAll("files")) {
-        const id = file.name.replace(/\.png$/i, "");
+        const id = file.name.replace(/\.[a-z0-9]+$/i, "");
         if (!(id in current)) { skipped.push(file.name); continue; }
         await setIcon(tid, id, file, current[id]);
         done.push(id);
@@ -717,13 +754,13 @@
     const coverForm = form([
       h("label", {}, "Juego", coverGame),
       coverPreview,
-      h("label", {}, "Carátula", h("span", { class: "hint" }, "JPG o PNG cuadrado (512×512). Solo se usa en la web."),
-        h("input", { name: "file", type: "file", accept: "image/png,image/jpeg", required: true })),
+      h("label", {}, "Carátula", h("span", { class: "hint" }, "Cualquier imagen; se convierte a 512×512. Solo se usa en la web."),
+        h("input", { name: "file", type: "file", accept: "image/*", required: true })),
     ], "Subir carátula", async (fd, el) => {
       const tid = fd.get("title_id"), file = fd.get("file");
-      if (file.type !== "image/png" && file.type !== "image/jpeg") throw new Error("La carátula tiene que ser JPG o PNG.");
+      const jpg = await squareImage(file, 512, "image/jpeg");
       const old = (await sb.from("games").select("cover_path").eq("title_id", tid).maybeSingle()).data;
-      const up = await uploadImage("covers", tid, file, old && old.cover_path);
+      const up = await uploadImage("covers", tid, jpg, old && old.cover_path);
       must(await sb.from("games").update({ cover_path: up.path }).eq("title_id", tid));
       await up.cleanup();
       el.querySelector("input[type=file]").value = "";

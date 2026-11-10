@@ -10,13 +10,7 @@
 #include "../../app/source/model.h"
 #include "../../app/source/ui.h"
 
-#define STB_IMAGE_IMPLEMENTATION
-#define STBI_ONLY_JPEG
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-function"
-#pragma GCC diagnostic ignored "-Wsign-compare"
-#include "../../app/source/third_party/stb_image.h"
-#pragma GCC diagnostic pop
+#include "../../app/source/third_party/stb_image.h" /* implementacion: app/source/stb_impl.c */
 
 static uint8_t *slurp(const char *dir, const char *name, size_t expect) {
     char path[512];
@@ -79,7 +73,11 @@ int main(int argc, char **argv) {
         char path[512];
         int w, h, n;
         snprintf(path, sizeof(path), "%s/%s", argv[4], i ? "bg_oscuro.bin" : "bg_claro.bin");
-        bg[i] = (uint32_t *)stbi_load(path, &w, &h, &n, 4);
+        FILE *bf = fopen(path, "rb");
+        static uint8_t jpg[400 * 1024];
+        size_t jl = bf ? fread(jpg, 1, sizeof(jpg), bf) : 0;
+        if (bf) fclose(bf);
+        bg[i] = (uint32_t *)stbi_load_from_memory(jpg, (int)jl, &w, &h, &n, 4);
         if (!bg[i] || w != UI_W || h != UI_H) { fprintf(stderr, "fondo %d invalido\n", i); return 1; }
     }
     a.mascot_small = slurp(argv[4], "mascot_small.bin", 66 * 66 * 4); a.small_w = 66; a.small_h = 66;
@@ -121,6 +119,16 @@ int main(int argc, char **argv) {
 
             for (int g = 0; g < m.ngames; g++) {
                 gr_open(&m, g, root);
+                /* iconos guardados en <sd>/config/greeny/cache, si los hay */
+                for (int i = 0; i < LG_MAX_ACH; i++) a.ach_icons[i] = a.ach_icons_gray[i] = NULL;
+                for (int i = 0; i < m.cur.nach; i++) {
+                    uint8_t *img = malloc(GR_ICON_BYTES), *gray = malloc(GR_ICON_BYTES);
+                    if (gr_icon_load(root, m.games[g].tid, m.cur.ach[i].id, img)) {
+                        gr_icon_gray(img, gray);
+                        a.ach_icons[i] = img;
+                        a.ach_icons_gray[i] = gray;
+                    }
+                }
                 snprintf(name, sizeof(name), grid ? "detail%d_grid" : "detail%d", g);
                 ui_detail(&c, &a, &m, &cfg, g, 1, 0);
                 save(&c, out, name, sfx);
@@ -150,7 +158,7 @@ int main(int argc, char **argv) {
                               .sync_en = "Up to date: 7 achievements sent, 2 new on your account." };
         ui_settings(&c, &a, &cfg, UI_TAB_ACCOUNT, 1, true, dark, &linked);
         save(&c, out, "settings_cuenta", sfx);
-        ui_profile prof = { .name = "Jhondy", .username = "megaJHONDY", .caption = "Coleccionista de logros", .linked = true,
+        ui_profile prof = { .name = "Jhondy", .username = "megaJHONDY", .caption = "Coleccionista de logros", .friend_code = "GR-4821-0937-5516", .linked = true,
                             .social_known = true, .followers = 12, .following = 3,
                             .stats = { .games = m.games_played, .achievements = m.unlocked, .platinums = m.platinums, .points = m.points_got } };
         ui_set_profile(NULL);

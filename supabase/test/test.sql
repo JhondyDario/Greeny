@@ -21,6 +21,8 @@ end $$;
 do $$
 declare n int; u text;
 begin
+    select count(distinct friend_code) into n from public.profiles where friend_code ~ '^GR-[0-9]{4}-[0-9]{4}-[0-9]{4}$';
+    assert n = 4, 'cada perfil nuevo recibe un codigo de amigo distinto: ' || n;
     select count(*) into n from public.profiles;
     assert n = 4, 'deben existir 4 perfiles, hay ' || n;
     select username into u from public.profiles where id = '00000000-0000-0000-0000-00000000000a';
@@ -240,8 +242,41 @@ begin
     assert ok, 'no se sigue dos veces';
     select followers into n from public.profile_stats where username = 'Ana_99';
     assert n = 1, 'Ana tiene un seguidor: ' || n;
+
+    -- codigo de amigo
+    declare code text; who text;
+    begin
+        select friend_code into code from public.profiles where username = 'Eland';
+        assert code ~ '^GR-[0-9]{4}-[0-9]{4}-[0-9]{4}$', 'formato del codigo: ' || coalesce(code, 'null');
+        who := public.follow_by_code(lower(replace(code, '-', ' ')));   -- con espacios y en minusculas tambien vale
+        assert who = 'Eland', 'seguir por codigo: ' || who;
+        who := public.follow_by_code(code);                              -- repetir no falla ni duplica
+        select count(*) into n from public.follows where follower_id = auth.uid();
+        assert n = 2, 'jefe sigue a dos: ' || n;
+
+        ok := false;
+        begin perform public.follow_by_code('GR-0000-0000-0000');
+        exception when others then ok := sqlerrm = 'no hay nadie con ese codigo de amigo'; end;
+        assert ok, 'codigo que no existe';
+        ok := false;
+        begin perform public.follow_by_code('123');
+        exception when others then ok := sqlerrm = 'el codigo de amigo tiene 12 numeros'; end;
+        assert ok, 'codigo corto';
+        ok := false;
+        begin perform public.follow_by_code((select friend_code from public.profiles where id = auth.uid()));
+        exception when others then ok := sqlerrm = 'ese es tu propio codigo'; end;
+        assert ok, 'no te sigues a ti mismo';
+        ok := false;
+        begin perform public.follow_code('00000000-0000-0000-0000-00000000000a', code);
+        exception when insufficient_privilege then ok := true; end;
+        assert ok, 'la funcion interna no se puede llamar directo (permitiria seguir en nombre de otro)';
+        ok := false;
+        begin update public.profiles set friend_code = 'GR-1111-1111-1111' where id = auth.uid();
+        exception when insufficient_privilege then ok := true; end;
+        assert ok, 'nadie se cambia el codigo a mano';
+    end;
     select following into n from public.profile_stats where username = 'jefe';
-    assert n = 1, 'jefe sigue a uno: ' || n;
+    assert n = 2, 'jefe sigue a dos (Ana y Eland): ' || n;
 end $$;
 reset role;
 reset request.jwt.claim.sub;
@@ -250,7 +285,11 @@ set role anon;
 do $$
 declare j jsonb;
 begin
+    assert public.device_follow_by_code((select device_token from t_link), (select friend_code from public.profiles where username = 'jefe')) = 'jefe',
+           'la consola de Ana sigue a jefe por codigo';
     j := public.device_profile((select device_token from t_link));
+    assert j ->> 'friend_code' ~ '^GR-', 'device_profile trae el codigo de amigo';
+    assert (j ->> 'following')::int = 1, 'Ana ahora sigue a uno';
     assert j ->> 'username' = 'Ana_99' and (j ->> 'followers')::int = 1 and (j ->> 'platinums')::int = 1
        and (j ->> 'points')::int = 15 and j ->> 'caption' = 'Cazatrofeos', 'device_profile: ' || j::text;
     assert public.device_profile('llave-inventada') is null, 'llave inventada: null';

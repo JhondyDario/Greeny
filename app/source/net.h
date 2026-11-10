@@ -10,3 +10,6 @@ const char *net_last_error(void); /* texto tecnico del ultimo fallo, para el reg
 
 /* Tiene la forma de gr_http_fn (ver account.h). */
 int net_http(const char *url, const char *bearer, const char *json_body, char *out, size_t cap, long *status);
+
+/* Tiene la forma de gr_get_fn (ver icons.h). Sirve para bajar imagenes. */
+int net_get(const char *url, void *out, size_t cap, size_t *len, long *status);

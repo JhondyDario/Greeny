@@ -112,6 +112,10 @@ static void server_error(const char *resp, char *err, size_t errlen) {
     if (strstr(msg, "Invalid login credentials")) snprintf(err, errlen, "Correo o contraseña incorrectos.");
     else if (strstr(msg, "Email not confirmed")) snprintf(err, errlen, "Falta confirmar el correo de la cuenta.");
     else if (strstr(msg, "consola no vinculada")) snprintf(err, errlen, "Esta consola ya no está vinculada.");
+    else if (strstr(msg, "no hay nadie con ese codigo")) snprintf(err, errlen, "No hay nadie con ese código de amigo.");
+    else if (strstr(msg, "12 numeros")) snprintf(err, errlen, "El código de amigo tiene 12 números.");
+    else if (strstr(msg, "tu propio codigo")) snprintf(err, errlen, "Ese es tu propio código.");
+    else if (strstr(msg, "Could not find the function")) snprintf(err, errlen, "El servidor todavía no tiene esta función.");
     else snprintf(err, errlen, "%s", msg);
 }
 
@@ -150,6 +154,7 @@ void gr_account_load(gr_account *a, const char *path) {
         else if (!strcmp(line, "caption")) snprintf(a->caption, sizeof(a->caption), "%s", v);
         else if (!strcmp(line, "followers")) { a->followers = atoi(v); a->social_known = true; }
         else if (!strcmp(line, "following")) a->following = atoi(v);
+        else if (!strcmp(line, "friend_code")) snprintf(a->friend_code, sizeof(a->friend_code), "%s", v);
     }
     fclose(f);
     if (!a->token[0]) a->linked = false;
@@ -162,6 +167,7 @@ int gr_account_save(const gr_account *a, const char *path) {
     int ok = fprintf(f, "token=%s\nlinked=%d\nusername=%s\ndisplay=%s\ncaption=%s\n", a->token, a->linked ? 1 : 0, a->username,
                      a->display, a->caption) > 0;
     if (ok && a->social_known) ok = fprintf(f, "followers=%d\nfollowing=%d\n", a->followers, a->following) > 0;
+    if (ok && a->friend_code[0]) ok = fprintf(f, "friend_code=%s\n", a->friend_code) > 0;
     if (fclose(f) != 0) ok = 0;
     return ok ? 0 : -1;
 }
@@ -219,6 +225,22 @@ gr_net_result gr_fetch_social(gr_http_fn http, gr_account *a) {
         a->following = following;
         a->social_known = true;
     }
+    gr_json_string(resp, "friend_code", a->friend_code, sizeof(a->friend_code));
+    return GR_NET_OK;
+}
+
+gr_net_result gr_follow_code(gr_http_fn http, const gr_account *a, const char *code, char *who, size_t wholen,
+                             char *err, size_t errlen) {
+    char c[64], body[256], resp[RESP_MAX];
+    who[0] = 0;
+    if (!a->token[0] || !a->linked) { snprintf(err, errlen, "Esta consola no está vinculada."); return GR_NET_REJECTED; }
+    gr_json_escape(c, sizeof(c), code);
+    snprintf(body, sizeof(body), "{\"device_token\":\"%s\",\"code\":\"%s\"}", a->token, c);
+    gr_net_result r = call(http, "/rest/v1/rpc/device_follow_by_code", NULL, body, resp, sizeof(resp), err, errlen);
+    if (r != GR_NET_OK) return r;
+    /* la funcion devuelve el usuario como un texto JSON suelto: "nombre" */
+    size_t len = strlen(resp);
+    if (len >= 3 && resp[0] == '"' && resp[len - 1] == '"') snprintf(who, wholen, "%.*s", (int)(len - 2), resp + 1);
     return GR_NET_OK;
 }
 

@@ -36,6 +36,56 @@ alter table public.profiles add constraint profiles_username_reserved check (low
 -- el nombre de usuario es unico sin importar mayusculas
 create unique index if not exists profiles_username_lower_idx on public.profiles (lower(username));
 
+-- Codigo de amigo, al estilo de la Switch: GR-1234-5678-9012. Sirve para seguir a
+-- alguien sin tener que buscar su nombre. Se genera solo al crear el perfil.
+alter table public.profiles add column if not exists friend_code text;
+
+create or replace function public.new_friend_code()
+returns text language plpgsql volatile set search_path = ''
+as $$
+declare
+    bytes bytea := uuid_send(gen_random_uuid());
+    digits text := '';
+begin
+    for i in 0..11 loop
+        digits := digits || (get_byte(bytes, i) % 10)::text;
+    end loop;
+    return 'GR-' || substr(digits, 1, 4) || '-' || substr(digits, 5, 4) || '-' || substr(digits, 9, 4);
+end;
+$$;
+
+create or replace function public.set_friend_code()
+returns trigger language plpgsql set search_path = ''
+as $$
+begin
+    -- el codigo lo pone siempre el servidor; si choca con uno existente se prueba otro
+    for attempt in 1..20 loop
+        new.friend_code := public.new_friend_code();
+        exit when not exists (select 1 from public.profiles p where p.friend_code = new.friend_code);
+    end loop;
+    return new;
+end;
+$$;
+
+drop trigger if exists profiles_friend_code on public.profiles;
+create trigger profiles_friend_code before insert on public.profiles
+    for each row execute function public.set_friend_code();
+
+-- perfiles creados antes de que existiera el codigo
+do $$
+declare r record; code text;
+begin
+    for r in select id from public.profiles where friend_code is null loop
+        loop
+            code := public.new_friend_code();
+            exit when not exists (select 1 from public.profiles p where p.friend_code = code);
+        end loop;
+        update public.profiles set friend_code = code where id = r.id;
+    end loop;
+end $$;
+
+create unique index if not exists profiles_friend_code_idx on public.profiles (friend_code);
+
 -- Frases sugeridas para el caption (el desplegable de la web).
 create table if not exists public.caption_presets (
     id      smallint primary key,
@@ -415,6 +465,60 @@ select p.id, p.username,
             on t.title_id = g.title_id
        ) s on true;
 
+-- Seguir a alguien por su codigo de amigo. Acepta el codigo con o sin "GR" y guiones.
+-- Devuelve el nombre de usuario de la persona seguida.
+create or replace function public.follow_code(who uuid, code text)
+returns text
+language plpgsql security definer set search_path = ''
+as $$
+declare
+    digits text := regexp_replace(coalesce(code, ''), '[^0-9]', '', 'g');
+    target record;
+begin
+    if char_length(digits) <> 12 then
+        raise exception 'el codigo de amigo tiene 12 numeros';
+    end if;
+    select p.id, p.username into target from public.profiles p
+     where p.friend_code = 'GR-' || substr(digits, 1, 4) || '-' || substr(digits, 5, 4) || '-' || substr(digits, 9, 4);
+    if target.id is null then
+        raise exception 'no hay nadie con ese codigo de amigo';
+    end if;
+    if target.id = who then
+        raise exception 'ese es tu propio codigo';
+    end if;
+    insert into public.follows (follower_id, followed_id) values (who, target.id) on conflict do nothing;
+    return target.username;
+end;
+$$;
+
+-- (web, con sesion)
+create or replace function public.follow_by_code(code text)
+returns text
+language plpgsql security definer set search_path = ''
+as $$
+begin
+    if (select auth.uid()) is null then
+        raise exception 'hay que iniciar sesion';
+    end if;
+    return public.follow_code((select auth.uid()), code);
+end;
+$$;
+
+-- (consola)
+create or replace function public.device_follow_by_code(device_token text, code text)
+returns text
+language plpgsql security definer set search_path = ''
+as $$
+declare v_uid uuid;
+begin
+    select d.user_id into v_uid from public.devices d where d.token_hash = public.hash_token(device_token);
+    if v_uid is null then
+        raise exception 'consola no vinculada';
+    end if;
+    return public.follow_code(v_uid, code);
+end;
+$$;
+
 -- (consola) Datos del perfil para mostrarlos en la app. null si la consola no esta vinculada.
 create or replace function public.device_profile(device_token text)
 returns jsonb
@@ -422,6 +526,7 @@ language sql stable security definer set search_path = ''
 as $$
     select jsonb_build_object(
                'username', p.username, 'display_name', p.display_name, 'caption', p.caption, 'avatar_url', p.avatar_url,
+               'friend_code', p.friend_code,
                'achievements', s.achievements, 'points', s.points, 'games', s.games, 'platinums', s.platinums,
                'followers', s.followers, 'following', s.following)
       from public.devices d
@@ -516,6 +621,8 @@ grant execute on function public.is_admin() to anon, authenticated;
 grant execute on function public.device_link_start(text) to anon, authenticated;
 grant execute on function public.device_whoami(text) to anon, authenticated;
 grant execute on function public.device_profile(text) to anon, authenticated;
+grant execute on function public.device_follow_by_code(text, text) to anon, authenticated;
+grant execute on function public.follow_by_code(text) to authenticated;
 grant execute on function public.device_push_unlocks(text, jsonb) to anon, authenticated;
 grant execute on function public.device_link_claim(text) to authenticated;
 grant execute on function public.device_register(text) to authenticated;

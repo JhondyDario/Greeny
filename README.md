@@ -42,6 +42,7 @@ config/greeny/games/                    archivos de logros, uno por juego
 config/greeny/unlocked/                 tu progreso
 config/greeny/sounds/                   sonidos que usa el sysmodule
 config/greeny/account.ini               llave de esta consola, si la vinculaste (no es tu contraseña)
+config/greeny/cache/                    iconos de logros ya descargados
 config/greeny/config.ini                opciones
 config/greeny/log.txt                   registro del sysmodule
 config/greeny/app-log.txt               pasos de arranque de la app
@@ -126,6 +127,8 @@ make -C test
 | Web con cuentas (`web/`) | Hecha; probada en navegador con servidor simulado, falta contra el proyecto real |
 | App: cuenta (vincular con código, entrar con correo, subir logros) | Probada contra el servidor real desde PC; falta probarla en consola |
 | Perfil, nivel, medallas y seguidores (app y web) | Revisado en PC y en navegador; falta probarlo en consola y contra el servidor real |
+| Iconos de logros en la app (se bajan del catálogo y se guardan en la SD) | Descarga probada contra el servidor real desde PC; falta probarla en consola |
+| Código de amigo y soporte táctil en la app | Falta probarlos en consola |
 | Buscador de juegos del catálogo en la app | Pendiente |
 | Iconos por logro, música y animaciones en la app | Pendiente ([docs/RECURSOS.md](docs/RECURSOS.md)) |
 

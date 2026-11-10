@@ -14,15 +14,13 @@
 #include "config.h"
 #include "diag.h"
 #include "gfx.h"
+#include "icons.h"
 #include "model.h"
 #include "net.h"
 #include "sfx.h"
 #include "ui.h"
 
-#define STB_IMAGE_IMPLEMENTATION
-#define STBI_ONLY_JPEG
-#define STBI_NO_STDIO
-#include "third_party/stb_image.h"
+#include "third_party/stb_image.h" /* la implementacion esta en stb_impl.c */
 
 #include "bg_claro_bin.h"
 #include "bg_oscuro_bin.h"
@@ -76,6 +74,15 @@ static ui_profile g_profile;          /* lo que muestran la barra de arriba y la
 /* mensaje de la pantalla SCREEN_MSG */
 static char g_msg_title[80], g_msg_line1[160], g_msg_line2[160];
 static bool g_msg_ok;
+static screen_t g_msg_return = SCREEN_SETTINGS; /* a donde vuelve el mensaje al aceptarlo */
+
+/* iconos de los logros del juego abierto */
+static uint8_t *g_icons[LG_MAX_ACH], *g_icons_gray[LG_MAX_ACH];
+static Thread g_icon_thread;
+static bool g_icon_thread_live;
+static volatile int g_icon_state;     /* 0 nada, 1 bajando, 2 termino */
+static int g_icon_downloaded;
+static char g_icon_tid[17];           /* juego cuyos iconos se estan bajando */
 
 static uint32_t g_bg_px[UI_W * UI_H]; /* fondo del tema actual, ya decodificado */
 static int g_bg_loaded = -1;          /* 0 claro, 1 oscuro, -1 ninguno */
@@ -221,6 +228,59 @@ static void console_nickname(char *out, size_t cap) {
     accountExit();
 }
 
+/* ---------- iconos de logros ---------- */
+
+/* Carga de la SD los iconos del juego abierto (los que haya). */
+static void load_icons(const char *tid) {
+    for (int i = 0; i < LG_MAX_ACH; i++) {
+        free(g_icons[i]);
+        free(g_icons_gray[i]);
+        g_icons[i] = g_icons_gray[i] = NULL;
+        g_assets.ach_icons[i] = g_assets.ach_icons_gray[i] = NULL;
+    }
+    for (int i = 0; tid && i < g_model.cur.nach; i++) {
+        uint8_t *img = malloc(GR_ICON_BYTES), *gray = malloc(GR_ICON_BYTES);
+        if (img && gray && gr_icon_load(ROOT, tid, g_model.cur.ach[i].id, img)) {
+            gr_icon_gray(img, gray);
+            g_assets.ach_icons[i] = g_icons[i] = img;
+            g_assets.ach_icons_gray[i] = g_icons_gray[i] = gray;
+        } else {
+            free(img);
+            free(gray);
+        }
+    }
+}
+
+static void icon_thread(void *arg) {
+    (void)arg;
+    g_icon_downloaded = 0;
+    gr_icons_sync(net_get, ROOT, g_icon_tid, &g_icon_downloaded);
+    g_icon_state = 2;
+}
+
+/* Pone al dia los iconos de un juego en segundo plano, si hay internet. */
+static void icons_start(const char *tid) {
+    if (g_icon_thread_live || !net_online()) return;
+    snprintf(g_icon_tid, sizeof(g_icon_tid), "%s", tid);
+    g_icon_state = 1;
+    if (R_SUCCEEDED(threadCreate(&g_icon_thread, icon_thread, NULL, NULL, 0x40000, 0x2C, -2)) &&
+        R_SUCCEEDED(threadStart(&g_icon_thread)))
+        g_icon_thread_live = true;
+    else
+        g_icon_state = 0;
+}
+
+/* Devuelve true si llegaron iconos nuevos del juego `open_tid` (hay que recargarlos y redibujar). */
+static bool icons_collect(const char *open_tid) {
+    if (!g_icon_thread_live || g_icon_state != 2) return false;
+    threadWaitForExit(&g_icon_thread);
+    threadClose(&g_icon_thread);
+    g_icon_thread_live = false;
+    g_icon_state = 0;
+    trace("iconos de %s: %d bajados", g_icon_tid, g_icon_downloaded);
+    return g_icon_downloaded > 0 && open_tid && !strcmp(open_tid, g_icon_tid);
+}
+
 /* ---------- cuenta ---------- */
 
 static void show_message(bool ok, const char *title, const char *line1, const char *line2) {
@@ -240,6 +300,7 @@ static void refresh_greeting(void) {
     g_profile.username = linked ? g_account.username : "";
     g_profile.name = linked ? (g_account.display[0] ? g_account.display : g_account.username) : (g_nick[0] ? g_nick : "Jugador");
     g_profile.caption = linked ? g_account.caption : "";
+    g_profile.friend_code = linked ? g_account.friend_code : "";
     g_profile.social_known = g_account.social_known;
     g_profile.followers = g_account.followers;
     g_profile.following = g_account.following;
@@ -322,12 +383,13 @@ static void sync_text(const char **es, const char **en) {
 }
 
 /* Teclado de la consola. Devuelve false si se cancelo o no se pudo abrir. */
-static bool ask_text(const char *guide, bool password, char *out, size_t cap) {
+static bool ask_text(const char *guide, bool password, bool numeric, char *out, size_t cap) {
     SwkbdConfig kbd;
     out[0] = 0;
     if (R_FAILED(swkbdCreate(&kbd, 0))) return false;
     if (password) swkbdConfigMakePresetPassword(&kbd);
     else swkbdConfigMakePresetDefault(&kbd);
+    if (numeric) swkbdConfigSetType(&kbd, SwkbdType_NumPad);
     swkbdConfigSetGuideText(&kbd, guide);
     swkbdConfigSetStringLenMax(&kbd, (u32)cap - 1);
     Result rc = swkbdShow(&kbd, out, cap);
@@ -339,8 +401,8 @@ static bool ask_text(const char *guide, bool password, char *out, size_t cap) {
 static void login_with_password(void) {
     char email[128], password[128], name[64], err[160] = "";
     if (!net_online()) { show_message(false, "Sin conexión", "Conecta la consola a internet e inténtalo de nuevo.", NULL); return; }
-    if (!ask_text("Correo de tu cuenta Greeny", false, email, sizeof(email))) { show_message(false, "Cancelado", "No se escribió el correo.", NULL); return; }
-    if (!ask_text("Contraseña", true, password, sizeof(password))) { show_message(false, "Cancelado", "No se escribió la contraseña.", NULL); return; }
+    if (!ask_text("Correo de tu cuenta Greeny", false, false, email, sizeof(email))) { show_message(false, "Cancelado", "No se escribió el correo.", NULL); return; }
+    if (!ask_text("Contraseña", true, false, password, sizeof(password))) { show_message(false, "Cancelado", "No se escribió la contraseña.", NULL); return; }
 
     device_name(name, sizeof(name));
     gr_account fresh;
@@ -358,6 +420,26 @@ static void login_with_password(void) {
     snprintf(line, sizeof(line), "Esta consola quedó vinculada a @%s.", g_account.username[0] ? g_account.username : "tu cuenta");
     show_message(true, "¡Listo!", line, "Tus logros se suben solos cuando hay internet.");
     sync_start();
+}
+
+/* Seguir a alguien escribiendo su codigo de amigo. Deja listo el mensaje de resultado. */
+static void follow_with_code(void) {
+    char code[32], who[40], err[160] = "";
+    if (!net_online()) { show_message(false, "Sin conexión", "Conecta la consola a internet e inténtalo de nuevo.", NULL); return; }
+    if (!ask_text("Código de amigo: 12 números", false, true, code, sizeof(code))) {
+        show_message(false, "Cancelado", "No se escribió ningún código.", NULL);
+        return;
+    }
+    gr_net_result r = gr_follow_code(net_http, &g_account, code, who, sizeof(who), err, sizeof(err));
+    if (r != GR_NET_OK) {
+        trace("seguir por codigo: fallo %d (%s) %s", (int)r, err, net_last_error());
+        show_message(false, "No se pudo seguir", err, NULL);
+        return;
+    }
+    char line[160];
+    snprintf(line, sizeof(line), "Ahora sigues a @%s.", who[0] ? who : "ese jugador");
+    show_message(true, "¡Listo!", line, NULL);
+    sync_start(); /* para que el contador de \"siguiendo\" se ponga al dia */
 }
 
 /* Si no hay fuente o pantalla grafica, al menos decirlo en modo texto en vez de cerrar sin mas. */
@@ -408,6 +490,7 @@ int main(int argc, char *argv[]) {
     padConfigureInput(1, HidNpadStyleSet_NpadStandard);
     PadState pad;
     padInitializeDefault(&pad);
+    hidInitializeTouchScreen();
     PadRepeater rep;
     padRepeaterInitialize(&rep, 22, 6);
 
@@ -499,6 +582,10 @@ int main(int argc, char *argv[]) {
     refresh_greeting();
     sync_start(); /* en segundo plano y solo si hay cuenta e internet; la app no espera por esto */
 
+    /* tactil: un toque corto es una pulsacion; un arrastre vertical mueve la lista */
+    bool touching = false;
+    int touch_x0 = 0, touch_y0 = 0, touch_x = 0, touch_y = 0;
+
     char link_code[8] = "";
     u64 link_started = 0, link_last_poll = 0;
     int link_shown_left = -1;
@@ -510,12 +597,42 @@ int main(int argc, char *argv[]) {
         padRepeaterUpdate(&rep, padGetButtons(&pad) & dirs);
         u64 down = padGetButtonsDown(&pad);
         u64 nav = (down | padRepeaterGetButtons(&rep)) & dirs;
+
+        /* ---- tactil: se traduce a los mismos botones, asi cada pantalla no necesita saber de toques ---- */
+        int tap_item = -1, tap_tab = -1;
+        HidTouchScreenState touch = {0};
+        if (hidGetTouchScreenStates(&touch, 1) && touch.count > 0) {
+            touch_x = (int)touch.touches[0].x;
+            touch_y = (int)touch.touches[0].y;
+            if (!touching) { touching = true; touch_x0 = touch_x; touch_y0 = touch_y; }
+        } else if (touching) {
+            touching = false;
+            int dx = touch_x - touch_x0, dy = touch_y - touch_y0;
+            if (abs(dx) < 24 && abs(dy) < 24) {
+                static const u64 button_of[UI_BTN_COUNT] = { HidNpadButton_A, HidNpadButton_B, HidNpadButton_X, HidNpadButton_Y,
+                                                             HidNpadButton_Plus, HidNpadButton_Minus, HidNpadButton_L, HidNpadButton_R };
+                const ui_zone *z = ui_zone_at(touch_x, touch_y);
+                if (z && z->kind == UI_ZONE_BUTTON && z->value >= 0 && z->value < UI_BTN_COUNT) down |= button_of[z->value];
+                else if (z && z->kind == UI_ZONE_ITEM) tap_item = z->value;
+                else if (z && z->kind == UI_ZONE_TAB) tap_tab = z->value;
+            } else if (abs(dy) > 60 && abs(dy) > abs(dx)) {
+                nav |= dy < 0 ? HidNpadButton_AnyDown : HidNpadButton_AnyUp; /* arrastrar hacia arriba baja en la lista */
+            }
+        }
+        /* tocar un elemento lo selecciona; tocarlo otra vez (o si ya estaba seleccionado) lo abre */
+#define TAP_SELECT(cursor_var, count) do { \
+            if (tap_item >= 0 && tap_item < (count)) { \
+                if ((cursor_var) == tap_item) down |= HidNpadButton_A; \
+                else { (cursor_var) = tap_item; dirty = true; sfx_play(SFX_NAV); } \
+            } } while (0)
+
         if (down & HidNpadButton_Plus) { plus_pressed = true; break; }
 
         bool moved = false, accepted = false, accepted_alt = false, opened = false, back = false;
 
         if (screen == SCREEN_HOME) {
             ui_layout l = ui_home_layout(&g_config);
+            TAP_SELECT(cursor, g_model.ngames);
             if (g_model.ngames > 0) moved = move_cursor(&cursor, g_model.ngames, l.cols, nav);
             if (down & HidNpadButton_Y) {
                 rescan();
@@ -533,6 +650,8 @@ int main(int argc, char *argv[]) {
             follow(cursor, &top, l);
             if ((down & HidNpadButton_A) && g_model.ngames > 0) {
                 gr_open(&g_model, cursor, ROOT);
+                load_icons(g_model.games[cursor].tid);   /* los que ya esten en la SD se ven de una vez */
+                icons_start(g_model.games[cursor].tid);  /* y en segundo plano se buscan los nuevos */
                 screen = SCREEN_DETAIL;
                 dcursor = dtop = 0;
                 opened = true;
@@ -542,6 +661,7 @@ int main(int argc, char *argv[]) {
         } else if (screen == SCREEN_DETAIL) {
             ui_layout l = ui_detail_layout(&g_config);
             int n = g_model.games[cursor].broken ? 0 : g_model.cur.nach;
+            if (tap_item >= 0 && tap_item < n && dcursor != tap_item) { dcursor = tap_item; dirty = true; sfx_play(SFX_NAV); }
             if (n > 0) moved = move_cursor(&dcursor, n, l.cols, nav);
             if ((down & HidNpadButton_Minus) && n > 0) {
                 g_config.ach_view = (g_config.ach_view + 1) % GR_VIEW_COUNT;
@@ -554,6 +674,8 @@ int main(int argc, char *argv[]) {
             if (down & HidNpadButton_B) { screen = SCREEN_HOME; back = true; }
         } else if (screen == SCREEN_SETTINGS) {
             bool linked = g_account.linked;
+            if (tap_tab >= 0 && tap_tab < UI_TABS && tap_tab != stab) { stab = tap_tab; srow = 0; accepted_alt = true; }
+            TAP_SELECT(srow, ui_tab_count(stab, linked));
             if (down & (HidNpadButton_L | HidNpadButton_R)) {
                 stab = (stab + ((down & HidNpadButton_R) ? 1 : UI_TABS - 1)) % UI_TABS;
                 srow = 0;
@@ -652,10 +774,21 @@ int main(int argc, char *argv[]) {
         } else if (screen == SCREEN_PROFILE) {
             if (down & (HidNpadButton_L | HidNpadButton_B)) { screen = SCREEN_HOME; back = true; }
             if (down & HidNpadButton_X) { screen = SCREEN_BADGES; opened = true; }
+            if ((down & HidNpadButton_Y) && g_account.linked) {
+                follow_with_code();
+                g_msg_return = SCREEN_PROFILE;
+                screen = SCREEN_MSG;
+                opened = true;
+            }
         } else if (screen == SCREEN_BADGES) {
             if (down & HidNpadButton_B) { screen = SCREEN_PROFILE; back = true; }
         } else if (screen == SCREEN_MSG) {
-            if (down & (HidNpadButton_A | HidNpadButton_B)) { screen = SCREEN_SETTINGS; stab = UI_TAB_ACCOUNT; srow = 0; back = true; }
+            if (down & (HidNpadButton_A | HidNpadButton_B)) {
+                screen = g_msg_return;
+                if (screen == SCREEN_SETTINGS) { stab = UI_TAB_ACCOUNT; srow = 0; }
+                g_msg_return = SCREEN_SETTINGS;
+                back = true;
+            }
         } else if (screen == SCREEN_DIAG) {
             if (down & HidNpadButton_Y) { rescan(); run_diag(); accepted_alt = true; }
             if (down & HidNpadButton_B) { screen = SCREEN_SETTINGS; back = true; }
@@ -681,6 +814,10 @@ int main(int argc, char *argv[]) {
         else if (moved) sfx_play(SFX_NAV);
         if (moved || accepted || accepted_alt || opened || back) dirty = true;
         if (sync_collect()) dirty = true;
+        if (icons_collect(screen == SCREEN_DETAIL ? g_model.games[cursor].tid : NULL)) {
+            load_icons(g_model.games[cursor].tid);
+            dirty = true;
+        }
         sfx_update();
 
         /* La pantalla (texto, tarjetas) solo se redibuja en su capa cuando algo cambia.
@@ -720,6 +857,7 @@ int main(int argc, char *argv[]) {
     trace("saliendo del bucle (%s)", plus_pressed ? "boton +" : "lo pidio el sistema: HOME o cierre");
     trace("cerrando red");
     if (g_sync_thread_live) { threadWaitForExit(&g_sync_thread); threadClose(&g_sync_thread); }
+    if (g_icon_thread_live) { threadWaitForExit(&g_icon_thread); threadClose(&g_icon_thread); }
     net_exit();
     trace("cerrando audio");
     sfx_exit();

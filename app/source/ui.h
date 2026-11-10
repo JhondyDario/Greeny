@@ -3,6 +3,7 @@
 #include "config.h"
 #include "diag.h"
 #include "gfx.h"
+#include "icons.h"
 #include "model.h"
 #include "progress.h"
 
@@ -12,7 +13,7 @@
 #define UI_COVER_BIG  150  /* caratula en la cuadricula */
 
 #define UI_APP_NAME    "Greeny"
-#define UI_APP_VERSION "0.0.7"
+#define UI_APP_VERSION "0.0.8"
 
 /* opciones, agrupadas en pestañas que se cambian con L y R */
 enum {
@@ -46,10 +47,24 @@ typedef struct {
     /* caratulas RGBA en el mismo orden que model->games; NULL = no hay */
     const uint8_t *covers[GR_MAX_GAMES];      /* UI_COVER x UI_COVER */
     const uint8_t *covers_big[GR_MAX_GAMES];  /* UI_COVER_BIG x UI_COVER_BIG */
+    /* iconos de los logros del juego abierto (GR_ICON_SIZE de lado), en el orden de model->cur.ach;
+     * NULL = no hay icono guardado. El gris es para los que aun no se tienen. */
+    const uint8_t *ach_icons[LG_MAX_ACH];
+    const uint8_t *ach_icons_gray[LG_MAX_ACH];
 } ui_assets;
 
 /* columnas y filas visibles de una pantalla, para que la navegacion sea la misma en lista y cuadricula */
 typedef struct { int cols, rows; } ui_layout;
+
+/* Zonas tactiles de la pantalla que se acaba de dibujar. */
+typedef enum { UI_ZONE_BUTTON, UI_ZONE_ITEM, UI_ZONE_TAB } ui_zone_kind;
+typedef struct {
+    int x, y, w, h;
+    ui_zone_kind kind;
+    int value;  /* UI_BTN_* para un boton; indice para un elemento o una pestaña */
+} ui_zone;
+/* La zona que hay en ese punto, o NULL. */
+const ui_zone *ui_zone_at(int x, int y);
 
 void ui_set_english(bool english);
 void ui_set_dark(bool dark);
@@ -61,6 +76,7 @@ typedef struct {
     const char *name;       /* nombre visible, o el apodo de la consola si no hay cuenta */
     const char *username;   /* "" si la consola no esta vinculada */
     const char *caption;
+    const char *friend_code; /* "" si aun no se sabe */
     bool linked;
     bool social_known;      /* false = todavia no se sabe cuantos seguidores tiene */
     int followers, following;
