@@ -1,6 +1,6 @@
 # Cuentas, web y sincronización
 
-**Estado: la base de datos está definida y probada ([`supabase/schema.sql`](../supabase/schema.sql)). Falta la web y la conexión desde la app.**
+**Estado: la base de datos y la web están hechas. La web se probó con un servidor simulado; falta probarla contra el proyecto real. Falta la conexión desde la app de la consola.**
 
 ## Proyecto
 
@@ -12,7 +12,41 @@
 Estos dos datos son públicos por diseño: van dentro de la web y de la app. Lo
 que protege los datos son las reglas de seguridad por fila de la base de datos.
 
-## Cómo va a funcionar
+## Configurar el inicio de sesión (una sola vez)
+
+La web se publica sola en GitHub Pages desde la carpeta `web/`:
+`https://jhondydario.github.io/Greeny/`
+
+### 1. Decirle a Supabase cuál es la web
+
+Supabase → **Authentication → URL Configuration**:
+
+- **Site URL**: `https://jhondydario.github.io/Greeny/`
+- **Redirect URLs**: añade `https://jhondydario.github.io/Greeny/`
+
+Sin esto, el enlace del correo de confirmación y el regreso de Discord llevan a
+una página que no existe.
+
+### 2. Discord
+
+1. Entra a <https://discord.com/developers/applications> → **New Application** →
+   nombre "Greeny".
+2. En **OAuth2**, copia el **Client ID** y genera el **Client Secret**.
+3. En Supabase → **Authentication → Sign In / Providers → Discord**: actívalo y
+   pega el Client ID y el Client Secret. Ahí mismo Supabase muestra un
+   **Callback URL** (termina en `/auth/v1/callback`).
+4. De vuelta en Discord → **OAuth2 → Redirects**: pega ese Callback URL y guarda.
+
+### 3. Publicar el primer juego
+
+1. Crea tu cuenta en la web y hazte administrador (la consulta está al final de
+   `supabase/schema.sql`).
+2. Vuelve a cargar la web: aparece **Publicar** en el menú.
+3. Sube `juegos/010028600EBDA000.txt`. El nombre del archivo es el Title ID.
+4. Sube los iconos: PNG de 128×128, cada uno con el id del logro como nombre
+   (`monedas_5.png`).
+
+## Cómo funciona
 
 ```
 Sysmodule ──guarda──▶ SD ──lee──▶ App Greeny ──HTTPS──▶ Supabase ◀── Web (GitHub Pages)
