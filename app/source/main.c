@@ -10,10 +10,12 @@
 
 #include <switch.h>
 
+#include "account.h"
 #include "config.h"
 #include "diag.h"
 #include "gfx.h"
 #include "model.h"
+#include "net.h"
 #include "sfx.h"
 #include "ui.h"
 
@@ -22,6 +24,8 @@
 #define STBI_NO_STDIO
 #include "third_party/stb_image.h"
 
+#include "bg_claro_bin.h"
+#include "bg_oscuro_bin.h"
 #include "buttons_bin.h"
 #include "mascot_big_bin.h"
 #include "mascot_small_bin.h"
@@ -30,6 +34,9 @@
 #define ROOT        SD "/config/greeny"
 #define CONFIG_PATH ROOT "/config.ini"
 #define TRACE_PATH  ROOT "/app-log.txt"
+#define ACCOUNT_PATH ROOT "/account.ini"
+#define LINK_SECONDS 600  /* lo que dura un codigo de vinculacion */
+#define LINK_POLL_MS 3000
 #define SYSMODULE_TID 0x4200000000010690ull
 #define TRACE_DONE  "salida normal"
 
@@ -39,7 +46,9 @@
 #define SMALL_W 66
 #define SMALL_H 66
 
-typedef enum { SCREEN_HOME, SCREEN_DETAIL, SCREEN_SETTINGS, SCREEN_DIAG, SCREEN_ABOUT, SCREEN_INTRO } screen_t;
+typedef enum {
+    SCREEN_HOME, SCREEN_DETAIL, SCREEN_SETTINGS, SCREEN_DIAG, SCREEN_ABOUT, SCREEN_INTRO, SCREEN_LINK, SCREEN_MSG
+} screen_t;
 
 static gr_model g_model;
 static gr_config g_config;
@@ -50,6 +59,24 @@ static bool g_ns_ok;
 static gr_diag_env g_env;
 static gr_diag_item g_diag[GR_DIAG_MAX];
 static int g_ndiag;
+
+/* cuenta y sincronizacion */
+typedef enum { SYNC_IDLE, SYNC_RUNNING, SYNC_OK, SYNC_OFFLINE, SYNC_FAILED, SYNC_UNLINKED } sync_state;
+static gr_account g_account;          /* la cuenta que usa la interfaz */
+static gr_account g_sync_account;     /* copia con la que trabaja el hilo de sincronizacion */
+static volatile int g_sync = SYNC_IDLE;
+static int g_sync_sent, g_sync_added;
+static char g_sync_err[160];
+static Thread g_sync_thread;
+static bool g_sync_thread_live;
+static char g_nick[40];               /* apodo del usuario de la consola */
+
+/* mensaje de la pantalla SCREEN_MSG */
+static char g_msg_title[80], g_msg_line1[160], g_msg_line2[160];
+static bool g_msg_ok;
+
+static uint32_t g_bg_px[UI_W * UI_H]; /* fondo del tema actual, ya decodificado */
+static int g_bg_loaded = -1;          /* 0 claro, 1 oscuro, -1 ninguno */
 
 /* ---------- rastro de arranque ----------
  * Cada paso se anota en app-log.txt antes de hacerlo. Si la app se congela, el
@@ -130,9 +157,28 @@ static void rescan(void) {
     load_covers();
 }
 
+/* Decodifica el fondo del tema (viene como JPEG dentro de la app). Si falla, queda el color liso. */
+static void load_background(bool dark) {
+    if (g_bg_loaded == (int)dark) return;
+    int w, h, n;
+    uint8_t *img = dark ? stbi_load_from_memory(bg_oscuro_bin, (int)bg_oscuro_bin_size, &w, &h, &n, 4)
+                        : stbi_load_from_memory(bg_claro_bin, (int)bg_claro_bin_size, &w, &h, &n, 4);
+    if (img && w == UI_W && h == UI_H) {
+        memcpy(g_bg_px, img, sizeof(g_bg_px));
+        ui_set_background(g_bg_px);
+        g_bg_loaded = (int)dark;
+    } else {
+        ui_set_background(NULL);
+        g_bg_loaded = -1;
+    }
+    stbi_image_free(img);
+}
+
 static void apply_config(void) {
+    bool dark = g_config.theme == GR_THEME_DARK || (g_config.theme == GR_THEME_AUTO && g_system_dark);
     ui_set_english(g_config.lang == GR_LANG_EN || (g_config.lang == GR_LANG_AUTO && !g_system_spanish));
-    ui_set_dark(g_config.theme == GR_THEME_DARK || (g_config.theme == GR_THEME_AUTO && g_system_dark));
+    ui_set_dark(dark);
+    load_background(dark);
 }
 
 static void save_config(void) {
@@ -168,6 +214,131 @@ static void console_nickname(char *out, size_t cap) {
         }
     }
     accountExit();
+}
+
+/* ---------- cuenta ---------- */
+
+static void show_message(bool ok, const char *title, const char *line1, const char *line2) {
+    g_msg_ok = ok;
+    snprintf(g_msg_title, sizeof(g_msg_title), "%s", title);
+    snprintf(g_msg_line1, sizeof(g_msg_line1), "%s", line1 ? line1 : "");
+    snprintf(g_msg_line2, sizeof(g_msg_line2), "%s", line2 ? line2 : "");
+}
+
+/* El saludo del inicio usa el usuario de Greeny si la consola esta vinculada; si no, el apodo de la consola. */
+static void refresh_greeting(void) {
+    ui_set_user(g_account.linked && g_account.username[0] ? g_account.username : g_nick);
+}
+
+static void device_name(char *out, size_t cap) {
+    if (g_nick[0]) snprintf(out, cap, "Switch de %s", g_nick);
+    else snprintf(out, cap, "Switch");
+}
+
+/* Hilo de sincronizacion: confirma de quien es la consola y sube los logros. Nunca bloquea la interfaz. */
+static void sync_thread(void *arg) {
+    (void)arg;
+    bool exists = false;
+    gr_net_result r = gr_whoami(net_http, &g_sync_account, &exists);
+    if (r == GR_NET_OFFLINE) { g_sync = SYNC_OFFLINE; return; }
+    if (r != GR_NET_OK) { snprintf(g_sync_err, sizeof(g_sync_err), "No se pudo consultar la cuenta."); g_sync = SYNC_FAILED; return; }
+    if (!exists || !g_sync_account.linked) { g_sync = SYNC_UNLINKED; return; }
+
+    r = gr_push_unlocks(net_http, &g_sync_account, ROOT, &g_sync_sent, &g_sync_added, g_sync_err, sizeof(g_sync_err));
+    g_sync = r == GR_NET_OK ? SYNC_OK : r == GR_NET_OFFLINE ? SYNC_OFFLINE : SYNC_FAILED;
+}
+
+static void sync_start(void) {
+    if (g_sync == SYNC_RUNNING || g_sync_thread_live || !g_account.token[0] || !g_account.linked) return;
+    if (!net_online()) { g_sync = SYNC_OFFLINE; return; }
+    g_sync_account = g_account;
+    g_sync = SYNC_RUNNING;
+    if (R_SUCCEEDED(threadCreate(&g_sync_thread, sync_thread, NULL, NULL, 0x40000, 0x2C, -2)) &&
+        R_SUCCEEDED(threadStart(&g_sync_thread))) {
+        g_sync_thread_live = true;
+    } else {
+        snprintf(g_sync_err, sizeof(g_sync_err), "No se pudo iniciar la sincronización.");
+        g_sync = SYNC_FAILED;
+    }
+}
+
+/* Recoge el resultado del hilo cuando termina. Devuelve true si hay que redibujar. */
+static bool sync_collect(void) {
+    if (!g_sync_thread_live || g_sync == SYNC_RUNNING) return false;
+    threadWaitForExit(&g_sync_thread);
+    threadClose(&g_sync_thread);
+    g_sync_thread_live = false;
+    trace("sincronizacion: estado %d, enviados %d, nuevos %d%s%s", (int)g_sync, g_sync_sent, g_sync_added,
+          g_sync == SYNC_OFFLINE ? ", " : "", g_sync == SYNC_OFFLINE ? net_last_error() : "");
+
+    if (g_sync == SYNC_UNLINKED) {
+        /* la desvincularon desde la web: olvidar la llave */
+        memset(&g_account, 0, sizeof(g_account));
+        gr_account_save(&g_account, ACCOUNT_PATH);
+    } else if (g_sync == SYNC_OK) {
+        g_account = g_sync_account; /* trae el nombre y la frase al dia */
+        gr_account_save(&g_account, ACCOUNT_PATH);
+    }
+    refresh_greeting();
+    return true;
+}
+
+static void sync_text(const char **es, const char **en) {
+    static char buf_es[200], buf_en[200];
+    switch (g_sync) {
+        case SYNC_RUNNING: *es = "Sincronizando…"; *en = "Syncing…"; return;
+        case SYNC_OFFLINE: *es = "Sin conexión. Se intentará la próxima vez que abras la app."; *en = "No connection. It will retry next time you open the app."; return;
+        case SYNC_FAILED:
+            snprintf(buf_es, sizeof(buf_es), "No se pudo: %s", g_sync_err);
+            snprintf(buf_en, sizeof(buf_en), "Failed: %s", g_sync_err);
+            break;
+        case SYNC_OK:
+            snprintf(buf_es, sizeof(buf_es), "Al día: %d logros enviados, %d nuevos en tu cuenta.", g_sync_sent, g_sync_added);
+            snprintf(buf_en, sizeof(buf_en), "Up to date: %d achievements sent, %d new on your account.", g_sync_sent, g_sync_added);
+            break;
+        default: *es = "Sube a tu cuenta los logros guardados en esta consola."; *en = "Uploads the achievements saved on this console to your account."; return;
+    }
+    *es = buf_es;
+    *en = buf_en;
+}
+
+/* Teclado de la consola. Devuelve false si se cancelo o no se pudo abrir. */
+static bool ask_text(const char *guide, bool password, char *out, size_t cap) {
+    SwkbdConfig kbd;
+    out[0] = 0;
+    if (R_FAILED(swkbdCreate(&kbd, 0))) return false;
+    if (password) swkbdConfigMakePresetPassword(&kbd);
+    else swkbdConfigMakePresetDefault(&kbd);
+    swkbdConfigSetGuideText(&kbd, guide);
+    swkbdConfigSetStringLenMax(&kbd, (u32)cap - 1);
+    Result rc = swkbdShow(&kbd, out, cap);
+    swkbdClose(&kbd);
+    return R_SUCCEEDED(rc) && out[0];
+}
+
+/* Entrar con correo y contraseña. Deja listo el mensaje de resultado. */
+static void login_with_password(void) {
+    char email[128], password[128], name[64], err[160] = "";
+    if (!net_online()) { show_message(false, "Sin conexión", "Conecta la consola a internet e inténtalo de nuevo.", NULL); return; }
+    if (!ask_text("Correo de tu cuenta Greeny", false, email, sizeof(email))) { show_message(false, "Cancelado", "No se escribió el correo.", NULL); return; }
+    if (!ask_text("Contraseña", true, password, sizeof(password))) { show_message(false, "Cancelado", "No se escribió la contraseña.", NULL); return; }
+
+    device_name(name, sizeof(name));
+    gr_account fresh;
+    gr_net_result r = gr_login_password(net_http, email, password, name, &fresh, err, sizeof(err));
+    memset(password, 0, sizeof(password));
+    if (r != GR_NET_OK) {
+        trace("entrar con correo: fallo %d (%s) %s", (int)r, err, net_last_error());
+        show_message(false, "No se pudo entrar", err, "Si entras con Discord, usa \"Vincular con un código\".");
+        return;
+    }
+    g_account = fresh;
+    gr_account_save(&g_account, ACCOUNT_PATH);
+    refresh_greeting();
+    char line[160];
+    snprintf(line, sizeof(line), "Esta consola quedó vinculada a @%s.", g_account.username[0] ? g_account.username : "tu cuenta");
+    show_message(true, "¡Listo!", line, "Tus logros se suben solos cuando hay internet.");
+    sync_start();
 }
 
 /* Si no hay fuente o pantalla grafica, al menos decirlo en modo texto en vez de cerrar sin mas. */
@@ -264,6 +435,9 @@ int main(int argc, char *argv[]) {
     trace("audio");
     bool sfx_ok = sfx_init();
 
+    trace("red");
+    net_init();
+
     AppletType at = appletGetAppletType();
     g_env.atmosphere = hosversionIsAtmosphere();
     g_env.covers_ok = g_ns_ok;
@@ -291,17 +465,23 @@ int main(int argc, char *argv[]) {
 
     int cursor = 0, top = 0, dcursor = 0, dtop = 0, stab = 0, srow = 0, intro_page = 0;
     screen_t screen = SCREEN_HOME;
+
+    trace("usuario y cuenta");
+    console_nickname(g_nick, sizeof(g_nick));
+    gr_account_load(&g_account, ACCOUNT_PATH);
     if (!g_config.intro_done) {
         /* primera vez: introduccion con la revision de la instalacion */
         trace("introduccion");
         run_diag();
         screen = SCREEN_INTRO;
     } else {
-        trace("usuario");
-        char nick[40];
-        console_nickname(nick, sizeof(nick));
-        ui_set_user(nick);
+        refresh_greeting();
     }
+    sync_start(); /* en segundo plano y solo si hay cuenta e internet; la app no espera por esto */
+
+    char link_code[8] = "";
+    u64 link_started = 0, link_last_poll = 0;
+    int link_shown_left = -1;
     bool dirty = true, plus_pressed = false;
     const u64 dirs = HidNpadButton_AnyUp | HidNpadButton_AnyDown | HidNpadButton_AnyLeft | HidNpadButton_AnyRight;
 
@@ -352,14 +532,16 @@ int main(int argc, char *argv[]) {
             follow(dcursor, &dtop, l);
             if (down & HidNpadButton_B) { screen = SCREEN_HOME; back = true; }
         } else if (screen == SCREEN_SETTINGS) {
+            bool linked = g_account.linked;
             if (down & (HidNpadButton_L | HidNpadButton_R)) {
                 stab = (stab + ((down & HidNpadButton_R) ? 1 : UI_TABS - 1)) % UI_TABS;
                 srow = 0;
                 accepted_alt = true;
             }
-            moved = move_cursor(&srow, ui_tab_count(stab), 1, nav);
+            if (srow >= ui_tab_count(stab, linked)) srow = 0;
+            moved = move_cursor(&srow, ui_tab_count(stab, linked), 1, nav);
             if (down & HidNpadButton_A) {
-                int opt = ui_tab_option(stab, srow);
+                int opt = ui_tab_option(stab, srow, linked);
                 switch (opt) {
                     case UI_OPT_LANG:       g_config.lang = (g_config.lang + 1) % GR_LANG_COUNT; break;
                     case UI_OPT_THEME:      g_config.theme = (g_config.theme + 1) % GR_THEME_COUNT; break;
@@ -369,18 +551,84 @@ int main(int argc, char *argv[]) {
                     case UI_OPT_SOUND:      g_config.sound = !g_config.sound; break;
                     case UI_OPT_POPUP:      g_config.popup = !g_config.popup; break;
                     case UI_OPT_ABOUT:      screen = SCREEN_ABOUT; break;
-                    default:                run_diag(); screen = SCREEN_DIAG; break;
+                    case UI_OPT_DIAG:       run_diag(); screen = SCREEN_DIAG; break;
+                    case UI_OPT_ACC_LINK: {
+                        char name[64], err[160] = "";
+                        device_name(name, sizeof(name));
+                        gr_net_result r = gr_link_start(net_http, name, &g_account, link_code, err, sizeof(err));
+                        if (r == GR_NET_OK) {
+                            gr_account_save(&g_account, ACCOUNT_PATH); /* por si se cierra la app antes de terminar */
+                            link_started = link_last_poll = armGetSystemTick();
+                            link_shown_left = -1;
+                            screen = SCREEN_LINK;
+                        } else {
+                            trace("vincular: fallo %d (%s) %s", (int)r, err, net_last_error());
+                            show_message(false, r == GR_NET_OFFLINE ? "Sin conexión" : "No se pudo pedir el código",
+                                         r == GR_NET_OFFLINE ? "Conecta la consola a internet e inténtalo de nuevo." : err, NULL);
+                            screen = SCREEN_MSG;
+                        }
+                        break;
+                    }
+                    case UI_OPT_ACC_LOGIN:
+                        login_with_password();
+                        screen = SCREEN_MSG;
+                        break;
+                    case UI_OPT_ACC_SYNC:
+                        sync_start();
+                        break;
+                    case UI_OPT_ACC_UNLINK:
+                        memset(&g_account, 0, sizeof(g_account));
+                        gr_account_save(&g_account, ACCOUNT_PATH);
+                        g_sync = SYNC_IDLE;
+                        refresh_greeting();
+                        srow = 0;
+                        show_message(true, "Consola desvinculada", "Ya no sube logros a tu cuenta.",
+                                     "Para quitarla también de la web: Cuenta → Consolas vinculadas.");
+                        screen = SCREEN_MSG;
+                        break;
+                    default: break; /* la fila de informacion no hace nada */
                 }
                 if (opt < UI_OPT_DIAG) {
                     accepted = true;
                     save_config();
                     top = 0; /* la vista pudo cambiar de forma */
                     follow(cursor, &top, ui_home_layout(&g_config));
-                } else {
+                } else if (opt == UI_OPT_ACC_SYNC) {
+                    accepted_alt = true;
+                } else if (opt != UI_OPT_ACC_INFO) {
                     opened = true;
                 }
             }
             if (down & HidNpadButton_B) { screen = SCREEN_HOME; back = true; }
+        } else if (screen == SCREEN_LINK) {
+            u64 now_tick = armGetSystemTick();
+            int left = LINK_SECONDS - (int)(armTicksToNs(now_tick - link_started) / 1000000000ull);
+            if (left < 0) left = 0;
+            if (left != link_shown_left) { link_shown_left = left; dirty = true; } /* el contador baja cada segundo */
+
+            if (down & HidNpadButton_B) {
+                memset(&g_account, 0, sizeof(g_account)); /* el servidor borra solo los codigos sin usar */
+                gr_account_save(&g_account, ACCOUNT_PATH);
+                screen = SCREEN_SETTINGS;
+                back = true;
+            } else if (left > 0 && armTicksToNs(now_tick - link_last_poll) / 1000000ull >= LINK_POLL_MS) {
+                bool exists = false;
+                link_last_poll = now_tick;
+                if (gr_whoami(net_http, &g_account, &exists) == GR_NET_OK && exists && g_account.linked) {
+                    gr_account_save(&g_account, ACCOUNT_PATH);
+                    refresh_greeting();
+                    char line[160];
+                    snprintf(line, sizeof(line), "Esta consola quedó vinculada a @%s.", g_account.username);
+                    show_message(true, "¡Consola vinculada!", line, "Tus logros se suben solos cuando hay internet.");
+                    screen = SCREEN_MSG;
+                    stab = UI_TAB_ACCOUNT;
+                    srow = 0;
+                    opened = true;
+                    sync_start();
+                }
+            }
+        } else if (screen == SCREEN_MSG) {
+            if (down & (HidNpadButton_A | HidNpadButton_B)) { screen = SCREEN_SETTINGS; stab = UI_TAB_ACCOUNT; srow = 0; back = true; }
         } else if (screen == SCREEN_DIAG) {
             if (down & HidNpadButton_Y) { rescan(); run_diag(); accepted_alt = true; }
             if (down & HidNpadButton_B) { screen = SCREEN_SETTINGS; back = true; }
@@ -392,6 +640,7 @@ int main(int argc, char *argv[]) {
                 if (++intro_page >= UI_INTRO_PAGES) {
                     g_config.intro_done = true;
                     save_config();
+                    refresh_greeting();
                     screen = SCREEN_HOME;
                 }
             }
@@ -404,6 +653,7 @@ int main(int argc, char *argv[]) {
         else if (accepted_alt) sfx_play(SFX_ACCEPT_ALT);
         else if (moved) sfx_play(SFX_NAV);
         if (moved || accepted || accepted_alt || opened || back) dirty = true;
+        if (sync_collect()) dirty = true;
         sfx_update();
 
         /* La pantalla (texto, tarjetas) solo se redibuja en su capa cuando algo cambia.
@@ -411,7 +661,13 @@ int main(int argc, char *argv[]) {
         bool redraw = dirty;
         if (dirty) {
             if (screen == SCREEN_DETAIL) ui_detail(&layer, &g_assets, &g_model, &g_config, cursor, dcursor, dtop);
-            else if (screen == SCREEN_SETTINGS) ui_settings(&layer, &g_assets, &g_config, stab, srow, g_system_spanish, g_system_dark);
+            else if (screen == SCREEN_SETTINGS) {
+                ui_account acc = { .linked = g_account.linked, .username = g_account.username, .caption = g_account.caption };
+                sync_text(&acc.sync_es, &acc.sync_en);
+                ui_settings(&layer, &g_assets, &g_config, stab, srow, g_system_spanish, g_system_dark, &acc);
+            }
+            else if (screen == SCREEN_LINK) ui_link(&layer, &g_assets, link_code, link_shown_left < 0 ? LINK_SECONDS : link_shown_left);
+            else if (screen == SCREEN_MSG) ui_message(&layer, &g_assets, g_msg_title, g_msg_line1, g_msg_line2[0] ? g_msg_line2 : NULL, g_msg_ok);
             else if (screen == SCREEN_DIAG) ui_diag(&layer, &g_assets, g_diag, g_ndiag);
             else if (screen == SCREEN_ABOUT) ui_about(&layer, &g_assets);
             else if (screen == SCREEN_INTRO) ui_intro(&layer, &g_assets, intro_page, g_diag, g_ndiag, g_env.sysmodule_running);
@@ -433,6 +689,9 @@ int main(int argc, char *argv[]) {
     /* Cada paso del cierre queda anotado: si la app se congela al salir (por
      * ejemplo con HOME), app-log.txt dice en cual. */
     trace("saliendo del bucle (%s)", plus_pressed ? "boton +" : "lo pidio el sistema: HOME o cierre");
+    trace("cerrando red");
+    if (g_sync_thread_live) { threadWaitForExit(&g_sync_thread); threadClose(&g_sync_thread); }
+    net_exit();
     trace("cerrando audio");
     sfx_exit();
     trace("cerrando caratulas");

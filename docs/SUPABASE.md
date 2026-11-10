@@ -1,6 +1,6 @@
 # Cuentas, web y sincronización
 
-**Estado: la base de datos y la web están hechas. La web se probó con un servidor simulado; falta probarla contra el proyecto real. Falta la conexión desde la app de la consola.**
+**Estado: base de datos, web y cuenta en la app están hechas. La parte de red de la app se probó desde una PC contra el proyecto real (`test/net/test_account --red`); falta probarla en una consola.**
 
 ## Proyecto
 

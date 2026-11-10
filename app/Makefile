@@ -40,7 +40,7 @@ include $(DEVKITPRO)/libnx/switch_rules
 TARGET		:=	greeny
 APP_TITLE	:=	Greeny
 APP_AUTHOR	:=	Jhondy
-APP_VERSION	:=	0.0.5
+APP_VERSION	:=	0.0.6
 BUILD		:=	build
 SOURCES		:=	source ../common
 DATA		:=	data
@@ -62,7 +62,7 @@ CXXFLAGS	:= $(CFLAGS) -fno-rtti -fno-exceptions
 ASFLAGS	:=	-g $(ARCH)
 LDFLAGS	=	-specs=$(DEVKITPRO)/libnx/switch.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)
 
-LIBS	:= -lfreetype -lharfbuzz -lfreetype -lpng -lbz2 -lz -lnx -lm
+LIBS	:= -lcurl -lz -lfreetype -lharfbuzz -lfreetype -lpng -lbz2 -lz -lnx -lm
 
 #---------------------------------------------------------------------------------
 # list of directories containing libraries, this must be the top level containing

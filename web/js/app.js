@@ -590,6 +590,21 @@
       return "Publicado: " + (def.name || tid) + " con " + def.achievements.length + " logros.";
     });
 
+    // Cada subida usa un nombre nuevo: si se reusara el mismo, el navegador y la
+    // consola seguirian mostrando la imagen vieja que tienen guardada.
+    async function uploadImage(bucket, base, file, oldPath) {
+      const ext = file.type === "image/jpeg" ? ".jpg" : ".png";
+      const path = base + "-" + Date.now().toString(36) + ext;
+      must(await sb.storage.from(bucket).upload(path, file, { contentType: file.type, cacheControl: "31536000" }));
+      return { path, cleanup: async () => { if (oldPath && oldPath !== path) await sb.storage.from(bucket).remove([oldPath]); } };
+    }
+    async function setIcon(tid, achId, file, oldPath) {
+      if (file.type !== "image/png") throw new Error("El icono tiene que ser un PNG.");
+      const up = await uploadImage("icons", tid + "/" + achId, file, oldPath);
+      must(await sb.from("achievements").update({ icon_path: up.path }).eq("title_id", tid).eq("ach_id", achId));
+      await up.cleanup();
+    }
+
     // Lista de logros del juego elegido: asi se sabe como nombrar cada icono.
     const achList = h("div", { class: "ach-list", "aria-live": "polite" });
     async function showAchievements(tid) {
@@ -601,12 +616,25 @@
         h("p", { class: "small", style: "margin:0 0 6px" },
           h("strong", {}, rows.length + " logros"), missing ? " · faltan " + missing + " iconos" : " · todos tienen icono"),
         h("table", {},
-          h("thead", {}, h("tr", {}, h("th", {}, ""), h("th", {}, "Nombre del archivo"), h("th", {}, "Logro"), h("th", {}, "Icono"))),
-          h("tbody", {}, rows.map((a) => h("tr", {},
-            h("td", {}, achIcon(a, false)),
-            h("td", {}, h("code", {}, a.ach_id + ".png")),
-            h("td", {}, a.name_es),
-            h("td", {}, a.icon_path ? h("span", { class: "pill ok" }, "Subido") : h("span", { class: "pill no" }, "Falta")))))));
+          h("thead", {}, h("tr", {}, h("th", {}, ""), h("th", {}, "Nombre del archivo"), h("th", {}, "Logro"), h("th", {}, "Icono"), h("th", {}, ""))),
+          h("tbody", {}, rows.map((a) => {
+            // boton para poner o cambiar el icono de este logro, sin importar como se llame el archivo
+            const input = h("input", { type: "file", accept: "image/png", hidden: true, "aria-label": "Icono de " + a.name_es });
+            const btn = h("button", { type: "button", class: "btn alt mini", onclick: () => input.click() }, a.icon_path ? "Cambiar" : "Subir");
+            input.addEventListener("change", async () => {
+              if (!input.files.length) return;
+              btn.disabled = true;
+              btn.textContent = "Subiendo…";
+              try { await setIcon(tid, a.ach_id, input.files[0], a.icon_path); await showAchievements(tid); }
+              catch (err) { alert(explain(err)); btn.disabled = false; btn.textContent = a.icon_path ? "Cambiar" : "Subir"; }
+            });
+            return h("tr", {},
+              h("td", {}, achIcon(a, false)),
+              h("td", {}, h("code", {}, a.ach_id + ".png")),
+              h("td", {}, a.name_es),
+              h("td", {}, a.icon_path ? h("span", { class: "pill ok" }, "Subido") : h("span", { class: "pill no" }, "Falta")),
+              h("td", {}, btn, input));
+          }))));
     }
     const iconGame = gameSelect();
     iconGame.addEventListener("change", () => showAchievements(iconGame.value));
@@ -615,18 +643,16 @@
     const icons = form([
       h("label", {}, "Juego", iconGame),
       achList,
-      h("label", {}, "Iconos de logros", h("span", { class: "hint" }, "PNG cuadrados (128×128). Cada archivo se llama como el id del logro: monedas_5.png"),
+      h("label", {}, "Subir varios a la vez", h("span", { class: "hint" }, "PNG cuadrados (128×128). Cada archivo se llama como dice la lista de arriba. Para uno solo, usa su botón Subir o Cambiar."),
         h("input", { name: "files", type: "file", accept: "image/png", multiple: true, required: true })),
     ], "Subir iconos", async (fd) => {
       const tid = fd.get("title_id");
-      const known = new Set(((await sb.from("achievements").select("ach_id").eq("title_id", tid)).data || []).map((a) => a.ach_id));
+      const current = Object.fromEntries(((await sb.from("achievements").select("ach_id,icon_path").eq("title_id", tid)).data || []).map((a) => [a.ach_id, a.icon_path]));
       const done = [], skipped = [];
       for (const file of fd.getAll("files")) {
         const id = file.name.replace(/\.png$/i, "");
-        if (!known.has(id)) { skipped.push(file.name); continue; }
-        const path = tid + "/" + id + ".png";
-        must(await sb.storage.from("icons").upload(path, file, { upsert: true, contentType: "image/png", cacheControl: "86400" }));
-        must(await sb.from("achievements").update({ icon_path: path }).eq("title_id", tid).eq("ach_id", id));
+        if (!(id in current)) { skipped.push(file.name); continue; }
+        await setIcon(tid, id, file, current[id]);
         done.push(id);
       }
       if (!done.length) throw new Error("Ningún archivo coincide con un id de logro de ese juego: " + skipped.join(", "));
@@ -634,15 +660,32 @@
       return done.length + " icono(s) subido(s)." + (skipped.length ? " Sin logro con ese nombre: " + skipped.join(", ") + "." : "");
     });
 
+    // Caratula actual del juego elegido, para ver como queda.
+    const coverPreview = h("div", { class: "cover-preview", "aria-live": "polite" });
+    async function showCover(tid) {
+      if (!tid) { coverPreview.replaceChildren(); return; }
+      const g = (await sb.from("games").select("name,cover_path").eq("title_id", tid).maybeSingle()).data;
+      coverPreview.replaceChildren(g ? cover(g, true) : "",
+        h("span", { class: "muted small" }, g && g.cover_path ? "Carátula actual. Sube otra para cambiarla." : "Este juego todavía no tiene carátula."));
+    }
+    const coverGame = gameSelect();
+    coverGame.addEventListener("change", () => showCover(coverGame.value));
+    showCover(coverGame.value);
+
     const coverForm = form([
-      h("label", {}, "Juego", gameSelect()),
+      h("label", {}, "Juego", coverGame),
+      coverPreview,
       h("label", {}, "Carátula", h("span", { class: "hint" }, "JPG o PNG cuadrado (512×512). Solo se usa en la web."),
         h("input", { name: "file", type: "file", accept: "image/png,image/jpeg", required: true })),
-    ], "Subir carátula", async (fd) => {
+    ], "Subir carátula", async (fd, el) => {
       const tid = fd.get("title_id"), file = fd.get("file");
-      const path = tid + (file.type === "image/png" ? ".png" : ".jpg");
-      must(await sb.storage.from("covers").upload(path, file, { upsert: true, contentType: file.type, cacheControl: "86400" }));
-      must(await sb.from("games").update({ cover_path: path }).eq("title_id", tid));
+      if (file.type !== "image/png" && file.type !== "image/jpeg") throw new Error("La carátula tiene que ser JPG o PNG.");
+      const old = (await sb.from("games").select("cover_path").eq("title_id", tid).maybeSingle()).data;
+      const up = await uploadImage("covers", tid, file, old && old.cover_path);
+      must(await sb.from("games").update({ cover_path: up.path }).eq("title_id", tid));
+      await up.cleanup();
+      el.querySelector("input[type=file]").value = "";
+      await showCover(tid);
       return "Carátula subida.";
     });
 

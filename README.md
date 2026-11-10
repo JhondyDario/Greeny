@@ -23,7 +23,7 @@ carátula real del juego.*
 | Parte | Qué hace |
 |---|---|
 | **Sysmodule** (`source/`) | Detecta el juego, lee su memoria por `dmnt:cht`, desbloquea logros, muestra el aviso y reproduce el sonido. |
-| **App Greeny** (`app/`) | Lista tus juegos con carátula, progreso y puntos; muestra cada logro, cómo se consigue y si ya lo tienes. Español e inglés, tema claro y oscuro, fondo animado, vista de lista o cuadrícula (se cambia con −), opciones por pestañas (L y R), sonidos, introducción de primera vez y una pantalla de diagnóstico. |
+| **App Greeny** (`app/`) | Lista tus juegos con carátula, progreso y puntos; muestra cada logro, cómo se consigue y si ya lo tienes. Español e inglés, tema claro y oscuro, fondo animado, vista de lista o cuadrícula (se cambia con −), opciones por pestañas (L y R), sonidos, introducción de primera vez, cuenta opcional para subir tus logros a la web y una pantalla de diagnóstico. |
 | **Motor** (`common/`) | Formato de logros y evaluación de condiciones. Portable: se prueba en PC. |
 | **Web** (`web/`) | Perfiles, progreso, rareza de cada logro, vincular consola y publicar juegos. Se publica en GitHub Pages. |
 | **Logros** (`juegos/`) | Un archivo por juego. Por ahora: Super Mario 3D World + Bowser's Fury v1.1.0 (12 logros). |
@@ -40,6 +40,8 @@ atmosphere/contents/4200000000010690/   sysmodule
 switch/greeny.nro                       app
 config/greeny/games/                    archivos de logros, uno por juego
 config/greeny/unlocked/                 tu progreso
+config/greeny/sounds/                   sonidos que usa el sysmodule
+config/greeny/account.ini               llave de esta consola, si la vinculaste (no es tu contraseña)
 config/greeny/config.ini                opciones
 config/greeny/log.txt                   registro del sysmodule
 config/greeny/app-log.txt               pasos de arranque de la app
@@ -122,7 +124,7 @@ make -C test
 | App: introducción de primera vez, saludo y Acerca de | Revisada en PC; falta probarla en consola |
 | Base de datos (Supabase) | Esquema listo y probado en Postgres ([docs/SUPABASE.md](docs/SUPABASE.md)) |
 | Web con cuentas (`web/`) | Hecha; probada en navegador con servidor simulado, falta contra el proyecto real |
-| Inicio de sesión y sincronización desde la app | Pendiente |
+| App: cuenta (vincular con código, entrar con correo, subir logros) | Probada contra el servidor real desde PC; falta probarla en consola |
 | Iconos por logro, música y animaciones en la app | Pendiente ([docs/RECURSOS.md](docs/RECURSOS.md)) |
 
 ## Limitaciones que conviene saber

@@ -1,5 +1,7 @@
 #include "ui.h"
 
+#include "account.h"
+
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
@@ -47,6 +49,9 @@ static bool g_en;
 void ui_set_english(bool english) { g_en = english; }
 void ui_set_dark(bool dark) { P = dark ? &k_dark : &k_light; }
 
+static const uint32_t *g_bg; /* imagen de fondo, o NULL */
+void ui_set_background(const uint32_t *px) { g_bg = px; }
+
 static char g_user[40];
 void ui_set_user(const char *name) { snprintf(g_user, sizeof(g_user), "%s", name ? name : ""); }
 
@@ -63,7 +68,13 @@ ui_layout ui_detail_layout(const gr_config *cfg) {
  * se puede animar sin tener que redibujar el texto en cada cuadro. */
 
 void ui_background(gfx_canvas *c, float t) {
-    gfx_clear(c, P->bg);
+    if (g_bg) {
+        for (int y = 0; y < c->h && y < UI_H; y++)
+            memcpy(&c->px[y * c->stride], &g_bg[y * UI_W], (size_t)(c->w < UI_W ? c->w : UI_W) * sizeof(uint32_t));
+    } else {
+        gfx_clear(c, P->bg);
+    }
+    if (t <= 0.0f) return; /* fondo animado apagado: solo la imagen */
     /* burbujas grandes y muy tenues que derivan despacio; t en segundos (0 = quieto) */
     static const struct { float x, y, r, vx, vy, phase; } k[] = {
         { 160, 250, 150,  7,  3, 0.0f }, { 520, 560, 110, -5,  4, 1.7f }, { 900, 300, 190,  4, -3, 3.1f },
@@ -77,7 +88,7 @@ void ui_background(gfx_canvas *c, float t) {
         /* dar la vuelta por el borde contrario, con margen para que no aparezcan de golpe */
         x = fmodf(fmodf(x + 200, span_x) + span_x, span_x) - 200;
         y = fmodf(fmodf(y + 200, span_y) + span_y, span_y) - 200;
-        gfx_circle_alpha(c, (int)x, (int)y, (int)k[i].r, P->bubble, 26);
+        gfx_circle_alpha(c, (int)x, (int)y, (int)k[i].r, P->bubble, g_bg ? 16 : 26);
     }
 }
 
@@ -116,7 +127,7 @@ static void header_stats(gfx_canvas *c, int unlocked, int total, int pts, int pt
 
 /* pista de boton: icono del boton (o circulo con la letra si no hay) + texto. Devuelve la x siguiente. */
 static int hint(gfx_canvas *c, int x, const char *btn, const char *label) {
-    static const char *const order[UI_BTN_COUNT] = { "A", "B", "X", "Y", "+", "−" };
+    static const char *const order[UI_BTN_COUNT] = { "A", "B", "X", "Y", "+", "−", "L", "R" };
     int cy = FOOTER_Y + 30, icon = -1;
     for (int i = 0; i < UI_BTN_COUNT; i++)
         if (!strcmp(btn, order[i])) icon = i;
@@ -416,11 +427,21 @@ static const struct { const char *es, *en; int n; int opt[3]; } k_tabs[UI_TABS] 
     { "General",     "General",  3, { UI_OPT_LANG, UI_OPT_THEME, UI_OPT_ANIM } },
     { "Vista",       "View",     2, { UI_OPT_GAMES_VIEW, UI_OPT_ACH_VIEW } },
     { "En el juego", "In-game",  2, { UI_OPT_SOUND, UI_OPT_POPUP } },
+    { "Cuenta",      "Account",  0, { 0 } },  /* sus filas dependen de si la consola esta vinculada */
     { "Ayuda",       "Help",     2, { UI_OPT_DIAG, UI_OPT_ABOUT } },
 };
 
-int ui_tab_count(int tab) { return k_tabs[tab].n; }
-int ui_tab_option(int tab, int row) { return k_tabs[tab].opt[row]; }
+int ui_tab_count(int tab, bool linked) {
+    if (tab == UI_TAB_ACCOUNT) return linked ? 3 : 2;
+    return k_tabs[tab].n;
+}
+
+int ui_tab_option(int tab, int row, bool linked) {
+    static const int with[3] = { UI_OPT_ACC_INFO, UI_OPT_ACC_SYNC, UI_OPT_ACC_UNLINK };
+    static const int without[2] = { UI_OPT_ACC_LINK, UI_OPT_ACC_LOGIN };
+    if (tab == UI_TAB_ACCOUNT) return linked ? with[row] : without[row];
+    return k_tabs[tab].opt[row];
+}
 
 static void option_row(gfx_canvas *c, int y, bool selected, const char *label, const char *help, const char *value,
                        gfx_color value_bg) {
@@ -433,20 +454,24 @@ static void option_row(gfx_canvas *c, int y, bool selected, const char *label, c
     gfx_text(c, x + w - 28 - vw + 21, y + 31, 21, C_WHITE, value);
 }
 
-/* boton L o R dibujado junto a las pestañas */
-static void shoulder(gfx_canvas *c, int x, int y, const char *letter) {
+/* boton L o R junto a las pestañas: el icono, o un recuadro con la letra si no hay */
+static void shoulder(gfx_canvas *c, int x, int y, int btn, const char *letter) {
+    if (g_buttons) {
+        gfx_image(c, x + 4, y - 2, g_buttons + (size_t)btn * UI_BTN_SIZE * UI_BTN_SIZE * 4, UI_BTN_SIZE, UI_BTN_SIZE);
+        return;
+    }
     gfx_round_rect(c, x, y, 46, 34, 10, P->ink);
     gfx_text(c, x + 23 - gfx_text_width(21, letter) / 2, y + 5, 21, P->footer, letter);
 }
 
 void ui_settings(gfx_canvas *c, const ui_assets *a, const gr_config *cfg, int tab, int row, bool system_spanish,
-                 bool system_dark) {
+                 bool system_dark, const ui_account *acc) {
     gfx_clear_transparent(c);
     header(c, a, NULL, T("Opciones", "Options"), T("Se guardan en la tarjeta SD", "Saved to the SD card"));
 
     /* pestañas */
     int tx = MARGIN + 60;
-    shoulder(c, MARGIN, 121, "L");
+    shoulder(c, MARGIN, 121, UI_BTN_L, "L");
     for (int i = 0; i < UI_TABS; i++) {
         const char *name = T(k_tabs[i].es, k_tabs[i].en);
         int w = gfx_text_width(23, name) + 44;
@@ -455,7 +480,7 @@ void ui_settings(gfx_canvas *c, const ui_assets *a, const gr_config *cfg, int ta
         gfx_text(c, tx + 22, 124, 23, i == tab ? C_WHITE : P->gray, name);
         tx += w + 10;
     }
-    shoulder(c, tx + 4, 121, "R");
+    shoulder(c, tx + 4, 121, UI_BTN_R, "R");
 
     char lang[48], theme[48];
     if (cfg->lang == GR_LANG_ES) snprintf(lang, sizeof(lang), "Español");
@@ -469,10 +494,37 @@ void ui_settings(gfx_canvas *c, const ui_assets *a, const gr_config *cfg, int ta
     const char *on = T("Activado", "On"), *off = T("Desactivado", "Off");
     const char *list = T("Lista", "List"), *grid = T("Cuadrícula", "Grid"), *open = T("Abrir", "Open");
 
-    for (int i = 0; i < k_tabs[tab].n; i++) {
+    char who[64];
+    snprintf(who, sizeof(who), "@%s", acc->username[0] ? acc->username : "?");
+
+    int count = ui_tab_count(tab, acc->linked);
+    for (int i = 0; i < count; i++) {
         int y = 184 + i * 104;
         bool sel = i == row;
-        switch (k_tabs[tab].opt[i]) {
+        switch (ui_tab_option(tab, i, acc->linked)) {
+            case UI_OPT_ACC_LINK:
+                option_row(c, y, sel, T("Vincular con un código", "Link with a code"),
+                           T("Te da un código para escribir en la web. Sirve también si entras con Discord.",
+                             "Gives you a code to type on the website. Also works if you sign in with Discord."), open, C_GREEN);
+                break;
+            case UI_OPT_ACC_LOGIN:
+                option_row(c, y, sel, T("Entrar con correo y contraseña", "Sign in with email and password"),
+                           T("Escribes los datos de tu cuenta con el teclado de la consola.",
+                             "Type your account details with the console keyboard."), open, C_GREEN);
+                break;
+            case UI_OPT_ACC_INFO:
+                option_row(c, y, sel, who, acc->caption[0] ? acc->caption : T("Esta consola sube tus logros a esta cuenta.", "This console uploads your achievements to this account."),
+                           T("Vinculada", "Linked"), C_GREEN);
+                break;
+            case UI_OPT_ACC_SYNC:
+                option_row(c, y, sel, T("Sincronizar ahora", "Sync now"), T(acc->sync_es, acc->sync_en), T("Subir", "Upload"), C_GREEN);
+                break;
+            case UI_OPT_ACC_UNLINK:
+                option_row(c, y, sel, T("Desvincular esta consola", "Unlink this console"),
+                           T("Deja de subir logros. Los que ya subiste se quedan en tu cuenta.",
+                             "Stops uploading. Achievements already uploaded stay on your account."),
+                           T("Desvincular", "Unlink"), C_NEUTRAL);
+                break;
             case UI_OPT_LANG:
                 option_row(c, y, sel, T("Idioma", "Language"),
                            T("Idioma de la app y de los avisos de logros.", "Language for the app and achievement pop-ups."), lang, C_GREEN);
@@ -519,8 +571,16 @@ void ui_settings(gfx_canvas *c, const ui_assets *a, const gr_config *cfg, int ta
         }
     }
 
+    if (tab == UI_TAB_ACCOUNT)
+        gfx_text(c, MARGIN + 4, 184 + count * 104 + 6, 19, P->gray,
+                 acc->linked ? T("La cuenta es opcional: sin internet la app y los logros funcionan igual.",
+                                 "The account is optional: without internet the app and achievements work the same.")
+                             : T("Opcional. Crea tu cuenta en " GR_WEB_URL " y vincula esta consola para ver tu progreso en la web.",
+                                 "Optional. Create your account at " GR_WEB_URL " and link this console to see your progress online."));
+
     footer_bar(c);
-    int hx = hint(c, MARGIN, "A", k_tabs[tab].opt[row] >= UI_OPT_DIAG ? T("Abrir", "Open") : T("Cambiar", "Change"));
+    int cur = ui_tab_option(tab, row, acc->linked);
+    int hx = hint(c, MARGIN, "A", cur >= UI_OPT_DIAG ? T("Abrir", "Open") : T("Cambiar", "Change"));
     hx = hint(c, hx, "B", T("Volver", "Back"));
     hint(c, hx, "+", T("Salir", "Exit"));
 }
@@ -616,7 +676,7 @@ void ui_about(gfx_canvas *c, const ui_assets *a) {
 
 static void intro_dots(gfx_canvas *c, int page) {
     for (int i = 0; i < UI_INTRO_PAGES; i++)
-        gfx_circle(c, UI_W / 2 + (i - 1) * 34, 632, i == page ? 9 : 6, i == page ? C_GREEN : P->gray_lt);
+        gfx_circle(c, UI_W / 2 + i * 34 - (UI_INTRO_PAGES - 1) * 17, 632, i == page ? 9 : 6, i == page ? C_GREEN : P->gray_lt);
 }
 
 void ui_intro(gfx_canvas *c, const ui_assets *a, int page, const gr_diag_item *items, int count,
@@ -649,6 +709,18 @@ void ui_intro(gfx_canvas *c, const ui_assets *a, int page, const gr_diag_item *i
                            "Items in red must be fixed for achievements to work.")
                        : T("Puedes repetir esta revisión cuando quieras en Opciones → Diagnóstico.",
                            "You can run this check again any time in Options → Diagnostics."));
+    } else if (page == 3) {
+        const int x = 190, w = 900;
+        card(c, x, 170, w, 380, false);
+        int tx = x + 44;
+        gfx_text(c, tx, 196, 38, P->ink, T("Tu cuenta (opcional)", "Your account (optional)"));
+        gfx_text(c, tx, 266, 22, P->ink, T("Con una cuenta, tus logros aparecen en tu perfil de la web.", "With an account, your achievements show on your web profile."));
+        gfx_text(c, tx, 300, 22, P->ink, T("Créala en:", "Create it at:"));
+        gfx_text(c, tx + gfx_text_width(22, T("Créala en:", "Create it at:")) + 12, 300, 22, P->accent, GR_WEB_URL);
+        gfx_text(c, tx, 356, 22, P->ink, T("Luego, aquí en la app: Opciones → Cuenta → Vincular.", "Then, here in the app: Options → Account → Link."));
+        gfx_text_fit(c, tx, 430, 20, P->gray,
+                     T("No es obligatoria: sin cuenta y sin internet, Greeny funciona igual.",
+                       "It is not required: without an account or internet, Greeny works the same."), w - 88);
     } else {
         const int x = 190, w = 900;
         card(c, x, 170, w, 380, false);
@@ -684,5 +756,67 @@ void ui_intro(gfx_canvas *c, const ui_assets *a, int page, const gr_diag_item *i
     footer_bar(c);
     int hx = hint(c, MARGIN, "A", page == UI_INTRO_PAGES - 1 ? T("Empezar", "Get started") : T("Siguiente", "Next"));
     if (page > 0) hx = hint(c, hx, "B", T("Atrás", "Back"));
+    hint(c, hx, "+", T("Salir", "Exit"));
+}
+
+/* ---------- cuenta: codigo de vinculacion y mensajes ---------- */
+
+void ui_link(gfx_canvas *c, const ui_assets *a, const char *code, int seconds_left) {
+    gfx_clear_transparent(c);
+    header(c, a, NULL, T("Vincular esta consola", "Link this console"), T("Paso único, desde tu teléfono o PC", "One-time step, from your phone or PC"));
+
+    const int x = 190, w = 900;
+    card(c, x, 130, w, 500, false);
+    int tx = x + 48;
+    gfx_text(c, tx, 152, 22, P->gray, T("1. Entra a esta página e inicia sesión:", "1. Open this page and sign in:"));
+    gfx_text(c, tx, 184, 30, P->accent, GR_WEB_URL);
+    gfx_text(c, tx, 244, 22, P->gray, T("2. En Cuenta → Vincular una consola, escribe este código:", "2. Under Account → Link a console, type this code:"));
+
+    /* el codigo, letra por letra en recuadros */
+    int n = (int)strlen(code), bw = 96, gap = 14, total = n * bw + (n - 1) * gap, bx = x + (w - total) / 2;
+    for (int i = 0; i < n; i++) {
+        char ch[2] = { code[i], 0 };
+        gfx_round_rect(c, bx + i * (bw + gap), 296, bw, 120, 16, C_GREEN);
+        gfx_text(c, bx + i * (bw + gap) + bw / 2 - gfx_text_width(76, ch) / 2, 312, 76, C_WHITE, ch);
+    }
+
+    char buf[96];
+    if (seconds_left > 0) {
+        snprintf(buf, sizeof(buf), T("Esperando… el código vence en %d:%02d", "Waiting… the code expires in %d:%02d"), seconds_left / 60, seconds_left % 60);
+        text_center(c, x + w / 2, 446, 22, P->ink, buf, w - 80);
+    } else {
+        text_center(c, x + w / 2, 446, 22, C_RED, T("El código venció. Pulsa B y pide otro.", "The code expired. Press B and get a new one."), w - 80);
+    }
+    text_center(c, x + w / 2, 500, 19, P->gray,
+                T("Esta pantalla se cierra sola cuando la web acepte el código.", "This screen closes by itself once the website accepts the code."), w - 80);
+    text_center(c, x + w / 2, 560, 19, P->gray,
+                T("La consola no guarda tu contraseña.", "The console does not store your password."), w - 80);
+
+    footer_bar(c);
+    int hx = hint(c, MARGIN, "B", T("Cancelar", "Cancel"));
+    hint(c, hx, "+", T("Salir", "Exit"));
+}
+
+void ui_message(gfx_canvas *c, const ui_assets *a, const char *title, const char *line1, const char *line2, bool ok) {
+    gfx_clear_transparent(c);
+    header(c, a, NULL, T("Cuenta", "Account"), NULL);
+
+    const int x = 190, w = 900;
+    card(c, x, 200, w, 300, false);
+    int tx = x + 44;
+    if (ok) {
+        gfx_circle(c, tx + 34, 270, 34, C_GREEN);
+        gfx_line(c, tx + 18, 272, tx + 29, 284, 8, C_WHITE);
+        gfx_line(c, tx + 29, 284, tx + 51, 258, 8, C_WHITE);
+    } else {
+        gfx_circle(c, tx + 34, 270, 34, C_YELLOW);
+        gfx_text(c, tx + 34 - gfx_text_width(44, "!") / 2, 242, 44, C_ON_YELLOW, "!");
+    }
+    gfx_text_fit(c, tx + 92, 246, 36, P->ink, title, w - 92 - 88);
+    if (line1) gfx_text_fit(c, tx, 340, 23, P->ink, line1, w - 88);
+    if (line2) gfx_text_fit(c, tx, 384, 21, P->gray, line2, w - 88);
+
+    footer_bar(c);
+    int hx = hint(c, MARGIN, "A", T("Aceptar", "OK"));
     hint(c, hx, "+", T("Salir", "Exit"));
 }

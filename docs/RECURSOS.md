@@ -18,7 +18,8 @@ tipografías ni personajes de Nintendo.
 | Insignia genérica desbloqueada y bloqueada | PNG transparente, 128×128 | Logros sin icono propio | Falta |
 | Icono por logro | PNG, 128×128, uno por logro, nombrado como el id (`monedas_5.png`) | App, web y aviso en el juego | Falta |
 | Carátula por juego para la web | JPG o PNG, 512×512 | Solo la web; la app usa la del juego instalado | Falta |
-| Fondo o patrón para la app | PNG 1280×720, muy suave | Fondo de las pantallas | Opcional |
+| Fondos claro y oscuro | PNG 1280×720 | Fondo de las pantallas de la app | Listo (`assets/fondo_claro.png`, `assets/fondo_oscuro.png`) |
+| Botones L y R | PNG transparente | Pestañas de Opciones | Listo (`assets/icons/`) |
 | Banner del repositorio | PNG 1280×640 | README y vista previa al compartir | Falta |
 | Iconos de menú: perfil, salir, menú | PNG transparente | Web (perfil y salir ya se usan) | Listo (`assets/icons/`) |
 | Iconos de botones (A, B, X, Y, +, −, casa) y sincronizar | PNG transparente | Pistas de botones en la app (casa y sincronizar aún sin usar) | Listo (`assets/icons/`) |

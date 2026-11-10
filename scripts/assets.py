@@ -2,12 +2,13 @@
 """Genera los recursos binarios a partir de assets/.
 
   app/data/mascot_big.bin    RGBA crudo 240x240: la cara de la mascota (introduccion y Acerca de)
-  app/data/buttons.bin       6 iconos de botones RGBA 38x38 seguidos (pistas de abajo)
+  app/data/buttons.bin       8 iconos de botones RGBA 38x38 seguidos (pistas de abajo y pestañas)
+  app/data/bg_*.bin          fondos claro y oscuro, guardados como JPEG (la app los decodifica al abrir)
   app/data/mascot_small.bin  RGBA crudo 66x66 (insignia de la cabecera: el logo G)
   app/icon.jpg               icono 256x256 para el menu de homebrew (de assets/app-icon.png)
   web/img/*.png              logo e iconos de la web
   app/data/sfx_*.bin         sonidos de la app: PCM 16 bit mono 48 kHz
-  data/snd_*.bin             sonidos del sysmodule: PCM 16 bit mono 32 kHz
+  sd/config/greeny/sounds/   sonidos del sysmodule: PCM 16 bit mono 32 kHz (van a la SD, no dentro del sysmodule)
 
 Los sonidos se recortan (silencio al inicio y al final) y se pasan a mono. Los
 del sysmodule van a 32 kHz porque ahi la memoria es muy limitada.
@@ -41,7 +42,7 @@ with open(os.path.join(ROOT, "app", "data", "mascot_big.bin"), "wb") as f:
 # iconos de botones para las pistas de abajo, todos seguidos en un archivo.
 # El orden es el de UI_BTN_* en app/source/ui.h.
 with open(os.path.join(ROOT, "app", "data", "buttons.bin"), "wb") as f:
-    for name in ("boton_a", "boton_b", "boton_x", "boton_y", "boton_mas", "boton_menos"):
+    for name in ("boton_a", "boton_b", "boton_x", "boton_y", "boton_mas", "boton_menos", "boton_l", "boton_r"):
         im = Image.open(os.path.join(ROOT, "assets", "icons", name + ".png")).convert("RGBA")
         f.write(fit(im.crop(im.getbbox()), 38, 38).tobytes())
 
@@ -50,6 +51,12 @@ logo = Image.open(os.path.join(ROOT, "assets", "logo-g.png")).convert("RGBA")
 logo = logo.crop(logo.getbbox())
 with open(os.path.join(ROOT, "app", "data", "mascot_small.bin"), "wb") as f:
     f.write(fit(logo, 66, 66).tobytes())
+
+# fondos: van como JPEG dentro de la app (crudos serian 3.7 MB cada uno)
+for name in ("claro", "oscuro"):
+    bg = Image.open(os.path.join(ROOT, "assets", "fondo_" + name + ".png")).convert("RGB").resize((1280, 720), Image.LANCZOS)
+    bg.save(os.path.join(ROOT, "app", "data", "bg_" + name + ".bin"), format="JPEG", quality=88, subsampling=0,
+            progressive=False, optimize=False)
 
 # icono de la app. JPEG lo mas estandar posible: es el formato que espera el menu de la consola
 icon = Image.open(os.path.join(ROOT, "assets", "app-icon.png")).convert("RGB").resize((256, 256), Image.LANCZOS)
@@ -106,8 +113,8 @@ def write_pcm(x, path):
 
 
 SND = os.path.join(ROOT, "assets", "sounds")
-os.makedirs(os.path.join(ROOT, "data"), exist_ok=True)
-jobs = [("cargado", "data/snd_cargado.bin", 32000), ("logro", "data/snd_logro.bin", 32000),
+os.makedirs(os.path.join(ROOT, "sd", "config", "greeny", "sounds"), exist_ok=True)
+jobs = [("cargado", "sd/config/greeny/sounds/cargado.pcm", 32000), ("logro", "sd/config/greeny/sounds/logro.pcm", 32000),
         ("navegar", "app/data/sfx_navegar.bin", 48000), ("regresar", "app/data/sfx_regresar.bin", 48000),
         ("aceptar_1", "app/data/sfx_aceptar_1.bin", 48000), ("aceptar_2", "app/data/sfx_aceptar_2.bin", 48000),
         ("abrir_menu", "app/data/sfx_abrir_menu.bin", 48000)]

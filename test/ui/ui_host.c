@@ -10,6 +10,14 @@
 #include "../../app/source/model.h"
 #include "../../app/source/ui.h"
 
+#define STB_IMAGE_IMPLEMENTATION
+#define STBI_ONLY_JPEG
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-function"
+#pragma GCC diagnostic ignored "-Wsign-compare"
+#include "../../app/source/third_party/stb_image.h"
+#pragma GCC diagnostic pop
+
 static uint8_t *slurp(const char *dir, const char *name, size_t expect) {
     char path[512];
     snprintf(path, sizeof(path), "%s/%s", dir, name);
@@ -65,6 +73,15 @@ int main(int argc, char **argv) {
     static ui_assets a;
     a.mascot_big = slurp(argv[4], "mascot_big.bin", 240 * 240 * 4);   a.big_w = 240;  a.big_h = 240;
     a.buttons = slurp(argv[4], "buttons.bin", UI_BTN_COUNT * UI_BTN_SIZE * UI_BTN_SIZE * 4);
+    /* fondos: JPEG, decodificados igual que en la app */
+    uint32_t *bg[2] = { NULL, NULL };
+    for (int i = 0; i < 2; i++) {
+        char path[512];
+        int w, h, n;
+        snprintf(path, sizeof(path), "%s/%s", argv[4], i ? "bg_oscuro.bin" : "bg_claro.bin");
+        bg[i] = (uint32_t *)stbi_load(path, &w, &h, &n, 4);
+        if (!bg[i] || w != UI_W || h != UI_H) { fprintf(stderr, "fondo %d invalido\n", i); return 1; }
+    }
     a.mascot_small = slurp(argv[4], "mascot_small.bin", 66 * 66 * 4); a.small_w = 66; a.small_h = 66;
     gfx_canvas c = { malloc(UI_W * UI_H * 4), UI_W, UI_H, UI_W };
 
@@ -87,6 +104,7 @@ int main(int argc, char **argv) {
         char sfx[32];
         snprintf(sfx, sizeof(sfx), "%s%s", dark ? "_dark" : "", en ? "_en" : "");
         ui_set_dark(dark);
+        ui_set_background(bg[dark]);
         ui_set_english(en);
         g_time = 0;
 
@@ -121,9 +139,23 @@ int main(int argc, char **argv) {
         for (int t = 0; t < UI_TABS; t++) {
             char name[32];
             snprintf(name, sizeof(name), "settings%d", t);
-            ui_settings(&c, &a, &cfg, t, ui_tab_count(t) - 1, true, dark);
+            ui_account acc = { .linked = false, .username = "", .caption = "", .sync_es = "", .sync_en = "" };
+            ui_settings(&c, &a, &cfg, t, ui_tab_count(t, false) - 1, true, dark, &acc);
             save(&c, out, name, sfx);
         }
+        ui_account linked = { .linked = true, .username = "megaJHONDY", .caption = "Coleccionista de logros",
+                              .sync_es = "Al día: 7 logros enviados, 2 nuevos en tu cuenta.",
+                              .sync_en = "Up to date: 7 achievements sent, 2 new on your account." };
+        ui_settings(&c, &a, &cfg, UI_TAB_ACCOUNT, 1, true, dark, &linked);
+        save(&c, out, "settings_cuenta", sfx);
+        ui_link(&c, &a, "JSH6PN", 547);
+        save(&c, out, "link", sfx);
+        ui_link(&c, &a, "JSH6PN", 0);
+        save(&c, out, "link_vencido", sfx);
+        ui_message(&c, &a, "¡Consola vinculada!", "Esta consola quedó vinculada a @megaJHONDY.", "Tus logros se suben solos cuando hay internet.", true);
+        save(&c, out, "msg_ok", sfx);
+        ui_message(&c, &a, "No se pudo entrar", "Correo o contraseña incorrectos.", "Si entras con Discord, usa \"Vincular con un código\".", false);
+        save(&c, out, "msg_error", sfx);
         ui_diag(&c, &a, items, nitems);
         save(&c, out, "diag", sfx);
         ui_about(&c, &a);
@@ -147,6 +179,7 @@ int main(int argc, char **argv) {
         ui_home(&c, &a, &m, &cfg, 0, 0);
         ui_set_user(NULL);
         g_time = 12.0f; save(&c, out, "home_t12", sfx);
+        g_time = 0.001f; /* resto de capturas con las burbujas en su sitio inicial */
         g_time = 300.0f; save(&c, out, "home_t300", sfx);
         g_time = 0;
 

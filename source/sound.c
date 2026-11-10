@@ -1,17 +1,20 @@
 /*
  * El audio se abre solo mientras suena y se cierra despues, para no quedarse
  * con una sesion de audren y memoria que el juego podria necesitar.
- * Los sonidos van dentro del ejecutable: PCM 16 bit mono a 32 kHz
- * (se generan con scripts/assets.py a partir de assets/sounds/).
+ * Los sonidos NO van dentro del sysmodule: se leen de la SD cuando hacen falta
+ * (archivos .pcm en sdmc:/config/greeny/sounds/, PCM 16 bit mono a 32 kHz, generados por
+ * scripts/assets.py). Un sysmodule ocupa memoria del sistema todo el tiempo,
+ * asi que conviene que el ejecutable sea lo mas chico posible.
  */
 #include "sound.h"
 
 #include <malloc.h>
+#include <stdio.h>
 #include <string.h>
 #include <switch.h>
 
-#include "snd_cargado_bin.h"
-#include "snd_logro_bin.h"
+#define SOUND_DIR "sdmc:/config/greeny/sounds/"
+#define SOUND_MAX (320 * 1024) /* tope por sonido: lo que cabe con holgura en el heap */
 
 #define RATE 32000
 #define TAIL_MS 250 /* margen despues del ultimo sample antes de cerrar el audio */
@@ -40,24 +43,38 @@ void sound_play(sound_id id) {
     if (!g_failed && id >= 0 && id < SOUND_COUNT) g_queued[id] = true;
 }
 
-static void get_pcm(sound_id id, const u8 **data, size_t *size) {
-    if (id == SOUND_LOADED) { *data = snd_cargado_bin; *size = snd_cargado_bin_size; }
-    else { *data = snd_logro_bin; *size = snd_logro_bin_size; }
-    *size &= ~(size_t)1;
+/* Lee el sonido de la SD a memoria alineada a pagina (lo que pide audren).
+ * Devuelve NULL si el archivo no esta: en ese caso simplemente no suena. */
+static void *load_pcm(sound_id id, size_t *out_size, size_t *out_pool) {
+    FILE *f = fopen(id == SOUND_LOADED ? SOUND_DIR "cargado.pcm" : SOUND_DIR "logro.pcm", "rb");
+    if (!f) return NULL;
+    fseek(f, 0, SEEK_END);
+    long len = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    if (len < 2 || len > SOUND_MAX) { fclose(f); return NULL; }
+
+    size_t size = (size_t)len & ~(size_t)1;
+    size_t pool_size = (size + 0xFFF) & ~(size_t)0xFFF;
+    void *pool = memalign(0x1000, pool_size);
+    if (pool && fread(pool, 1, size, f) == size) {
+        memset((u8 *)pool + size, 0, pool_size - size);
+        armDCacheFlush(pool, pool_size);
+        *out_size = size;
+        *out_pool = pool_size;
+    } else {
+        free(pool);
+        pool = NULL;
+    }
+    fclose(f);
+    return pool;
 }
 
+/* rc = 0 con *out_ms = 0 significa "no hay nada que sonar" (falta el archivo o la memoria). */
 static Result start(sound_id id, u32 *out_ms) {
-    const u8 *pcm;
-    size_t size;
-    get_pcm(id, &pcm, &size);
-    size_t pool_size = (size + 0xFFF) & ~(size_t)0xFFF;
-
-    /* audren necesita memoria alineada a pagina que pueda mapear: se copia al heap */
-    g_pool = memalign(0x1000, pool_size);
-    if (!g_pool) return MAKERESULT(Module_Libnx, LibnxError_OutOfMemory);
-    memcpy(g_pool, pcm, size);
-    memset((u8 *)g_pool + size, 0, pool_size - size);
-    armDCacheFlush(g_pool, pool_size);
+    size_t size = 0, pool_size = 0;
+    *out_ms = 0;
+    g_pool = load_pcm(id, &size, &pool_size);
+    if (!g_pool) return 0;
 
     Result rc = smInitialize();
     if (R_FAILED(rc)) goto fail_pool;
@@ -135,6 +152,7 @@ void sound_update(uint64_t now_ms) {
             g_fail_rc = rc;
             return;
         }
+        if (ms == 0) continue; /* sin archivo de sonido: se sigue en silencio */
         g_active = true;
         g_close_at = now_ms + ms;
         return;
