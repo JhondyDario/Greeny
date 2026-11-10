@@ -20,6 +20,7 @@ typedef struct {
     gr_game_entry games[GR_MAX_GAMES];
     int ngames;
     int total, unlocked, points, points_got; /* sumas de todos los juegos */
+    int games_played, platinums;             /* juegos con algun logro / con todos */
     lg_game cur;                             /* juego abierto en el detalle */
 } gr_model;
 

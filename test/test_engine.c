@@ -1,6 +1,7 @@
 /* Pruebas del motor en PC con memoria falsa. make -C test */
 #include "../common/config.h"
 #include "../common/engine.h"
+#include "../common/progress.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -400,13 +401,13 @@ static void test_i18n_config(void) {
     CHECK(c.theme == GR_THEME_AUTO && c.games_view == GR_VIEW_LIST && c.ach_view == GR_VIEW_LIST);
 
     c.lang = GR_LANG_EN; c.sound = false; c.popup = true;
-    c.theme = GR_THEME_DARK; c.games_view = GR_VIEW_GRID; c.ach_view = GR_VIEW_LIST; c.animated_bg = false; c.intro_done = true;
+    c.theme = GR_THEME_DARK; c.games_view = GR_VIEW_GRID; c.ach_view = GR_VIEW_LIST; c.animated_bg = false; c.intro_done = true; c.start_page = GR_START_PROFILE;
     CHECK(gr_config_save(&c, path) == 0);
     gr_config c2;
     gr_config_load(&c2, path);
     CHECK(c2.lang == GR_LANG_EN && !c2.sound && c2.popup);
     CHECK(c2.theme == GR_THEME_DARK && c2.games_view == GR_VIEW_GRID && c2.ach_view == GR_VIEW_LIST);
-    CHECK(!c2.animated_bg && c2.intro_done);
+    CHECK(!c2.animated_bg && c2.intro_done && c2.start_page == GR_START_PROFILE);
 
     /* un config.ini viejo (sin las claves nuevas) se lee con los valores por defecto en lo que falta */
     FILE *old = fopen(path, "w");
@@ -414,10 +415,10 @@ static void test_i18n_config(void) {
     fclose(old);
     gr_config_load(&c2, path);
     CHECK(c2.lang == GR_LANG_ES && !c2.sound && c2.theme == GR_THEME_AUTO && c2.ach_view == GR_VIEW_LIST);
-    CHECK(c2.animated_bg && !c2.intro_done);
+    CHECK(c2.animated_bg && !c2.intro_done && c2.start_page == GR_START_TROPHIES);
 
     /* valores fuera de rango no escriben basura */
-    gr_config bad_cfg = { 99, -4, 7, 2, true, true, true, false };
+    gr_config bad_cfg = { 99, -4, 7, 2, true, true, true, false, 42 };
     CHECK(gr_config_save(&bad_cfg, path) == 0);
     gr_config_load(&c2, path);
     CHECK(c2.lang == GR_LANG_AUTO && c2.theme == GR_THEME_AUTO && c2.games_view == GR_VIEW_LIST);
@@ -436,6 +437,29 @@ static void test_i18n_config(void) {
 
     CHECK(gr_config_save(&c, "no/existe/x.ini") != 0);
     remove(path);
+}
+
+static void test_progress(void) {
+    int into, span;
+    CHECK(gr_level(0, &into, &span) == 1 && into == 0 && span == 50);
+    CHECK(gr_level(49, &into, &span) == 1 && into == 49);
+    CHECK(gr_level(50, &into, &span) == 2 && into == 0 && span == 100);
+    CHECK(gr_level(149, &into, &span) == 2 && into == 99);
+    CHECK(gr_level(150, &into, &span) == 3 && into == 0 && span == 150);
+    CHECK(gr_level(190, &into, &span) == 3 && into == 40 && span == 150);   /* Mario completo */
+    CHECK(gr_level(-5, &into, &span) == 1 && into == 0);
+    CHECK(gr_level(1000000000, NULL, NULL) >= 999);                          /* no se queda en un bucle eterno */
+
+    gr_stats s = { .games = 1, .achievements = 7, .platinums = 0, .points = 70 };
+    CHECK(gr_badges_earned(&s) == 1 && gr_badge_earned(&gr_badges[0], &s) && !gr_badge_earned(&gr_badges[1], &s));
+    CHECK(gr_badge_value(&gr_badges[1], &s) == 7 && gr_badges[1].goal == 10);
+    gr_stats full = { .games = 10, .achievements = 200, .platinums = 5, .points = 2000 };
+    CHECK(gr_badges_earned(&full) == gr_badge_count);
+    gr_stats none = { 0, 0, 0, 0 };
+    CHECK(gr_badges_earned(&none) == 0);
+    /* ids unicos: son los nombres de los dibujos */
+    for (int i = 0; i < gr_badge_count; i++)
+        for (int j = i + 1; j < gr_badge_count; j++) CHECK(strcmp(gr_badges[i].id, gr_badges[j].id) != 0);
 }
 
 static void test_store(void) {
@@ -476,6 +500,7 @@ int main(void) {
     test_debug();
     test_scan();
     test_i18n_config();
+    test_progress();
     test_store();
     printf("%d/%d pruebas pasaron\n", g_total - g_fail, g_total);
     return g_fail ? 1 : 0;

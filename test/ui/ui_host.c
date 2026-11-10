@@ -103,6 +103,8 @@ int main(int argc, char **argv) {
         bool dark = v & 1, en = v & 2;
         char sfx[32];
         snprintf(sfx, sizeof(sfx), "%s%s", dark ? "_dark" : "", en ? "_en" : "");
+        static ui_profile chip = { .name = "Jhondy", .username = "megaJHONDY", .caption = "", .linked = true, .stats = { 1, 7, 0, 180 } };
+        ui_set_profile(&chip);
         ui_set_dark(dark);
         ui_set_background(bg[dark]);
         ui_set_english(en);
@@ -148,6 +150,18 @@ int main(int argc, char **argv) {
                               .sync_en = "Up to date: 7 achievements sent, 2 new on your account." };
         ui_settings(&c, &a, &cfg, UI_TAB_ACCOUNT, 1, true, dark, &linked);
         save(&c, out, "settings_cuenta", sfx);
+        ui_profile prof = { .name = "Jhondy", .username = "megaJHONDY", .caption = "Coleccionista de logros", .linked = true,
+                            .social_known = true, .followers = 12, .following = 3,
+                            .stats = { .games = m.games_played, .achievements = m.unlocked, .platinums = m.platinums, .points = m.points_got } };
+        ui_set_profile(NULL);
+        ui_profile_screen(&c, &a, &prof);
+        save(&c, out, "perfil", sfx);
+        ui_profile anon = { .name = "Jhondy", .username = "", .caption = "", .linked = false, .stats = { 0, 0, 0, 0 } };
+        ui_profile_screen(&c, &a, &anon);
+        save(&c, out, "perfil_sin_cuenta", sfx);
+        ui_set_profile(&prof);
+        ui_badges(&c, &a, &prof);
+        save(&c, out, "medallas", sfx);
         ui_link(&c, &a, "JSH6PN", 547);
         save(&c, out, "link", sfx);
         ui_link(&c, &a, "JSH6PN", 0);

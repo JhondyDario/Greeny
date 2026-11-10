@@ -58,6 +58,7 @@ static int cmp_games(const void *a, const void *b) {
 
 void gr_scan(gr_model *m, const char *root) {
     m->ngames = m->total = m->unlocked = m->points = m->points_got = 0;
+    m->games_played = m->platinums = 0;
 
     char path[160];
     snprintf(path, sizeof(path), "%s/games", root);
@@ -83,6 +84,8 @@ void gr_scan(gr_model *m, const char *root) {
         m->unlocked += e->unlocked;
         m->points += e->points;
         m->points_got += e->points_got;
+        if (e->unlocked > 0) m->games_played++;
+        if (e->total > 0 && e->unlocked == e->total) m->platinums++;
     }
     closedir(d);
     qsort(m->games, (size_t)m->ngames, sizeof(m->games[0]), cmp_games);

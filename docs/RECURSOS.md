@@ -26,6 +26,16 @@ tipografías ni personajes de Nintendo.
 | Cara de la mascota | PNG transparente, 512×512 | Introducción y Acerca de en la app, portada de la web | Listo (`assets/cara.png`) |
 | Fotogramas de animación de la mascota (saltando, 8 a 12 cuadros) | PNG transparente, mismo tamaño todos | Animación en inicio y al desbloquear | Opcional, para cuando haya animaciones |
 
+### Medallas del perfil
+
+Once medallas, PNG transparente de 256×256, con el id como nombre. Hoy se dibujan
+con un círculo de color y una estrella.
+
+`primer_logro`, `logros_10`, `logros_50`, `logros_200`, `primer_platino`,
+`platinos_5`, `juegos_3`, `juegos_10`, `puntos_100`, `puntos_500`, `puntos_2000`
+
+Hace falta también una versión "bloqueada" genérica (gris, con candado).
+
 ### Iconos de los 12 logros de Mario 3D World
 
 `prueba_de_vida`, `monedas_5`, `monedas_50`, `monedas_90`, `vidas_10`,

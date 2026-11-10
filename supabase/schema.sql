@@ -380,16 +380,55 @@ select a.title_id, a.ach_id,
   left join public.unlocks u on u.title_id = a.title_id and u.ach_id = a.ach_id
  group by a.title_id, a.ach_id;
 
--- puntos y logros totales de cada usuario
-create or replace view public.profile_stats with (security_invoker = true) as
+-- Seguir a otros jugadores.
+create table if not exists public.follows (
+    follower_id uuid not null references public.profiles (id) on delete cascade,
+    followed_id uuid not null references public.profiles (id) on delete cascade,
+    created_at  timestamptz not null default now(),
+    primary key (follower_id, followed_id),
+    constraint follows_not_self check (follower_id <> followed_id)
+);
+create index if not exists follows_followed_idx on public.follows (followed_id);
+
+-- Totales de cada usuario: logros, puntos, juegos, platinos (juegos con todos sus
+-- logros), seguidores y siguiendo. El nivel y las medallas se calculan a partir
+-- de estos numeros con las mismas reglas en la app y en la web.
+drop view if exists public.profile_stats;
+create view public.profile_stats with (security_invoker = true) as
 select p.id, p.username,
-       count(u.ach_id) as achievements,
-       coalesce(sum(a.points), 0) as points,
-       count(distinct u.title_id) as games
+       coalesce(s.achievements, 0)::int as achievements,
+       coalesce(s.points, 0)::int       as points,
+       coalesce(s.games, 0)::int        as games,
+       coalesce(s.platinums, 0)::int    as platinums,
+       (select count(*) from public.follows f where f.followed_id = p.id)::int as followers,
+       (select count(*) from public.follows f where f.follower_id = p.id)::int as following
   from public.profiles p
-  left join public.unlocks u on u.user_id = p.id
-  left join public.achievements a on a.title_id = u.title_id and a.ach_id = u.ach_id
- group by p.id, p.username;
+  left join lateral (
+        select sum(g.n) as achievements, sum(g.pts) as points, count(*) as games,
+               count(*) filter (where g.n = t.total) as platinums
+          from (select u.title_id, count(*) as n, sum(a.points) as pts
+                  from public.unlocks u
+                  join public.achievements a on a.title_id = u.title_id and a.ach_id = u.ach_id
+                 where u.user_id = p.id
+                 group by u.title_id) g
+          join (select title_id, count(*) as total from public.achievements group by title_id) t
+            on t.title_id = g.title_id
+       ) s on true;
+
+-- (consola) Datos del perfil para mostrarlos en la app. null si la consola no esta vinculada.
+create or replace function public.device_profile(device_token text)
+returns jsonb
+language sql stable security definer set search_path = ''
+as $$
+    select jsonb_build_object(
+               'username', p.username, 'display_name', p.display_name, 'caption', p.caption, 'avatar_url', p.avatar_url,
+               'achievements', s.achievements, 'points', s.points, 'games', s.games, 'platinums', s.platinums,
+               'followers', s.followers, 'following', s.following)
+      from public.devices d
+      join public.profiles p on p.id = d.user_id
+      join public.profile_stats s on s.id = p.id
+     where d.token_hash = public.hash_token(device_token);
+$$;
 
 
 -- -----------------------------------------------------------------------------
@@ -404,6 +443,7 @@ alter table public.games           enable row level security;
 alter table public.achievements    enable row level security;
 alter table public.unlocks         enable row level security;
 alter table public.devices         enable row level security;
+alter table public.follows         enable row level security;
 
 -- perfiles: publicos; cada quien edita el suyo (y solo ciertas columnas, ver permisos abajo)
 drop policy if exists profiles_read on public.profiles;
@@ -438,6 +478,14 @@ create policy achievements_admin_write on public.achievements for all
 drop policy if exists unlocks_read on public.unlocks;
 create policy unlocks_read on public.unlocks for select using (true);
 
+-- seguir: cualquiera ve quien sigue a quien; cada uno sigue y deja de seguir por si mismo
+drop policy if exists follows_read on public.follows;
+create policy follows_read on public.follows for select using (true);
+drop policy if exists follows_insert_own on public.follows;
+create policy follows_insert_own on public.follows for insert with check ((select auth.uid()) = follower_id);
+drop policy if exists follows_delete_own on public.follows;
+create policy follows_delete_own on public.follows for delete using ((select auth.uid()) = follower_id);
+
 -- consolas: cada quien ve y puede desvincular las suyas
 drop policy if exists devices_read_own on public.devices;
 create policy devices_read_own on public.devices for select using ((select auth.uid()) = user_id);
@@ -449,6 +497,8 @@ grant usage on schema public to anon, authenticated;
 grant select on public.profiles, public.caption_presets, public.games, public.achievements, public.unlocks,
                 public.achievement_stats, public.profile_stats to anon, authenticated;
 grant select on public.admins to authenticated;
+grant select on public.follows to anon, authenticated;
+grant insert, delete on public.follows to authenticated;
 grant select, delete on public.devices to authenticated;
 grant insert, update, delete on public.games, public.achievements to authenticated;
 
@@ -465,6 +515,7 @@ revoke execute on all functions in schema public from public, anon, authenticate
 grant execute on function public.is_admin() to anon, authenticated;
 grant execute on function public.device_link_start(text) to anon, authenticated;
 grant execute on function public.device_whoami(text) to anon, authenticated;
+grant execute on function public.device_profile(text) to anon, authenticated;
 grant execute on function public.device_push_unlocks(text, jsonb) to anon, authenticated;
 grant execute on function public.device_link_claim(text) to authenticated;
 grant execute on function public.device_register(text) to authenticated;

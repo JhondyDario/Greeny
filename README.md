@@ -125,6 +125,8 @@ make -C test
 | Base de datos (Supabase) | Esquema listo y probado en Postgres ([docs/SUPABASE.md](docs/SUPABASE.md)) |
 | Web con cuentas (`web/`) | Hecha; probada en navegador con servidor simulado, falta contra el proyecto real |
 | App: cuenta (vincular con código, entrar con correo, subir logros) | Probada contra el servidor real desde PC; falta probarla en consola |
+| Perfil, nivel, medallas y seguidores (app y web) | Revisado en PC y en navegador; falta probarlo en consola y contra el servidor real |
+| Buscador de juegos del catálogo en la app | Pendiente |
 | Iconos por logro, música y animaciones en la app | Pendiente ([docs/RECURSOS.md](docs/RECURSOS.md)) |
 
 ## Limitaciones que conviene saber

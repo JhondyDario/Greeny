@@ -52,6 +52,9 @@ void ui_set_dark(bool dark) { P = dark ? &k_dark : &k_light; }
 static const uint32_t *g_bg; /* imagen de fondo, o NULL */
 void ui_set_background(const uint32_t *px) { g_bg = px; }
 
+static const ui_profile *g_profile; /* para la barra de arriba; NULL = no mostrarla */
+void ui_set_profile(const ui_profile *p) { g_profile = p; }
+
 static char g_user[40];
 void ui_set_user(const char *name) { snprintf(g_user, sizeof(g_user), "%s", name ? name : ""); }
 
@@ -94,6 +97,8 @@ void ui_background(gfx_canvas *c, float t) {
 
 /* ---------- piezas comunes ---------- */
 
+static void user_chip(gfx_canvas *c);
+
 /* cabecera: caratula del juego si la hay, si no la mascota */
 static void header(gfx_canvas *c, const ui_assets *a, const uint8_t *cover, const char *title, const char *sub) {
     g_buttons = a->buttons;
@@ -109,20 +114,45 @@ static void header(gfx_canvas *c, const ui_assets *a, const uint8_t *cover, cons
     }
     if (sub) {
         gfx_text_fit(c, 122, 12, 38, C_WHITE, title, 640);
-        gfx_text_fit(c, 124, 58, 21, C_GREEN_LT, sub, 640);
+        gfx_text_fit(c, 124, 58, 21, C_GREEN_LT, sub, 760);
     } else {
         gfx_text(c, 122, 22, 46, C_WHITE, title);
     }
+    user_chip(c);
 }
 
-static void header_stats(gfx_canvas *c, int unlocked, int total, int pts, int pts_total) {
-    char buf[64];
-    snprintf(buf, sizeof(buf), T("%d de %d logros", "%d of %d achievements"), unlocked, total);
-    gfx_text_right(c, UI_W - MARGIN, 14, 26, C_WHITE, buf);
-    snprintf(buf, sizeof(buf), "%d / %d pts", pts, pts_total);
-    gfx_text_right(c, UI_W - MARGIN, 46, 21, C_YELLOW, buf);
-    gfx_round_rect(c, UI_W - 300, 76, 260, 10, 5, C_GREEN_DK);
-    if (total > 0 && unlocked > 0) gfx_round_rect(c, UI_W - 300, 76, 10 + 250 * unlocked / total, 10, 5, C_YELLOW);
+/* primera letra de un texto UTF-8, para los avatares sin imagen */
+static void first_letter(const char *text, char out[5]) {
+    const unsigned char *p = (const unsigned char *)text;
+    out[0] = '?';
+    out[1] = 0;
+    if (!*p) return;
+    int n = *p < 0x80 ? 1 : (*p & 0xE0) == 0xC0 ? 2 : (*p & 0xF0) == 0xE0 ? 3 : 4, i = 0;
+    for (; i < n && p[i]; i++) out[i] = (char)p[i];
+    out[i] = 0;
+}
+
+static void avatar(gfx_canvas *c, int cx, int cy, int r, const char *name) {
+    char letter[5];
+    first_letter(name, letter);
+    gfx_circle(c, cx, cy, r + 3, C_WHITE);
+    gfx_circle(c, cx, cy, r, C_GREEN_DK);
+    int fs = r * 11 / 10;
+    gfx_text(c, cx - gfx_text_width(fs, letter) / 2, cy - fs * 6 / 10, fs, C_WHITE, letter);
+}
+
+/* arriba a la derecha: icono del usuario, nombre y nivel */
+static void user_chip(gfx_canvas *c) {
+    if (!g_profile) return;
+    const int cx = UI_W - MARGIN - 32, cy = 48;
+    avatar(c, cx, cy, 30, g_profile->name);
+    int right = cx - 30 - 16;
+    gfx_text_right(c, right, 16, 25, C_WHITE, g_profile->name);
+    char buf[32];
+    snprintf(buf, sizeof(buf), T("Nivel %d", "Level %d"), gr_level(g_profile->stats.points, NULL, NULL));
+    int w = gfx_text_width(18, buf) + 24;
+    gfx_round_rect(c, right - w, 52, w, 28, 14, C_YELLOW);
+    gfx_text(c, right - w + 12, 56, 18, C_ON_YELLOW, buf);
 }
 
 /* pista de boton: icono del boton (o circulo con la letra si no hay) + texto. Devuelve la x siguiente. */
@@ -286,7 +316,6 @@ void ui_home(gfx_canvas *c, const ui_assets *a, const gr_model *m, const gr_conf
     if (g_user[0]) snprintf(tagline, sizeof(tagline), T("¡Bienvenido de vuelta, %s!", "Welcome back, %s!"), g_user);
     else snprintf(tagline, sizeof(tagline), "%s", T("Logros para tu Switch", "Achievements for your Switch"));
     gfx_text_fit(c, 122 + gfx_text_width(46, UI_APP_NAME) + 14, 44, 22, C_GREEN_LT, tagline, 520);
-    header_stats(c, m->unlocked, m->total, m->points_got, m->points);
 
     if (m->ngames == 0) {
         card(c, MARGIN, 150, 920, 200, false);
@@ -307,6 +336,7 @@ void ui_home(gfx_canvas *c, const ui_assets *a, const gr_model *m, const gr_conf
     hx = hint(c, hx, "X", T("Opciones", "Options"));
     hx = hint(c, hx, "Y", T("Recargar", "Reload"));
     if (m->ngames > 0) hx = hint(c, hx, "−", cfg->games_view == GR_VIEW_GRID ? T("Lista", "List") : T("Cuadrícula", "Grid"));
+    hx = hint(c, hx, "R", T("Perfil", "Profile"));
     hint(c, hx, "+", T("Salir", "Exit"));
 }
 
@@ -392,12 +422,12 @@ void ui_detail(gfx_canvas *c, const ui_assets *a, const gr_model *m, const gr_co
     const gr_game_entry *g = &m->games[game];
     gfx_clear_transparent(c);
 
-    char sub[96];
+    char sub[160], ver[48];
+    if (g->version[0]) snprintf(ver, sizeof(ver), T("Versión %s", "Version %s"), g->version);
+    else snprintf(ver, sizeof(ver), "%s", T("Versión sin indicar", "Version not specified"));
     if (g->broken) snprintf(sub, sizeof(sub), "%s", T("Archivo de logros con error", "Achievement file has an error"));
-    else if (g->version[0])
-        snprintf(sub, sizeof(sub), T("Logros compatibles con la versión %s del juego", "Achievements for game version %s"),
-                 g->version);
-    else snprintf(sub, sizeof(sub), "%s", T("Versión compatible sin indicar", "Supported version not specified"));
+    else snprintf(sub, sizeof(sub), T("%s  ·  %d de %d logros  ·  %d / %d pts", "%s  ·  %d of %d achievements  ·  %d / %d pts"),
+                  ver, g->unlocked, g->total, g->points_got, g->points);
     header(c, a, a->covers[game], g->name, sub);
 
     if (g->broken) {
@@ -409,7 +439,6 @@ void ui_detail(gfx_canvas *c, const ui_assets *a, const gr_model *m, const gr_co
                  T("Corrígelo en la tarjeta SD y pulsa Y en la pantalla de inicio.",
                    "Fix it on the SD card and press Y on the home screen."));
     } else {
-        header_stats(c, g->unlocked, g->total, g->points_got, g->points);
         ui_layout l = ui_detail_layout(cfg);
         if (l.cols > 1) detail_grid(c, &m->cur, cursor, top, l);
         else detail_list(c, &m->cur, cursor, top, l.rows);
@@ -423,8 +452,8 @@ void ui_detail(gfx_canvas *c, const ui_assets *a, const gr_model *m, const gr_co
 
 /* ---------- opciones ---------- */
 
-static const struct { const char *es, *en; int n; int opt[3]; } k_tabs[UI_TABS] = {
-    { "General",     "General",  3, { UI_OPT_LANG, UI_OPT_THEME, UI_OPT_ANIM } },
+static const struct { const char *es, *en; int n; int opt[4]; } k_tabs[UI_TABS] = {
+    { "General",     "General",  4, { UI_OPT_LANG, UI_OPT_THEME, UI_OPT_ANIM, UI_OPT_START } },
     { "Vista",       "View",     2, { UI_OPT_GAMES_VIEW, UI_OPT_ACH_VIEW } },
     { "En el juego", "In-game",  2, { UI_OPT_SOUND, UI_OPT_POPUP } },
     { "Cuenta",      "Account",  0, { 0 } },  /* sus filas dependen de si la consola esta vinculada */
@@ -559,6 +588,11 @@ void ui_settings(gfx_canvas *c, const ui_assets *a, const gr_config *cfg, int ta
                            T("Mensajes en pantalla mientras juegas. Se aplica al abrir un juego.",
                              "On-screen messages while you play. Applies when a game starts."),
                            cfg->popup ? on : off, cfg->popup ? C_GREEN : C_NEUTRAL);
+                break;
+            case UI_OPT_START:
+                option_row(c, y, sel, T("Página de inicio", "Start page"),
+                           T("Qué pantalla se abre al entrar a la app.", "Which screen opens when you start the app."),
+                           cfg->start_page == GR_START_PROFILE ? T("Mi perfil", "My profile") : T("Mis trofeos", "My trophies"), C_GREEN);
                 break;
             case UI_OPT_DIAG:
                 option_row(c, y, sel, T("Diagnóstico", "Diagnostics"),
@@ -818,5 +852,144 @@ void ui_message(gfx_canvas *c, const ui_assets *a, const char *title, const char
 
     footer_bar(c);
     int hx = hint(c, MARGIN, "A", T("Aceptar", "OK"));
+    hint(c, hx, "+", T("Salir", "Exit"));
+}
+
+/* ---------- perfil y medallas ---------- */
+
+/* estrella de cinco puntas hecha con lineas */
+static void star(gfx_canvas *c, int cx, int cy, int r, int thick, gfx_color col) {
+    int px[5], py[5];
+    for (int i = 0; i < 5; i++) {
+        float ang = -1.5707963f + (float)i * 1.2566371f;
+        px[i] = cx + (int)(cosf(ang) * (float)r);
+        py[i] = cy + (int)(sinf(ang) * (float)r);
+    }
+    for (int i = 0; i < 5; i++) gfx_line(c, px[i], py[i], px[(i + 2) % 5], py[(i + 2) % 5], thick, col);
+}
+
+/* Medalla provisional: el color dice de que tipo es. Cuando haya dibujos, van aqui. */
+static void medal(gfx_canvas *c, int cx, int cy, int r, const gr_badge *b, bool earned) {
+    static const gfx_color kind_col[] = { GFX_RGB(0x2F, 0xA6, 0x3B), GFX_RGB(0xF7, 0xC9, 0x1E), GFX_RGB(0x2B, 0x8F, 0xD9), GFX_RGB(0xE5, 0x48, 0x4D) };
+    if (!earned) {
+        gfx_circle(c, cx, cy, r, P->gray_lt);
+        gfx_circle(c, cx, cy - r / 5, r / 3, P->gray);
+        gfx_circle(c, cx, cy - r / 5, r / 5, P->gray_lt);
+        gfx_round_rect(c, cx - r * 4 / 9, cy - r / 8, r * 8 / 9, r * 2 / 3, 4, P->gray);
+        return;
+    }
+    gfx_circle(c, cx, cy, r, P->ink);
+    gfx_circle(c, cx, cy, r - 3, kind_col[b->kind]);
+    star(c, cx, cy + 1, r * 5 / 9, r > 24 ? 5 : 3, b->kind == GR_BADGE_PLATINUMS ? C_ON_YELLOW : C_WHITE);
+}
+
+static void stat_tile(gfx_canvas *c, int x, int y, int w, const char *value, const char *label) {
+    card(c, x, y, w, 104, false);
+    gfx_text(c, x + 22, y + 12, 40, P->ink, value);
+    gfx_text(c, x + 22, y + 66, 19, P->gray, label);
+}
+
+void ui_profile_screen(gfx_canvas *c, const ui_assets *a, const ui_profile *p) {
+    (void)a;
+    gfx_clear_transparent(c);
+    g_buttons = a->buttons; /* esta pantalla no usa la cabecera, que es la que suele dejarlos listos */
+
+    int into, span, level = gr_level(p->stats.points, &into, &span);
+    char buf[96];
+
+    /* tarjeta del usuario */
+    const int lx = MARGIN, lw = 400, ly = 34, lh = 600;
+    card(c, lx, ly, lw, lh, false);
+    int cx = lx + lw / 2;
+    gfx_circle(c, cx, ly + 110, 84, C_YELLOW);
+    avatar(c, cx, ly + 110, 76, p->name);
+    text_center(c, cx, ly + 214, 34, P->ink, p->name, lw - 40);
+    if (p->linked && p->username[0]) {
+        snprintf(buf, sizeof(buf), "@%s", p->username);
+        text_center(c, cx, ly + 258, 20, P->gray, buf, lw - 40);
+    } else {
+        text_center(c, cx, ly + 258, 19, P->gray, T("Sin cuenta vinculada", "No account linked"), lw - 40);
+    }
+    if (p->caption && p->caption[0]) {
+        snprintf(buf, sizeof(buf), "“%s”", p->caption);
+        text_center(c, cx, ly + 296, 21, P->ink, buf, lw - 40);
+    }
+
+    snprintf(buf, sizeof(buf), T("Nivel %d", "Level %d"), level);
+    int pw = gfx_text_width(26, buf) + 44;
+    gfx_round_rect(c, cx - pw / 2, ly + 356, pw, 46, 23, C_YELLOW);
+    gfx_text(c, cx - pw / 2 + 22, ly + 364, 26, C_ON_YELLOW, buf);
+    gfx_round_rect(c, lx + 40, ly + 424, lw - 80, 18, 9, P->gray_lt);
+    if (into > 0) gfx_round_rect(c, lx + 40, ly + 424, 18 + (lw - 98) * into / span, 18, 9, C_GREEN);
+    snprintf(buf, sizeof(buf), T("%d / %d pts para el nivel %d", "%d / %d pts to level %d"), into, span, level + 1);
+    text_center(c, cx, ly + 452, 18, P->gray, buf, lw - 40);
+    snprintf(buf, sizeof(buf), T("%d puntos en total", "%d points in total"), p->stats.points);
+    text_center(c, cx, ly + 500, 21, P->points, buf, lw - 40);
+
+    /* numeros */
+    const int rx = lx + lw + 30, tw = 240, gap = 20;
+    char v[6][16];
+    snprintf(v[0], 16, "%d", p->stats.games);
+    snprintf(v[1], 16, "%d", p->stats.achievements);
+    snprintf(v[2], 16, "%d", p->stats.platinums);
+    snprintf(v[3], 16, "%d", p->stats.points);
+    if (p->linked && p->social_known) { snprintf(v[4], 16, "%d", p->followers); snprintf(v[5], 16, "%d", p->following); }
+    else { snprintf(v[4], 16, "–"); snprintf(v[5], 16, "–"); }
+    const char *labels[6] = { T("Juegos jugados", "Games played"), T("Logros", "Achievements"), T("Juegos platinados", "Platinum games"),
+                              T("Puntos", "Points"), T("Seguidores", "Followers"), T("Siguiendo", "Following") };
+    for (int i = 0; i < 6; i++) stat_tile(c, rx + (i % 3) * (tw + gap), ly + (i / 3) * 124, tw, v[i], labels[i]);
+    if (!p->linked)
+        gfx_text(c, rx + 4, ly + 252, 18, P->gray,
+                 T("Seguidores y siguiendo aparecen al vincular tu cuenta (Opciones → Cuenta).",
+                   "Followers and following appear once you link your account (Options → Account)."));
+
+    /* medallas */
+    const int by = ly + 296, bw = 3 * tw + 2 * gap;
+    card(c, rx, by, bw, 304, false);
+    snprintf(buf, sizeof(buf), T("Medallas  ·  %d de %d", "Badges  ·  %d of %d"), gr_badges_earned(&p->stats), gr_badge_count);
+    gfx_text(c, rx + 24, by + 16, 26, P->ink, buf);
+    const int per_row = 6, r = 40, cell = (bw - 48) / per_row;
+    for (int i = 0; i < gr_badge_count; i++) {
+        int mx = rx + 24 + (i % per_row) * cell + cell / 2, my = by + 104 + (i / per_row) * 116;
+        bool earned = gr_badge_earned(&gr_badges[i], &p->stats);
+        medal(c, mx, my, r, &gr_badges[i], earned);
+        text_center(c, mx, my + r + 6, 15, earned ? P->ink : P->gray, T(gr_badges[i].name_es, gr_badges[i].name_en), cell - 6);
+    }
+
+    footer_bar(c);
+    int hx = hint(c, MARGIN, "L", T("Mis trofeos", "My trophies"));
+    hx = hint(c, hx, "X", T("Ver medallas", "View badges"));
+    hint(c, hx, "+", T("Salir", "Exit"));
+}
+
+void ui_badges(gfx_canvas *c, const ui_assets *a, const ui_profile *p) {
+    gfx_clear_transparent(c);
+    char sub[96];
+    snprintf(sub, sizeof(sub), T("%d de %d conseguidas", "%d of %d earned"), gr_badges_earned(&p->stats), gr_badge_count);
+    header(c, a, NULL, T("Medallas", "Badges"), sub);
+
+    const int x = MARGIN, w = CONTENT_W, h = 44;
+    for (int i = 0; i < gr_badge_count; i++) {
+        const gr_badge *b = &gr_badges[i];
+        int y = 112 + i * 49, value = gr_badge_value(b, &p->stats);
+        bool earned = value >= b->goal;
+        gfx_round_rect(c, x, y, w, h, 12, P->card);
+        medal(c, x + 28, y + h / 2, 17, b, earned);
+        gfx_text_fit(c, x + 58, y + 9, 21, earned ? P->ink : P->gray, T(b->name_es, b->name_en), 250);
+        gfx_text_fit(c, x + 320, y + 11, 18, P->gray, T(b->how_es, b->how_en), w - 320 - 250);
+        if (earned) {
+            pill(c, x + w - 16, y + 8, C_GREEN, C_WHITE, T("CONSEGUIDA", "EARNED"));
+        } else {
+            char buf[32];
+            snprintf(buf, sizeof(buf), "%d / %d", value, b->goal);
+            gfx_text_right(c, x + w - 20, y + 11, 18, P->ink, buf);
+            int bx = x + w - 230;
+            gfx_round_rect(c, bx, y + 17, 110, 10, 5, P->gray_lt);
+            if (value > 0) gfx_round_rect(c, bx, y + 17, 10 + 100 * value / b->goal, 10, 5, C_GREEN);
+        }
+    }
+
+    footer_bar(c);
+    int hx = hint(c, MARGIN, "B", T("Volver al perfil", "Back to profile"));
     hint(c, hx, "+", T("Salir", "Exit"));
 }

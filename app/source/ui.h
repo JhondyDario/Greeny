@@ -4,6 +4,7 @@
 #include "diag.h"
 #include "gfx.h"
 #include "model.h"
+#include "progress.h"
 
 #define UI_W 1280
 #define UI_H 720
@@ -11,12 +12,12 @@
 #define UI_COVER_BIG  150  /* caratula en la cuadricula */
 
 #define UI_APP_NAME    "Greeny"
-#define UI_APP_VERSION "0.0.6"
+#define UI_APP_VERSION "0.0.7"
 
 /* opciones, agrupadas en pestañas que se cambian con L y R */
 enum {
-    UI_OPT_LANG, UI_OPT_THEME, UI_OPT_ANIM, UI_OPT_GAMES_VIEW, UI_OPT_ACH_VIEW, UI_OPT_SOUND, UI_OPT_POPUP, UI_OPT_DIAG,
-    UI_OPT_ABOUT,
+    UI_OPT_LANG, UI_OPT_THEME, UI_OPT_ANIM, UI_OPT_GAMES_VIEW, UI_OPT_ACH_VIEW, UI_OPT_SOUND, UI_OPT_POPUP, UI_OPT_START,
+    UI_OPT_DIAG, UI_OPT_ABOUT,
     /* pestaña Cuenta: unas u otras segun si la consola esta vinculada */
     UI_OPT_ACC_LINK, UI_OPT_ACC_LOGIN, UI_OPT_ACC_INFO, UI_OPT_ACC_SYNC, UI_OPT_ACC_UNLINK,
     UI_OPT_COUNT
@@ -54,6 +55,19 @@ void ui_set_english(bool english);
 void ui_set_dark(bool dark);
 /* Nombre para el saludo del inicio ("Bienvenido de vuelta, ..."); NULL o "" = sin saludo. */
 void ui_set_user(const char *name);
+
+/* El usuario: lo usan la barra de arriba (icono, nombre y nivel) y la pantalla de perfil. */
+typedef struct {
+    const char *name;       /* nombre visible, o el apodo de la consola si no hay cuenta */
+    const char *username;   /* "" si la consola no esta vinculada */
+    const char *caption;
+    bool linked;
+    bool social_known;      /* false = todavia no se sabe cuantos seguidores tiene */
+    int followers, following;
+    gr_stats stats;
+} ui_profile;
+/* Deja el perfil para la barra de arriba. Se guarda el puntero: debe seguir vivo. */
+void ui_set_profile(const ui_profile *p);
 /* Imagen de fondo UI_W x UI_H en RGBA; NULL = color liso del tema. */
 void ui_set_background(const uint32_t *px);
 
@@ -76,6 +90,9 @@ void ui_link(gfx_canvas *c, const ui_assets *a, const char *code, int seconds_le
 void ui_message(gfx_canvas *c, const ui_assets *a, const char *title, const char *line1, const char *line2, bool ok);
 void ui_diag(gfx_canvas *c, const ui_assets *a, const gr_diag_item *items, int count);
 void ui_about(gfx_canvas *c, const ui_assets *a);
+/* Perfil a pantalla completa (sin la barra de arriba) y detalle de las medallas. */
+void ui_profile_screen(gfx_canvas *c, const ui_assets *a, const ui_profile *p);
+void ui_badges(gfx_canvas *c, const ui_assets *a, const ui_profile *p);
 
 /* Introduccion de la primera vez: bienvenida, revision de la instalacion y que hacer despues. */
 #define UI_INTRO_PAGES 4

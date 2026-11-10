@@ -113,12 +113,23 @@ static void test_flows_fake(const char *tmp) {
     CHECK(gr_whoami(http_fake, &a, &exists) == GR_NET_OK && !exists);
     CHECK(gr_whoami(http_down, &a, &exists) == GR_NET_OFFLINE);
 
+    /* seguidores y siguiendo */
+    g_reply = "{\"points\": 190, \"caption\": \"x\", \"followers\": 12, \"following\": 3, \"username\": \"megaJHONDY\"}";
+    a.linked = true;
+    CHECK(gr_fetch_social(http_fake, &a) == GR_NET_OK && a.social_known && a.followers == 12 && a.following == 3);
+    CHECK(strstr(g_last_url, "/rest/v1/rpc/device_profile"));
+    g_reply = "null"; /* consola sin vincular: no cambia nada */
+    CHECK(gr_fetch_social(http_fake, &a) == GR_NET_OK && a.followers == 12);
+    int v = 0;
+    CHECK(gr_json_int("{\"a\":-7}", "a", &v) && v == -7 && !gr_json_int("{\"a\":null}", "a", &v));
+
     /* guardar y leer */
     snprintf(path, sizeof(path), "%s/account.ini", tmp);
     CHECK(gr_account_save(&a, path) == 0);
     gr_account c;
     gr_account_load(&c, path);
     CHECK(!strcmp(c.token, a.token) && c.linked && !strcmp(c.username, "megaJHONDY") && !strcmp(c.caption, "Cazatrofeos"));
+    CHECK(c.social_known && c.followers == 12 && c.following == 3);
     gr_account empty = {0};
     gr_account_save(&empty, path); /* sin llave: se borra el archivo */
     gr_account_load(&c, path);

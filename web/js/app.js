@@ -319,8 +319,12 @@
       sb.from("unlocks").select("title_id,ach_id,unlocked_at,achievements(name_es,points,icon_path)")
         .eq("user_id", profile.id).order("unlocked_at", { ascending: false }),
     ]);
-    const stats = statRes.data || { achievements: 0, points: 0, games: 0 };
+    // platinums, followers y following solo existen con el esquema nuevo de la base de datos
+    const stats = { achievements: 0, points: 0, games: 0, platinums: 0, followers: 0, following: 0, ...(statRes.data || {}) };
     const unlocks = (unlockRes.data || []).filter((u) => u.achievements);
+    const lvl = window.GreenyProgress.level(stats.points);
+    const badgeList = window.GreenyProgress.badges(stats);
+    const earned = badgeList.filter((b) => b.earned).length;
     const titles = [...new Set(unlocks.map((u) => u.title_id))];
     const [gameRes, allAch] = titles.length
       ? await Promise.all([
@@ -333,6 +337,26 @@
     for (const a of allAch.data || []) totals[a.title_id] = (totals[a.title_id] || 0) + 1;
 
     const isMe = session && session.user.id === profile.id;
+
+    // boton de seguir: solo con sesion y en el perfil de otra persona
+    let followBtn = null;
+    if (session && !isMe) {
+      const mine = await sb.from("follows").select("follower_id").eq("follower_id", session.user.id).eq("followed_id", profile.id).maybeSingle();
+      if (!mine.error) {
+        let following = !!mine.data;
+        followBtn = h("button", { class: "btn" + (following ? " alt" : ""), type: "button", "aria-pressed": String(following) }, following ? "Siguiendo" : "Seguir");
+        followBtn.addEventListener("click", async () => {
+          followBtn.disabled = true;
+          const res = following
+            ? await sb.from("follows").delete().eq("follower_id", session.user.id).eq("followed_id", profile.id)
+            : await sb.from("follows").insert({ follower_id: session.user.id, followed_id: profile.id });
+          followBtn.disabled = false;
+          if (res.error) { alert(explain(res.error)); return; }
+          render(); // para que el contador de seguidores quede al dia
+        });
+      }
+    }
+
     return [
       h("section", { class: "card row" }, avatar(profile, "big"),
         h("div", { class: "grow" },
@@ -340,11 +364,29 @@
           h("div", { class: "muted" }, "@" + profile.username, profile.discord_username ? " · Discord: " + profile.discord_username : ""),
           profile.caption ? h("p", { style: "margin:8px 0 0;font-size:1.1rem" }, "“" + profile.caption + "”") : null,
           h("div", { class: "muted small", style: "margin-top:6px" }, "En Greeny desde " + fmtDate(profile.created_at))),
-        isMe ? h("a", { class: "btn alt", href: "#/cuenta" }, "Editar") : null),
+        isMe ? h("a", { class: "btn alt", href: "#/cuenta" }, "Editar") : followBtn),
+      h("section", { class: "card level", style: "margin-top:14px" },
+        h("div", { class: "row" },
+          h("span", { class: "pill pts lvl" }, "Nivel " + lvl.level),
+          h("div", { class: "grow" }, h("div", { class: "bar", role: "img", "aria-label": lvl.into + " de " + lvl.span + " puntos para el nivel " + (lvl.level + 1) },
+            h("i", { style: "width:" + Math.round((lvl.into / lvl.span) * 100) + "%" }))),
+          h("span", { class: "muted small nowrap" }, lvl.into + " / " + lvl.span + " pts para el nivel " + (lvl.level + 1)))),
       h("section", { class: "stats", style: "margin-top:14px" },
         h("div", { class: "card stat" }, h("b", {}, fmtNum(stats.points)), h("span", {}, "puntos")),
         h("div", { class: "card stat" }, h("b", {}, fmtNum(stats.achievements)), h("span", {}, "logros")),
-        h("div", { class: "card stat" }, h("b", {}, fmtNum(stats.games)), h("span", {}, "juegos"))),
+        h("div", { class: "card stat" }, h("b", {}, fmtNum(stats.games)), h("span", {}, "juegos jugados")),
+        h("div", { class: "card stat" }, h("b", {}, fmtNum(stats.platinums)), h("span", {}, "juegos platinados")),
+        h("div", { class: "card stat" }, h("b", {}, fmtNum(stats.followers)), h("span", {}, "seguidores")),
+        h("div", { class: "card stat" }, h("b", {}, fmtNum(stats.following)), h("span", {}, "siguiendo"))),
+      h("h2", {}, "Medallas ", h("span", { class: "muted small" }, earned + " de " + badgeList.length)),
+      h("div", { class: "badges" }, badgeList.map((b) =>
+        h("div", { class: "card badge" + (b.earned ? " earned" : "") },
+          h("span", { class: "medal " + b.kind, "aria-hidden": "true" }, b.earned ? "★" : ""),
+          h("div", {},
+            h("strong", {}, b.name),
+            h("div", { class: "muted small" }, b.how),
+            b.earned ? h("span", { class: "pill ok" }, "Conseguida")
+                     : h("span", { class: "muted small" }, Math.min(b.value, b.goal) + " / " + b.goal))))),
       h("h2", {}, "Juegos"),
       titles.length
         ? h("div", { class: "stack" }, titles.map((tid) => {

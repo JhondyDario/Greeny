@@ -31,6 +31,8 @@ typedef struct {
     char username[24];
     char display[36];
     char caption[64];
+    bool social_known;   /* ya se consultaron seguidores y siguiendo alguna vez */
+    int  followers, following;
 } gr_account;
 
 void gr_account_load(gr_account *a, const char *path);
@@ -42,6 +44,9 @@ gr_net_result gr_link_start(gr_http_fn http, const char *device_name, gr_account
 /* Pregunta al servidor de quien es esta consola y actualiza `a`.
  * *exists = false si la llave ya no existe (codigo vencido o consola desvinculada desde la web). */
 gr_net_result gr_whoami(gr_http_fn http, gr_account *a, bool *exists);
+
+/* Trae seguidores y siguiendo (lo unico del perfil que la consola no puede calcular sola). */
+gr_net_result gr_fetch_social(gr_http_fn http, gr_account *a);
 
 /* Entra con correo y contraseña y registra la consola de una vez. */
 gr_net_result gr_login_password(gr_http_fn http, const char *email, const char *password, const char *device_name,
@@ -56,3 +61,4 @@ gr_net_result gr_push_unlocks(gr_http_fn http, const gr_account *a, const char *
 size_t gr_json_escape(char *dst, size_t cap, const char *src);                 /* devuelve lo escrito, sin el 0 */
 bool   gr_json_string(const char *json, const char *key, char *out, size_t cap); /* false si no esta o es null */
 bool   gr_json_bool(const char *json, const char *key, bool *out);
+bool   gr_json_int(const char *json, const char *key, int *out);

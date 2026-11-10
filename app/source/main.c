@@ -47,7 +47,8 @@
 #define SMALL_H 66
 
 typedef enum {
-    SCREEN_HOME, SCREEN_DETAIL, SCREEN_SETTINGS, SCREEN_DIAG, SCREEN_ABOUT, SCREEN_INTRO, SCREEN_LINK, SCREEN_MSG
+    SCREEN_HOME, SCREEN_DETAIL, SCREEN_SETTINGS, SCREEN_DIAG, SCREEN_ABOUT, SCREEN_INTRO, SCREEN_LINK, SCREEN_MSG,
+    SCREEN_PROFILE, SCREEN_BADGES
 } screen_t;
 
 static gr_model g_model;
@@ -70,6 +71,7 @@ static char g_sync_err[160];
 static Thread g_sync_thread;
 static bool g_sync_thread_live;
 static char g_nick[40];               /* apodo del usuario de la consola */
+static ui_profile g_profile;          /* lo que muestran la barra de arriba y la pantalla de perfil */
 
 /* mensaje de la pantalla SCREEN_MSG */
 static char g_msg_title[80], g_msg_line1[160], g_msg_line2[160];
@@ -151,10 +153,13 @@ static void load_covers(void) {
     }
 }
 
+static void refresh_greeting(void);
+
 static void rescan(void) {
     trace("leyendo archivos de logros");
     gr_scan(&g_model, ROOT);
     load_covers();
+    refresh_greeting(); /* los numeros del perfil salen de aqui */
 }
 
 /* Decodifica el fondo del tema (viene como JPEG dentro de la app). Si falla, queda el color liso. */
@@ -227,7 +232,20 @@ static void show_message(bool ok, const char *title, const char *line1, const ch
 
 /* El saludo del inicio usa el usuario de Greeny si la consola esta vinculada; si no, el apodo de la consola. */
 static void refresh_greeting(void) {
-    ui_set_user(g_account.linked && g_account.username[0] ? g_account.username : g_nick);
+    bool linked = g_account.linked && g_account.username[0];
+    ui_set_user(linked ? g_account.username : g_nick);
+
+    /* el perfil se arma con lo que hay en la SD; de internet solo vienen seguidores y siguiendo */
+    g_profile.linked = linked;
+    g_profile.username = linked ? g_account.username : "";
+    g_profile.name = linked ? (g_account.display[0] ? g_account.display : g_account.username) : (g_nick[0] ? g_nick : "Jugador");
+    g_profile.caption = linked ? g_account.caption : "";
+    g_profile.social_known = g_account.social_known;
+    g_profile.followers = g_account.followers;
+    g_profile.following = g_account.following;
+    g_profile.stats = (gr_stats){ .games = g_model.games_played, .achievements = g_model.unlocked,
+                                  .platinums = g_model.platinums, .points = g_model.points_got };
+    ui_set_profile(&g_profile);
 }
 
 static void device_name(char *out, size_t cap) {
@@ -243,6 +261,7 @@ static void sync_thread(void *arg) {
     if (r == GR_NET_OFFLINE) { g_sync = SYNC_OFFLINE; return; }
     if (r != GR_NET_OK) { snprintf(g_sync_err, sizeof(g_sync_err), "No se pudo consultar la cuenta."); g_sync = SYNC_FAILED; return; }
     if (!exists || !g_sync_account.linked) { g_sync = SYNC_UNLINKED; return; }
+    gr_fetch_social(net_http, &g_sync_account); /* si falla, quedan los numeros de la ultima vez */
 
     r = gr_push_unlocks(net_http, &g_sync_account, ROOT, &g_sync_sent, &g_sync_added, g_sync_err, sizeof(g_sync_err));
     g_sync = r == GR_NET_OK ? SYNC_OK : r == GR_NET_OFFLINE ? SYNC_OFFLINE : SYNC_FAILED;
@@ -474,9 +493,10 @@ int main(int argc, char *argv[]) {
         trace("introduccion");
         run_diag();
         screen = SCREEN_INTRO;
-    } else {
-        refresh_greeting();
+    } else if (g_config.start_page == GR_START_PROFILE) {
+        screen = SCREEN_PROFILE;
     }
+    refresh_greeting();
     sync_start(); /* en segundo plano y solo si hay cuenta e internet; la app no espera por esto */
 
     char link_code[8] = "";
@@ -518,6 +538,7 @@ int main(int argc, char *argv[]) {
                 opened = true;
             }
             if (down & HidNpadButton_X) { screen = SCREEN_SETTINGS; stab = srow = 0; opened = true; }
+            if (down & HidNpadButton_R) { screen = SCREEN_PROFILE; opened = true; }
         } else if (screen == SCREEN_DETAIL) {
             ui_layout l = ui_detail_layout(&g_config);
             int n = g_model.games[cursor].broken ? 0 : g_model.cur.nach;
@@ -550,6 +571,7 @@ int main(int argc, char *argv[]) {
                     case UI_OPT_ACH_VIEW:   g_config.ach_view = (g_config.ach_view + 1) % GR_VIEW_COUNT; break;
                     case UI_OPT_SOUND:      g_config.sound = !g_config.sound; break;
                     case UI_OPT_POPUP:      g_config.popup = !g_config.popup; break;
+                    case UI_OPT_START:      g_config.start_page = (g_config.start_page + 1) % GR_START_COUNT; break;
                     case UI_OPT_ABOUT:      screen = SCREEN_ABOUT; break;
                     case UI_OPT_DIAG:       run_diag(); screen = SCREEN_DIAG; break;
                     case UI_OPT_ACC_LINK: {
@@ -627,6 +649,11 @@ int main(int argc, char *argv[]) {
                     sync_start();
                 }
             }
+        } else if (screen == SCREEN_PROFILE) {
+            if (down & (HidNpadButton_L | HidNpadButton_B)) { screen = SCREEN_HOME; back = true; }
+            if (down & HidNpadButton_X) { screen = SCREEN_BADGES; opened = true; }
+        } else if (screen == SCREEN_BADGES) {
+            if (down & HidNpadButton_B) { screen = SCREEN_PROFILE; back = true; }
         } else if (screen == SCREEN_MSG) {
             if (down & (HidNpadButton_A | HidNpadButton_B)) { screen = SCREEN_SETTINGS; stab = UI_TAB_ACCOUNT; srow = 0; back = true; }
         } else if (screen == SCREEN_DIAG) {
@@ -666,6 +693,8 @@ int main(int argc, char *argv[]) {
                 sync_text(&acc.sync_es, &acc.sync_en);
                 ui_settings(&layer, &g_assets, &g_config, stab, srow, g_system_spanish, g_system_dark, &acc);
             }
+            else if (screen == SCREEN_PROFILE) ui_profile_screen(&layer, &g_assets, &g_profile);
+            else if (screen == SCREEN_BADGES) ui_badges(&layer, &g_assets, &g_profile);
             else if (screen == SCREEN_LINK) ui_link(&layer, &g_assets, link_code, link_shown_left < 0 ? LINK_SECONDS : link_shown_left);
             else if (screen == SCREEN_MSG) ui_message(&layer, &g_assets, g_msg_title, g_msg_line1, g_msg_line2[0] ? g_msg_line2 : NULL, g_msg_ok);
             else if (screen == SCREEN_DIAG) ui_diag(&layer, &g_assets, g_diag, g_ndiag);

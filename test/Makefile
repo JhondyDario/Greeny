@@ -7,7 +7,7 @@ test: test_engine
 	./test_engine
 
 test_engine: test_engine.c ../common/engine.c ../common/engine.h ../common/config.c ../common/config.h
-	$(CC) $(CFLAGS) -o $@ test_engine.c ../common/engine.c ../common/config.c
+	$(CC) $(CFLAGS) -o $@ test_engine.c ../common/engine.c ../common/config.c ../common/progress.c
 
 lgcheck: lgcheck.c ../common/engine.c ../common/engine.h
 	$(CC) -std=c11 -O2 -Wall -Wextra -o $@ lgcheck.c ../common/engine.c

@@ -96,6 +96,13 @@ bool gr_json_bool(const char *json, const char *key, bool *out) {
     return false;
 }
 
+bool gr_json_int(const char *json, const char *key, int *out) {
+    const char *p = find_value(json, key);
+    if (!p || !((*p >= '0' && *p <= '9') || *p == '-')) return false;
+    *out = atoi(p);
+    return true;
+}
+
 /* Mensaje de error del servidor, traducido cuando es uno de los que el usuario puede ver. */
 static void server_error(const char *resp, char *err, size_t errlen) {
     char msg[160];
@@ -141,6 +148,8 @@ void gr_account_load(gr_account *a, const char *path) {
         else if (!strcmp(line, "username")) snprintf(a->username, sizeof(a->username), "%s", v);
         else if (!strcmp(line, "display")) snprintf(a->display, sizeof(a->display), "%s", v);
         else if (!strcmp(line, "caption")) snprintf(a->caption, sizeof(a->caption), "%s", v);
+        else if (!strcmp(line, "followers")) { a->followers = atoi(v); a->social_known = true; }
+        else if (!strcmp(line, "following")) a->following = atoi(v);
     }
     fclose(f);
     if (!a->token[0]) a->linked = false;
@@ -152,6 +161,7 @@ int gr_account_save(const gr_account *a, const char *path) {
     if (!f) return -1;
     int ok = fprintf(f, "token=%s\nlinked=%d\nusername=%s\ndisplay=%s\ncaption=%s\n", a->token, a->linked ? 1 : 0, a->username,
                      a->display, a->caption) > 0;
+    if (ok && a->social_known) ok = fprintf(f, "followers=%d\nfollowing=%d\n", a->followers, a->following) > 0;
     if (fclose(f) != 0) ok = 0;
     return ok ? 0 : -1;
 }
@@ -193,6 +203,21 @@ gr_net_result gr_whoami(gr_http_fn http, gr_account *a, bool *exists) {
         gr_json_string(resp, "username", a->username, sizeof(a->username));
         gr_json_string(resp, "display_name", a->display, sizeof(a->display));
         gr_json_string(resp, "caption", a->caption, sizeof(a->caption));
+    }
+    return GR_NET_OK;
+}
+
+gr_net_result gr_fetch_social(gr_http_fn http, gr_account *a) {
+    char body[128], resp[RESP_MAX];
+    if (!a->token[0] || !a->linked) return GR_NET_OK;
+    snprintf(body, sizeof(body), "{\"device_token\":\"%s\"}", a->token);
+    gr_net_result r = call(http, "/rest/v1/rpc/device_profile", NULL, body, resp, sizeof(resp), NULL, 0);
+    if (r != GR_NET_OK) return r;
+    int followers, following;
+    if (gr_json_int(resp, "followers", &followers) && gr_json_int(resp, "following", &following)) {
+        a->followers = followers;
+        a->following = following;
+        a->social_known = true;
     }
     return GR_NET_OK;
 }

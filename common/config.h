@@ -5,6 +5,7 @@
 typedef enum { GR_LANG_AUTO, GR_LANG_ES, GR_LANG_EN, GR_LANG_COUNT } gr_lang;
 typedef enum { GR_THEME_AUTO, GR_THEME_LIGHT, GR_THEME_DARK, GR_THEME_COUNT } gr_theme;
 typedef enum { GR_VIEW_LIST, GR_VIEW_GRID, GR_VIEW_COUNT } gr_view;
+typedef enum { GR_START_TROPHIES, GR_START_PROFILE, GR_START_COUNT } gr_start;
 
 typedef struct {
     int  lang;        /* gr_lang */
@@ -15,6 +16,7 @@ typedef struct {
     bool popup;       /* aviso en pantalla al desbloquear un logro */
     bool animated_bg; /* fondo animado en la app */
     bool intro_done;  /* ya se mostro la introduccion de la app */
+    int  start_page;  /* gr_start: que pantalla abre la app */
 } gr_config;
 
 void gr_config_defaults(gr_config *c);

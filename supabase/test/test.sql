@@ -209,11 +209,53 @@ begin
 
     select * into r from public.profile_stats where username = 'Ana_99';
     assert r.achievements = 2 and r.points = 15 and r.games = 1, 'estadisticas del perfil';
+    assert r.platinums = 1, 'Mario tiene 2 logros en la prueba y Ana tiene los 2: un platino, hay ' || r.platinums;
+    assert r.followers = 0 and r.following = 0, 'sin seguidores todavia';
+    select * into r from public.profile_stats where username = 'jefe';
+    assert r.achievements = 0 and r.points = 0 and r.games = 0 and r.platinums = 0, 'usuario sin logros: todo en cero';
     select * into r from public.achievement_stats where ach_id = 'monedas_5';
     assert r.unlocked_by = 1 and r.players = 1, 'rareza';
     select * into r from public.achievement_stats where ach_id = 'secreto';
     assert r.unlocked_by = 0 and r.players = 0, 'logro que nadie tiene';
 end $$;
+
+-- ===== seguir =====
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000d';
+do $$
+declare ok boolean; n int;
+begin
+    insert into public.follows (follower_id, followed_id) values (auth.uid(), '00000000-0000-0000-0000-00000000000a');
+    ok := false;
+    begin insert into public.follows (follower_id, followed_id) values ('00000000-0000-0000-0000-00000000000a', auth.uid());
+    exception when insufficient_privilege then ok := true; end;
+    assert ok, 'nadie puede hacer que otro lo siga';
+    ok := false;
+    begin insert into public.follows (follower_id, followed_id) values (auth.uid(), auth.uid());
+    exception when check_violation then ok := true; end;
+    assert ok, 'no se puede seguir a uno mismo';
+    ok := false;
+    begin insert into public.follows (follower_id, followed_id) values (auth.uid(), '00000000-0000-0000-0000-00000000000a');
+    exception when unique_violation then ok := true; end;
+    assert ok, 'no se sigue dos veces';
+    select followers into n from public.profile_stats where username = 'Ana_99';
+    assert n = 1, 'Ana tiene un seguidor: ' || n;
+    select following into n from public.profile_stats where username = 'jefe';
+    assert n = 1, 'jefe sigue a uno: ' || n;
+end $$;
+reset role;
+reset request.jwt.claim.sub;
+
+set role anon;
+do $$
+declare j jsonb;
+begin
+    j := public.device_profile((select device_token from t_link));
+    assert j ->> 'username' = 'Ana_99' and (j ->> 'followers')::int = 1 and (j ->> 'platinums')::int = 1
+       and (j ->> 'points')::int = 15 and j ->> 'caption' = 'Cazatrofeos', 'device_profile: ' || j::text;
+    assert public.device_profile('llave-inventada') is null, 'llave inventada: null';
+end $$;
+reset role;
 
 -- ===== administrador =====
 set role authenticated;
