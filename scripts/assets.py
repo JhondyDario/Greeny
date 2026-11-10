@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Genera los recursos binarios a partir de assets/.
 
+  app/data/mascot_big.bin    RGBA crudo 220x330 (introduccion y Acerca de)
   app/data/mascot_small.bin  RGBA crudo 50x75 (cabecera de la app)
   app/icon.jpg               icono 256x256 para el menu de homebrew
   app/data/sfx_*.bin         sonidos de la app: PCM 16 bit mono 48 kHz
@@ -29,7 +30,7 @@ def fit(img, w, h):
 
 
 os.makedirs(os.path.join(ROOT, "app", "data"), exist_ok=True)
-for name, (w, h) in {"mascot_small": (50, 75)}.items():
+for name, (w, h) in {"mascot_big": (220, 330), "mascot_small": (50, 75)}.items():
     with open(os.path.join(ROOT, "app", "data", name + ".bin"), "wb") as f:
         f.write(fit(src, w, h).tobytes())
 

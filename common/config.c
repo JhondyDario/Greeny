@@ -15,6 +15,7 @@ void gr_config_defaults(gr_config *c) {
     c->sound = true;
     c->popup = true;
     c->animated_bg = true;
+    c->intro_done = false;
 }
 
 /* deja *out intacto si el valor no es uno de los nombres validos */
@@ -43,6 +44,7 @@ void gr_config_load(gr_config *c, const char *path) {
         else if (!strcmp(key, "sound")) pick_bool(val, &c->sound);
         else if (!strcmp(key, "popup")) pick_bool(val, &c->popup);
         else if (!strcmp(key, "animated_bg")) pick_bool(val, &c->animated_bg);
+        else if (!strcmp(key, "intro_done")) pick_bool(val, &c->intro_done);
     }
     fclose(f);
 }
@@ -55,10 +57,10 @@ int gr_config_save(const gr_config *c, const char *path) {
     FILE *f = fopen(path, "w");
     if (!f) return -1;
     int ok = fprintf(f, "# Configuracion de Greeny. La app la escribe; el sysmodule la lee al abrir un juego.\n"
-                        "lang = %s\ntheme = %s\ngames_view = %s\nach_view = %s\nsound = %d\npopup = %d\nanimated_bg = %d\n",
+                        "lang = %s\ntheme = %s\ngames_view = %s\nach_view = %s\nsound = %d\npopup = %d\nanimated_bg = %d\nintro_done = %d\n",
                      name_of(k_lang, GR_LANG_COUNT, c->lang), name_of(k_theme, GR_THEME_COUNT, c->theme),
                      name_of(k_view, GR_VIEW_COUNT, c->games_view), name_of(k_view, GR_VIEW_COUNT, c->ach_view),
-                     c->sound ? 1 : 0, c->popup ? 1 : 0, c->animated_bg ? 1 : 0) > 0;
+                     c->sound ? 1 : 0, c->popup ? 1 : 0, c->animated_bg ? 1 : 0, c->intro_done ? 1 : 0) > 0;
     if (fclose(f) != 0) ok = 0;
     return ok ? 0 : -1;
 }

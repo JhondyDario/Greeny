@@ -46,6 +46,9 @@ static bool g_en;
 void ui_set_english(bool english) { g_en = english; }
 void ui_set_dark(bool dark) { P = dark ? &k_dark : &k_light; }
 
+static char g_user[40];
+void ui_set_user(const char *name) { snprintf(g_user, sizeof(g_user), "%s", name ? name : ""); }
+
 ui_layout ui_home_layout(const gr_config *cfg) {
     return cfg->games_view == GR_VIEW_GRID ? (ui_layout){ 5, 2 } : (ui_layout){ 1, 5 };
 }
@@ -258,8 +261,10 @@ static void home_grid(gfx_canvas *c, const ui_assets *a, const gr_model *m, int 
 void ui_home(gfx_canvas *c, const ui_assets *a, const gr_model *m, const gr_config *cfg, int cursor, int top) {
     gfx_clear_transparent(c);
     header(c, a, NULL, UI_APP_NAME, NULL);
-    gfx_text(c, 122 + gfx_text_width(46, UI_APP_NAME) + 14, 44, 22, C_GREEN_LT,
-             T("Logros para tu Switch", "Achievements for your Switch"));
+    char tagline[96];
+    if (g_user[0]) snprintf(tagline, sizeof(tagline), T("¡Bienvenido de vuelta, %s!", "Welcome back, %s!"), g_user);
+    else snprintf(tagline, sizeof(tagline), "%s", T("Logros para tu Switch", "Achievements for your Switch"));
+    gfx_text_fit(c, 122 + gfx_text_width(46, UI_APP_NAME) + 14, 44, 22, C_GREEN_LT, tagline, 520);
     header_stats(c, m->unlocked, m->total, m->points_got, m->points);
 
     if (m->ngames == 0) {
@@ -397,13 +402,13 @@ void ui_detail(gfx_canvas *c, const ui_assets *a, const gr_model *m, const gr_co
 
 static void option_row(gfx_canvas *c, int row, bool selected, const char *label, const char *help, const char *value,
                        gfx_color value_bg) {
-    const int x = MARGIN, w = CONTENT_W, h = 57, y = 114 + row * (h + 10);
+    const int x = MARGIN, w = CONTENT_W, h = 51, y = 112 + row * (h + 9);
     card(c, x, y, w, h, selected);
-    gfx_text(c, x + 24, y + 5, 22, P->ink, label);
-    gfx_text_fit(c, x + 24, y + 33, 16, P->gray, help, w - 48 - 300);
-    int vw = gfx_text_width(19, value) + 36;
-    gfx_round_rect(c, x + w - 24 - vw, y + 11, vw, 35, 17, value_bg);
-    gfx_text(c, x + w - 24 - vw + 18, y + 17, 19, C_WHITE, value);
+    gfx_text(c, x + 24, y + 3, 21, P->ink, label);
+    gfx_text_fit(c, x + 24, y + 29, 15, P->gray, help, w - 48 - 300);
+    int vw = gfx_text_width(18, value) + 34;
+    gfx_round_rect(c, x + w - 24 - vw, y + 9, vw, 33, 16, value_bg);
+    gfx_text(c, x + w - 24 - vw + 17, y + 15, 18, C_WHITE, value);
 }
 
 void ui_settings(gfx_canvas *c, const ui_assets *a, const gr_config *cfg, int cursor, bool system_spanish,
@@ -448,9 +453,12 @@ void ui_settings(gfx_canvas *c, const ui_assets *a, const gr_config *cfg, int cu
     option_row(c, UI_OPT_DIAG, cursor == UI_OPT_DIAG, T("Diagnóstico", "Diagnostics"),
                T("Revisa que Greeny esté bien instalado y funcionando.", "Checks that Greeny is installed and working."),
                T("Abrir", "Open"), C_NEUTRAL);
+    option_row(c, UI_OPT_ABOUT, cursor == UI_OPT_ABOUT, T("Acerca de", "About"),
+               T("Créditos, versión y dónde contactar.", "Credits, version and where to get in touch."),
+               T("Abrir", "Open"), C_NEUTRAL);
 
     footer_bar(c);
-    int hx = hint(c, MARGIN, "A", cursor == UI_OPT_DIAG ? T("Abrir", "Open") : T("Cambiar", "Change"));
+    int hx = hint(c, MARGIN, "A", cursor >= UI_OPT_DIAG ? T("Abrir", "Open") : T("Cambiar", "Change"));
     hx = hint(c, hx, "B", T("Volver", "Back"));
     hint(c, hx, "+", T("Salir de la app", "Exit app"));
 }
@@ -474,6 +482,15 @@ static void diag_icon(gfx_canvas *c, int cx, int cy, gr_diag_state st) {
     }
 }
 
+static void diag_row(gfx_canvas *c, int y, const gr_diag_item *it) {
+    const int x = MARGIN, w = CONTENT_W, h = 44;
+    gfx_round_rect(c, x, y, w, h, 12, P->card);
+    diag_icon(c, x + 28, y + h / 2, it->state);
+    gfx_text_fit(c, x + 58, y + 9, 21, P->ink, g_en ? it->title_en : it->title_es, 330);
+    gfx_text_fit(c, x + 400, y + 11, 18, it->state == GR_DIAG_FAIL ? C_RED : P->gray,
+                 g_en ? it->detail_en : it->detail_es, w - 400 - 20);
+}
+
 void ui_diag(gfx_canvas *c, const ui_assets *a, const gr_diag_item *items, int count) {
     gfx_clear_transparent(c);
 
@@ -488,19 +505,122 @@ void ui_diag(gfx_canvas *c, const ui_assets *a, const gr_diag_item *items, int c
     else snprintf(sub, sizeof(sub), "%s", T("Todo en orden", "Everything looks good"));
     header(c, a, NULL, T("Diagnóstico", "Diagnostics"), sub);
 
-    const int x = MARGIN, w = CONTENT_W, h = 44;
-    for (int i = 0; i < count && i < GR_DIAG_MAX; i++) {
-        const gr_diag_item *it = &items[i];
-        int y = 112 + i * (h + 5);
-        gfx_round_rect(c, x, y, w, h, 12, P->card);
-        diag_icon(c, x + 28, y + h / 2, it->state);
-        gfx_text_fit(c, x + 58, y + 9, 21, P->ink, g_en ? it->title_en : it->title_es, 330);
-        gfx_text_fit(c, x + 400, y + 11, 18, it->state == GR_DIAG_FAIL ? C_RED : P->gray,
-                     g_en ? it->detail_en : it->detail_es, w - 400 - 20);
-    }
+    for (int i = 0; i < count && i < GR_DIAG_MAX; i++) diag_row(c, 112 + i * 49, &items[i]);
 
     footer_bar(c);
     int hx = hint(c, MARGIN, "Y", T("Revisar de nuevo", "Check again"));
     hx = hint(c, hx, "B", T("Volver", "Back"));
+    hint(c, hx, "+", T("Salir de la app", "Exit app"));
+}
+
+/* ---------- acerca de ---------- */
+
+void ui_about(gfx_canvas *c, const ui_assets *a) {
+    gfx_clear_transparent(c);
+    header(c, a, NULL, T("Acerca de", "About"), UI_APP_NAME " " UI_APP_VERSION);
+
+    const int x = MARGIN, w = 880;
+    card(c, x, 126, w, 500, false);
+    int tx = x + 36, y = 150;
+    gfx_text(c, tx, y, 40, P->ink, UI_APP_NAME);
+    gfx_text(c, tx + gfx_text_width(40, UI_APP_NAME) + 16, y + 16, 22, P->gray, T("versión " UI_APP_VERSION, "version " UI_APP_VERSION));
+    gfx_text(c, tx, y + 60, 22, P->gray,
+             T("El primer sistema de logros no oficial para la Switch.", "The first unofficial achievement system for the Switch."));
+
+    gfx_text(c, tx, y + 118, 19, P->gray, T("CREADO POR", "CREATED BY"));
+    gfx_text(c, tx, y + 142, 30, P->ink, "Jhondy");
+
+    gfx_text(c, tx, y + 204, 19, P->gray, T("CÓDIGO, AYUDA Y CONTACTO", "SOURCE, HELP AND CONTACT"));
+    gfx_text(c, tx, y + 228, 26, P->accent, "github.com/JhondyDario/Greeny");
+    gfx_text(c, tx, y + 264, 18, P->gray,
+             T("Reporta errores o propone logros abriendo un \"issue\" ahí.", "Report bugs or suggest achievements by opening an issue there."));
+
+    gfx_text(c, tx, y + 322, 19, P->gray, T("LICENCIA Y CRÉDITOS", "LICENSE AND CREDITS"));
+    gfx_text_fit(c, tx, y + 346, 19, P->ink,
+                 T("Software libre, licencia GPLv2. Usa código de Atmosphère, libtesla, FreeType y stb.",
+                   "Free software, GPLv2 license. Uses code from Atmosphère, libtesla, FreeType and stb."), w - 72);
+    gfx_text_fit(c, tx, y + 400, 18, P->gray,
+                 T("Proyecto de fans. No está afiliado ni avalado por Nintendo.",
+                   "Fan project. Not affiliated with or endorsed by Nintendo."), w - 72);
+
+    if (a->mascot_big) gfx_image(c, x + w + (UI_W - MARGIN - x - w - a->big_w) / 2 + 10, 210, a->mascot_big, a->big_w, a->big_h);
+
+    footer_bar(c);
+    int hx = hint(c, MARGIN, "B", T("Volver", "Back"));
+    hint(c, hx, "+", T("Salir de la app", "Exit app"));
+}
+
+/* ---------- introduccion ---------- */
+
+static void intro_dots(gfx_canvas *c, int page) {
+    for (int i = 0; i < UI_INTRO_PAGES; i++)
+        gfx_circle(c, UI_W / 2 + (i - 1) * 34, 632, i == page ? 9 : 6, i == page ? C_GREEN : P->gray_lt);
+}
+
+void ui_intro(gfx_canvas *c, const ui_assets *a, int page, const gr_diag_item *items, int count,
+              bool sysmodule_running) {
+    gfx_clear_transparent(c);
+    char sub[48];
+    snprintf(sub, sizeof(sub), T("Paso %d de %d", "Step %d of %d"), page + 1, UI_INTRO_PAGES);
+    header(c, a, NULL, T("Primeros pasos", "Getting started"), sub);
+
+    int fails = 0;
+    for (int i = 0; i < count; i++) fails += items[i].state == GR_DIAG_FAIL;
+
+    if (page == 0) {
+        if (a->mascot_big) gfx_image(c, 110, 180, a->mascot_big, a->big_w, a->big_h);
+        const int tx = 400;
+        gfx_text(c, tx, 190, 46, P->ink, T("¡Bienvenido a Greeny!", "Welcome to Greeny!"));
+        gfx_text(c, tx, 262, 25, P->gray, T("Logros para tus juegos de Switch.", "Achievements for your Switch games."));
+        gfx_text(c, tx, 326, 22, P->ink, T("Greeny corre en segundo plano mientras juegas.", "Greeny runs in the background while you play."));
+        gfx_text(c, tx, 360, 22, P->ink,
+                 T("Cuando cumples un logro, te avisa en pantalla y lo guarda.", "When you earn an achievement, it pops up and gets saved."));
+        gfx_text(c, tx, 394, 22, P->ink, T("En esta app ves tu progreso en cada juego.", "This app shows your progress in every game."));
+        gfx_text(c, tx, 458, 22, P->gray,
+                 T("Primero vamos a revisar que todo esté bien instalado.", "First, let's check that everything is installed correctly."));
+    } else if (page == 1) {
+        gfx_text(c, MARGIN, 122, 30, P->ink, T("Revisando la instalación", "Checking the installation"));
+        int shown = count < 6 ? count : 6; /* las primeras son las de instalacion; el resto esta en Diagnostico */
+        for (int i = 0; i < shown; i++) diag_row(c, 180 + i * 52, &items[i]);
+        gfx_text(c, MARGIN, 180 + shown * 52 + 14, 20, P->gray,
+                 fails ? T("Lo que está en rojo hay que arreglarlo para que los logros funcionen.",
+                           "Items in red must be fixed for achievements to work.")
+                       : T("Puedes repetir esta revisión cuando quieras en Opciones → Diagnóstico.",
+                           "You can run this check again any time in Options → Diagnostics."));
+    } else {
+        const int x = 190, w = 900;
+        card(c, x, 170, w, 380, false);
+        int tx = x + 44;
+        if (sysmodule_running && !fails) {
+            gfx_circle(c, tx + 34, 240, 34, C_GREEN);
+            gfx_line(c, tx + 18, 242, tx + 29, 254, 8, C_WHITE);
+            gfx_line(c, tx + 29, 254, tx + 51, 228, 8, C_WHITE);
+            gfx_text(c, tx + 92, 212, 40, P->ink, T("¡Todo listo!", "All set!"));
+            gfx_text(c, tx, 310, 23, P->ink, T("Greeny ya está funcionando en esta consola.", "Greeny is already running on this console."));
+            gfx_text(c, tx, 348, 23, P->ink,
+                     T("Abre un juego que tenga logros y verás un aviso al empezar.", "Start a game that has achievements and a pop-up will appear."));
+            gfx_text(c, tx, 420, 20, P->gray,
+                     T("Si no sale el aviso, vuelve aquí y abre Opciones → Diagnóstico.", "If no pop-up appears, come back and open Options → Diagnostics."));
+        } else {
+            gfx_circle(c, tx + 34, 240, 34, C_YELLOW);
+            gfx_text(c, tx + 34 - gfx_text_width(44, "!") / 2, 212, 44, C_ON_YELLOW, "!");
+            gfx_text(c, tx + 92, 212, 40, P->ink, T("Reinicia la consola", "Restart the console"));
+            gfx_text(c, tx, 300, 23, P->ink,
+                     T("Los logros empiezan a funcionar después de reiniciar.", "Achievements start working after a restart."));
+            gfx_text(c, tx, 346, 21, P->ink,
+                     T("Mantén pulsado POWER, entra a Opciones de apagado y elige Reiniciar.", "Hold POWER, open Power Options and choose Restart."));
+            gfx_text(c, tx, 380, 21, P->ink,
+                     T("Suspender la consola no sirve: tiene que apagar y encender.", "Sleep mode is not enough: it has to power off and on."));
+            gfx_text_fit(c, tx, 446, 20, fails ? C_RED : P->gray,
+                         fails ? T("Antes, corrige lo que salió en rojo en el paso anterior.", "First, fix what showed up in red on the previous step.")
+                               : T("Después, abre un juego con logros y verás un aviso al empezar.", "Then start a game with achievements and a pop-up will appear."),
+                         w - 88);
+        }
+    }
+
+    intro_dots(c, page);
+    footer_bar(c);
+    int hx = hint(c, MARGIN, "A", page == UI_INTRO_PAGES - 1 ? T("Empezar", "Get started") : T("Siguiente", "Next"));
+    if (page > 0) hx = hint(c, hx, "B", T("Atrás", "Back"));
     hint(c, hx, "+", T("Salir de la app", "Exit app"));
 }

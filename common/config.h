@@ -14,6 +14,7 @@ typedef struct {
     bool sound;       /* sonido al desbloquear un logro */
     bool popup;       /* aviso en pantalla al desbloquear un logro */
     bool animated_bg; /* fondo animado en la app */
+    bool intro_done;  /* ya se mostro la introduccion de la app */
 } gr_config;
 
 void gr_config_defaults(gr_config *c);

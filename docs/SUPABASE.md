@@ -1,6 +1,6 @@
 # Cuentas, web y sincronización
 
-**Estado: diseño. Todavía no hay código de esta parte.**
+**Estado: la base de datos está definida y probada ([`supabase/schema.sql`](../supabase/schema.sql)). Falta la web y la conexión desde la app.**
 
 ## Proyecto
 
@@ -57,17 +57,50 @@ Dos formas, las dos en la app:
 > La clave `service_role` de Supabase y el Client Secret de Discord son
 > secretos. No van en el repositorio, ni en la app, ni en un chat.
 
-## Datos que se van a guardar
+## Crear las tablas
+
+1. En Supabase: **SQL Editor → New query**.
+2. Pega todo el contenido de [`supabase/schema.sql`](../supabase/schema.sql) y pulsa **Run**.
+3. Regístrate (o crea tu usuario en Authentication → Users) y hazte
+   administrador con la consulta que está al final del archivo.
+
+Se puede correr más de una vez: no borra datos.
+
+## Datos que se guardan
 
 | Tabla | Contenido |
 |---|---|
-| `profiles` | Usuario, nombre visible, avatar, Discord vinculado |
-| `games` | Title ID, nombre, versión, definición de logros |
+| `profiles` | Usuario, nombre visible, frase (caption), avatar, Discord |
+| `caption_presets` | Frases sugeridas para el caption ("Cazatrofeos", etc.), en español e inglés |
+| `games` | Title ID, nombre, versión y el archivo de logros completo |
+| `achievements` | Logros de cada juego: textos, puntos e icono |
 | `unlocks` | Usuario, juego, logro, fecha |
-| `devices` | Consolas vinculadas a un usuario y códigos de vinculación |
+| `devices` | Consolas vinculadas a un usuario |
+| `admins` | Quién puede publicar juegos, logros e imágenes |
 
-Cada usuario solo puede escribir su propio progreso (reglas de seguridad por
-fila de Supabase). Los perfiles se pueden ver públicamente.
+Reglas:
+
+- Todo el mundo puede leer perfiles, juegos publicados, logros y progreso.
+- Cada usuario edita solo su perfil (usuario, nombre, caption, avatar).
+- **Nadie inserta logros a mano**, ni con sesión iniciada: solo entran desde una
+  consola vinculada.
+- La consola nunca guarda tu contraseña. Guarda una llave propia que solo sirve
+  para subir logros a tu cuenta y que puedes revocar desde la web. En la base de
+  datos solo está el hash de esa llave.
+- El caption puede ser una frase sugerida o texto libre de hasta 60 caracteres.
+  El texto libre no tiene moderación todavía.
+
+### Probar el esquema sin tocar Supabase
+
+`supabase/test/` trae un simulador mínimo de Supabase y las pruebas de permisos:
+
+```bash
+docker run -d --name pgtest -e POSTGRES_PASSWORD=x postgres:16
+```
+
+```bash
+cat supabase/test/stub.sql supabase/schema.sql supabase/test/test.sql | docker exec -i pgtest psql -U postgres -v ON_ERROR_STOP=1 -q
+```
 
 ## Catálogo en línea: logros, iconos y carátulas
 

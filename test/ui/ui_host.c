@@ -63,6 +63,7 @@ int main(int argc, char **argv) {
     snprintf(root, sizeof(root), "%s/config/greeny", sd);
 
     static ui_assets a;
+    a.mascot_big = slurp(argv[4], "mascot_big.bin", 220 * 330 * 4);   a.big_w = 220;  a.big_h = 330;
     a.mascot_small = slurp(argv[4], "mascot_small.bin", 50 * 75 * 4); a.small_w = 50; a.small_h = 75;
     gfx_canvas c = { malloc(UI_W * UI_H * 4), UI_W, UI_H, UI_W };
 
@@ -120,10 +121,26 @@ int main(int argc, char **argv) {
         save(&c, out, "settings", sfx);
         ui_diag(&c, &a, items, nitems);
         save(&c, out, "diag", sfx);
+        ui_about(&c, &a);
+        save(&c, out, "about", sfx);
+        for (int p = 0; p < UI_INTRO_PAGES; p++) {
+            char name[32];
+            snprintf(name, sizeof(name), "intro%d", p);
+            ui_intro(&c, &a, p, items, nitems, env.sysmodule_running);
+            save(&c, out, name, sfx);
+        }
+        /* la ultima pagina cuando todo esta bien */
+        static gr_diag_item ok_items[GR_DIAG_MAX];
+        memcpy(ok_items, items, sizeof(ok_items));
+        for (int i = 0; i < nitems; i++) if (ok_items[i].state == GR_DIAG_FAIL) ok_items[i].state = GR_DIAG_OK;
+        ui_intro(&c, &a, 2, ok_items, nitems, true);
+        save(&c, out, "intro2_ok", sfx);
 
         /* el mismo inicio en otros dos instantes, para ver que el fondo se mueve */
         cfg.games_view = GR_VIEW_LIST;
+        ui_set_user("Jhondy");
         ui_home(&c, &a, &m, &cfg, 0, 0);
+        ui_set_user(NULL);
         g_time = 12.0f; save(&c, out, "home_t12", sfx);
         g_time = 300.0f; save(&c, out, "home_t300", sfx);
         g_time = 0;

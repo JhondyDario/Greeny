@@ -22,6 +22,7 @@
 #define STBI_NO_STDIO
 #include "third_party/stb_image.h"
 
+#include "mascot_big_bin.h"
 #include "mascot_small_bin.h"
 
 #define SD          "sdmc:"
@@ -31,11 +32,13 @@
 #define SYSMODULE_TID 0x4200000000010690ull
 #define TRACE_DONE  "salida normal"
 
-/* tamaño con el que se genero el .bin (scripts/assets.py) */
+/* tamaños con los que se generaron los .bin (scripts/assets.py) */
+#define BIG_W 220
+#define BIG_H 330
 #define SMALL_W 50
 #define SMALL_H 75
 
-typedef enum { SCREEN_HOME, SCREEN_DETAIL, SCREEN_SETTINGS, SCREEN_DIAG } screen_t;
+typedef enum { SCREEN_HOME, SCREEN_DETAIL, SCREEN_SETTINGS, SCREEN_DIAG, SCREEN_ABOUT, SCREEN_INTRO } screen_t;
 
 static gr_model g_model;
 static gr_config g_config;
@@ -148,6 +151,24 @@ static void run_diag(void) {
     g_ndiag = gr_diag_run(g_diag, GR_DIAG_MAX, &g_env, &g_model);
 }
 
+/* Apodo del usuario de la consola, para el saludo. Deja "" si no se puede saber. */
+static void console_nickname(char *out, size_t cap) {
+    out[0] = 0;
+    if (R_FAILED(accountInitialize(AccountServiceType_Application)) &&
+        R_FAILED(accountInitialize(AccountServiceType_System)))
+        return;
+    AccountUid uid;
+    if (R_SUCCEEDED(accountGetPreselectedUser(&uid)) || R_SUCCEEDED(accountGetLastOpenedUser(&uid))) {
+        AccountProfile profile;
+        if (accountUidIsValid(&uid) && R_SUCCEEDED(accountGetProfile(&profile, uid))) {
+            AccountProfileBase base;
+            if (R_SUCCEEDED(accountProfileGet(&profile, NULL, &base))) snprintf(out, cap, "%s", base.nickname);
+            accountProfileClose(&profile);
+        }
+    }
+    accountExit();
+}
+
 /* Si no hay fuente o pantalla grafica, al menos decirlo en modo texto en vez de cerrar sin mas. */
 static int fatal_screen(PadState *pad, const char *what) {
     trace("error fatal: %s", what);
@@ -247,6 +268,9 @@ int main(int argc, char *argv[]) {
     g_env.covers_ok = g_ns_ok;
     g_env.applet_mode = at != AppletType_Application && at != AppletType_SystemApplication;
 
+    g_assets.mascot_big = mascot_big_bin;
+    g_assets.big_w = BIG_W;
+    g_assets.big_h = BIG_H;
     g_assets.mascot_small = mascot_small_bin;
     g_assets.small_w = SMALL_W;
     g_assets.small_h = SMALL_H;
@@ -263,8 +287,19 @@ int main(int argc, char *argv[]) {
     trace("listo: %d juego(s), audio %s, caratulas %s, modo %s", g_model.ngames, sfx_ok ? "si" : "no",
           g_ns_ok ? "si" : "no", g_env.applet_mode ? "applet" : "aplicacion");
 
-    int cursor = 0, top = 0, dcursor = 0, dtop = 0, scursor = 0;
+    int cursor = 0, top = 0, dcursor = 0, dtop = 0, scursor = 0, intro_page = 0;
     screen_t screen = SCREEN_HOME;
+    if (!g_config.intro_done) {
+        /* primera vez: introduccion con la revision de la instalacion */
+        trace("introduccion");
+        run_diag();
+        screen = SCREEN_INTRO;
+    } else {
+        trace("usuario");
+        char nick[40];
+        console_nickname(nick, sizeof(nick));
+        ui_set_user(nick);
+    }
     bool dirty = true;
     const u64 dirs = HidNpadButton_AnyUp | HidNpadButton_AnyDown | HidNpadButton_AnyLeft | HidNpadButton_AnyRight;
 
@@ -312,18 +347,31 @@ int main(int argc, char *argv[]) {
                     case UI_OPT_ACH_VIEW:   g_config.ach_view = (g_config.ach_view + 1) % GR_VIEW_COUNT; break;
                     case UI_OPT_SOUND:      g_config.sound = !g_config.sound; break;
                     case UI_OPT_POPUP:      g_config.popup = !g_config.popup; break;
+                    case UI_OPT_ABOUT:      screen = SCREEN_ABOUT; break;
                     default:                run_diag(); screen = SCREEN_DIAG; break;
                 }
-                if (scursor != UI_OPT_DIAG) {
+                if (scursor < UI_OPT_DIAG) {
                     save_config();
                     top = 0; /* la vista pudo cambiar de forma */
                     follow(cursor, &top, ui_home_layout(&g_config));
                 }
             }
             if (down & HidNpadButton_B) { screen = SCREEN_HOME; back = true; }
-        } else {
+        } else if (screen == SCREEN_DIAG) {
             if (down & HidNpadButton_Y) { rescan(); run_diag(); accepted = true; }
             if (down & HidNpadButton_B) { screen = SCREEN_SETTINGS; back = true; }
+        } else if (screen == SCREEN_ABOUT) {
+            if (down & HidNpadButton_B) { screen = SCREEN_SETTINGS; back = true; }
+        } else {
+            if (down & HidNpadButton_A) {
+                accepted = true;
+                if (++intro_page >= UI_INTRO_PAGES) {
+                    g_config.intro_done = true;
+                    save_config();
+                    screen = SCREEN_HOME;
+                }
+            }
+            if ((down & HidNpadButton_B) && intro_page > 0) { intro_page--; back = true; }
         }
 
         if (back) sfx_play(SFX_BACK);
@@ -339,6 +387,8 @@ int main(int argc, char *argv[]) {
             if (screen == SCREEN_DETAIL) ui_detail(&layer, &g_assets, &g_model, &g_config, cursor, dcursor, dtop);
             else if (screen == SCREEN_SETTINGS) ui_settings(&layer, &g_assets, &g_config, scursor, g_system_spanish, g_system_dark);
             else if (screen == SCREEN_DIAG) ui_diag(&layer, &g_assets, g_diag, g_ndiag);
+            else if (screen == SCREEN_ABOUT) ui_about(&layer, &g_assets);
+            else if (screen == SCREEN_INTRO) ui_intro(&layer, &g_assets, intro_page, g_diag, g_ndiag, g_env.sysmodule_running);
             else ui_home(&layer, &g_assets, &g_model, &g_config, cursor, top);
             dirty = false;
         }
