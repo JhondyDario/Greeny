@@ -255,6 +255,11 @@ int main(int argc, char *argv[]) {
     gr_config_load(&g_config, CONFIG_PATH);
     apply_config();
     rescan();
+    /* capa donde se dibuja la pantalla; el fondo se pinta aparte en cada cuadro */
+    static u32 layer_px[UI_W * UI_H];
+    gfx_canvas layer = { .px = layer_px, .w = UI_W, .h = UI_H, .stride = UI_W };
+    const u64 start_tick = armGetSystemTick();
+
     trace("listo: %d juego(s), audio %s, caratulas %s, modo %s", g_model.ngames, sfx_ok ? "si" : "no",
           g_ns_ok ? "si" : "no", g_env.applet_mode ? "applet" : "aplicacion");
 
@@ -302,6 +307,7 @@ int main(int argc, char *argv[]) {
                 switch (scursor) {
                     case UI_OPT_LANG:       g_config.lang = (g_config.lang + 1) % GR_LANG_COUNT; break;
                     case UI_OPT_THEME:      g_config.theme = (g_config.theme + 1) % GR_THEME_COUNT; break;
+                    case UI_OPT_ANIM:       g_config.animated_bg = !g_config.animated_bg; break;
                     case UI_OPT_GAMES_VIEW: g_config.games_view = (g_config.games_view + 1) % GR_VIEW_COUNT; break;
                     case UI_OPT_ACH_VIEW:   g_config.ach_view = (g_config.ach_view + 1) % GR_VIEW_COUNT; break;
                     case UI_OPT_SOUND:      g_config.sound = !g_config.sound; break;
@@ -326,16 +332,24 @@ int main(int argc, char *argv[]) {
         if (moved || accepted || back) dirty = true;
         sfx_update();
 
-        /* El buffer lineal conserva lo ultimo dibujado, asi que solo se repinta si algo cambio. */
+        /* La pantalla (texto, tarjetas) solo se redibuja en su capa cuando algo cambia.
+         * Con el fondo animado, cada cuadro se pinta el fondo y se pone la capa encima. */
+        bool redraw = dirty;
+        if (dirty) {
+            if (screen == SCREEN_DETAIL) ui_detail(&layer, &g_assets, &g_model, &g_config, cursor, dcursor, dtop);
+            else if (screen == SCREEN_SETTINGS) ui_settings(&layer, &g_assets, &g_config, scursor, g_system_spanish, g_system_dark);
+            else if (screen == SCREEN_DIAG) ui_diag(&layer, &g_assets, g_diag, g_ndiag);
+            else ui_home(&layer, &g_assets, &g_model, &g_config, cursor, top);
+            dirty = false;
+        }
+
         u32 stride;
         u32 *px = (u32 *)framebufferBegin(&fb, &stride);
-        if (dirty) {
+        if (redraw || g_config.animated_bg) {
             gfx_canvas c = { .px = px, .w = UI_W, .h = UI_H, .stride = (int)(stride / sizeof(u32)) };
-            if (screen == SCREEN_DETAIL) ui_detail(&c, &g_assets, &g_model, &g_config, cursor, dcursor, dtop);
-            else if (screen == SCREEN_SETTINGS) ui_settings(&c, &g_assets, &g_config, scursor, g_system_spanish, g_system_dark);
-            else if (screen == SCREEN_DIAG) ui_diag(&c, &g_assets, g_diag, g_ndiag);
-            else ui_home(&c, &g_assets, &g_model, &g_config, cursor, top);
-            dirty = false;
+            float t = g_config.animated_bg ? (float)(armTicksToNs(armGetSystemTick() - start_tick) / 1000000ull) / 1000.0f : 0.0f;
+            ui_background(&c, t);
+            gfx_compose(&c, &layer);
         }
         framebufferEnd(&fb);
     }

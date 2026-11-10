@@ -1,5 +1,6 @@
 #include "ui.h"
 
+#include <math.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
@@ -7,20 +8,20 @@
 /* ---------- paleta: verde, blanco, rojo y amarillo, en claro y oscuro ---------- */
 
 typedef struct {
-    gfx_color bg, card, card_sel, ink, gray, gray_lt, shadow, footer, accent, points;
+    gfx_color bg, card, card_sel, ink, gray, gray_lt, shadow, footer, accent, points, bubble;
 } palette;
 
 static const palette k_light = {
     .bg = GFX_RGB(0xF3, 0xF7, 0xEC), .card = GFX_RGB(0xFF, 0xFF, 0xFF), .card_sel = GFX_RGB(0xE3, 0xF4, 0xDF),
     .ink = GFX_RGB(0x1E, 0x2A, 0x1F), .gray = GFX_RGB(0x6B, 0x7A, 0x6C), .gray_lt = GFX_RGB(0xD9, 0xE2, 0xD4),
     .shadow = GFX_RGB(0xD3, 0xDD, 0xCB), .footer = GFX_RGB(0xFF, 0xFF, 0xFF), .accent = GFX_RGB(0x1D, 0x7A, 0x2A),
-    .points = GFX_RGB(0x8A, 0x65, 0x00),
+    .points = GFX_RGB(0x8A, 0x65, 0x00), .bubble = GFX_RGB(0x2F, 0xA6, 0x3B),
 };
 static const palette k_dark = {
     .bg = GFX_RGB(0x12, 0x1A, 0x14), .card = GFX_RGB(0x1F, 0x2B, 0x22), .card_sel = GFX_RGB(0x2A, 0x4A, 0x30),
     .ink = GFX_RGB(0xEE, 0xF4, 0xEA), .gray = GFX_RGB(0xA3, 0xB1, 0xA4), .gray_lt = GFX_RGB(0x3A, 0x4A, 0x3E),
     .shadow = GFX_RGB(0x0A, 0x0F, 0x0B), .footer = GFX_RGB(0x18, 0x22, 0x1B), .accent = GFX_RGB(0x6F, 0xD6, 0x7B),
-    .points = GFX_RGB(0xF7, 0xC9, 0x1E),
+    .points = GFX_RGB(0xF7, 0xC9, 0x1E), .bubble = GFX_RGB(0x3F, 0xC0, 0x4E),
 };
 static const palette *P = &k_light;
 
@@ -51,6 +52,29 @@ ui_layout ui_home_layout(const gr_config *cfg) {
 
 ui_layout ui_detail_layout(const gr_config *cfg) {
     return cfg->ach_view == GR_VIEW_GRID ? (ui_layout){ 3, 3 } : (ui_layout){ 1, 6 };
+}
+
+/* ---------- fondo ----------
+ * Las pantallas se dibujan en una capa transparente y el fondo va debajo, asi
+ * se puede animar sin tener que redibujar el texto en cada cuadro. */
+
+void ui_background(gfx_canvas *c, float t) {
+    gfx_clear(c, P->bg);
+    /* burbujas grandes y muy tenues que derivan despacio; t en segundos (0 = quieto) */
+    static const struct { float x, y, r, vx, vy, phase; } k[] = {
+        { 160, 250, 150,  7,  3, 0.0f }, { 520, 560, 110, -5,  4, 1.7f }, { 900, 300, 190,  4, -3, 3.1f },
+        { 1160, 560, 130, -6, -2, 4.4f }, { 330, 640,  90,  5, -4, 0.9f }, { 720, 180, 100, -4,  5, 2.6f },
+        { 1080, 180,  70,  6,  3, 5.2f },
+    };
+    const float span_x = UI_W + 400, span_y = UI_H + 400;
+    for (unsigned i = 0; i < sizeof(k) / sizeof(k[0]); i++) {
+        float x = k[i].x + k[i].vx * t + 40.0f * sinf(t * 0.21f + k[i].phase);
+        float y = k[i].y + k[i].vy * t + 30.0f * cosf(t * 0.17f + k[i].phase);
+        /* dar la vuelta por el borde contrario, con margen para que no aparezcan de golpe */
+        x = fmodf(fmodf(x + 200, span_x) + span_x, span_x) - 200;
+        y = fmodf(fmodf(y + 200, span_y) + span_y, span_y) - 200;
+        gfx_circle_alpha(c, (int)x, (int)y, (int)k[i].r, P->bubble, 26);
+    }
 }
 
 /* ---------- piezas comunes ---------- */
@@ -232,7 +256,7 @@ static void home_grid(gfx_canvas *c, const ui_assets *a, const gr_model *m, int 
 }
 
 void ui_home(gfx_canvas *c, const ui_assets *a, const gr_model *m, const gr_config *cfg, int cursor, int top) {
-    gfx_clear(c, P->bg);
+    gfx_clear_transparent(c);
     header(c, a, NULL, UI_APP_NAME, NULL);
     gfx_text(c, 122 + gfx_text_width(46, UI_APP_NAME) + 14, 44, 22, C_GREEN_LT,
              T("Logros para tu Switch", "Achievements for your Switch"));
@@ -339,7 +363,7 @@ static void detail_grid(gfx_canvas *c, const lg_game *gm, int cursor, int top, u
 
 void ui_detail(gfx_canvas *c, const ui_assets *a, const gr_model *m, const gr_config *cfg, int game, int cursor, int top) {
     const gr_game_entry *g = &m->games[game];
-    gfx_clear(c, P->bg);
+    gfx_clear_transparent(c);
 
     char sub[96];
     if (g->broken) snprintf(sub, sizeof(sub), "%s", T("Archivo de logros con error", "Achievement file has an error"));
@@ -373,18 +397,18 @@ void ui_detail(gfx_canvas *c, const ui_assets *a, const gr_model *m, const gr_co
 
 static void option_row(gfx_canvas *c, int row, bool selected, const char *label, const char *help, const char *value,
                        gfx_color value_bg) {
-    const int x = MARGIN, w = CONTENT_W, h = 64, y = 118 + row * (h + 12);
+    const int x = MARGIN, w = CONTENT_W, h = 57, y = 114 + row * (h + 10);
     card(c, x, y, w, h, selected);
-    gfx_text(c, x + 24, y + 7, 24, P->ink, label);
-    gfx_text_fit(c, x + 24, y + 38, 17, P->gray, help, w - 48 - 300);
-    int vw = gfx_text_width(20, value) + 40;
-    gfx_round_rect(c, x + w - 24 - vw, y + 13, vw, 38, 19, value_bg);
-    gfx_text(c, x + w - 24 - vw + 20, y + 20, 20, C_WHITE, value);
+    gfx_text(c, x + 24, y + 5, 22, P->ink, label);
+    gfx_text_fit(c, x + 24, y + 33, 16, P->gray, help, w - 48 - 300);
+    int vw = gfx_text_width(19, value) + 36;
+    gfx_round_rect(c, x + w - 24 - vw, y + 11, vw, 35, 17, value_bg);
+    gfx_text(c, x + w - 24 - vw + 18, y + 17, 19, C_WHITE, value);
 }
 
 void ui_settings(gfx_canvas *c, const ui_assets *a, const gr_config *cfg, int cursor, bool system_spanish,
                  bool system_dark) {
-    gfx_clear(c, P->bg);
+    gfx_clear_transparent(c);
     header(c, a, NULL, T("Opciones", "Options"), T("Se guardan en la tarjeta SD", "Saved to the SD card"));
 
     char lang[48], theme[48];
@@ -404,6 +428,9 @@ void ui_settings(gfx_canvas *c, const ui_assets *a, const gr_config *cfg, int cu
     option_row(c, UI_OPT_THEME, cursor == UI_OPT_THEME, T("Tema", "Theme"),
                T("Auto usa el tema claro u oscuro de la consola.", "Auto follows the console's light or dark theme."),
                theme, C_GREEN);
+    option_row(c, UI_OPT_ANIM, cursor == UI_OPT_ANIM, T("Fondo animado", "Animated background"),
+               T("Burbujas que se mueven despacio detrás de las pantallas.", "Slow-moving bubbles behind the screens."),
+               cfg->animated_bg ? on : off, cfg->animated_bg ? C_GREEN : C_NEUTRAL);
     option_row(c, UI_OPT_GAMES_VIEW, cursor == UI_OPT_GAMES_VIEW, T("Vista de juegos", "Games view"),
                T("Cómo se muestran los juegos en el inicio.", "How games are shown on the home screen."),
                cfg->games_view == GR_VIEW_GRID ? grid : list, C_GREEN);
@@ -448,7 +475,7 @@ static void diag_icon(gfx_canvas *c, int cx, int cy, gr_diag_state st) {
 }
 
 void ui_diag(gfx_canvas *c, const ui_assets *a, const gr_diag_item *items, int count) {
-    gfx_clear(c, P->bg);
+    gfx_clear_transparent(c);
 
     int fails = 0, warns = 0;
     for (int i = 0; i < count; i++) {

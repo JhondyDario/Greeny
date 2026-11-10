@@ -11,11 +11,11 @@
 #define UI_COVER_BIG  150  /* caratula en la cuadricula */
 
 #define UI_APP_NAME    "Greeny"
-#define UI_APP_VERSION "0.4.0"
+#define UI_APP_VERSION "0.0.4"
 
 /* filas de la pantalla de opciones */
 enum {
-    UI_OPT_LANG, UI_OPT_THEME, UI_OPT_GAMES_VIEW, UI_OPT_ACH_VIEW, UI_OPT_SOUND, UI_OPT_POPUP, UI_OPT_DIAG,
+    UI_OPT_LANG, UI_OPT_THEME, UI_OPT_ANIM, UI_OPT_GAMES_VIEW, UI_OPT_ACH_VIEW, UI_OPT_SOUND, UI_OPT_POPUP, UI_OPT_DIAG,
     UI_OPT_COUNT
 };
 
@@ -35,7 +35,12 @@ void ui_set_dark(bool dark);
 ui_layout ui_home_layout(const gr_config *cfg);
 ui_layout ui_detail_layout(const gr_config *cfg);
 
-/* `top` es la primera fila visible (en filas, no en elementos). */
+/* Fondo de todas las pantallas. `t` son segundos transcurridos; con 0 queda quieto. */
+void ui_background(gfx_canvas *c, float t);
+
+/* Las pantallas se dibujan sobre una capa transparente: primero ui_background()
+ * en el destino y luego gfx_compose() de la capa encima.
+ * `top` es la primera fila visible (en filas, no en elementos). */
 void ui_home(gfx_canvas *c, const ui_assets *a, const gr_model *m, const gr_config *cfg, int cursor, int top);
 void ui_detail(gfx_canvas *c, const ui_assets *a, const gr_model *m, const gr_config *cfg, int game, int cursor, int top);
 void ui_settings(gfx_canvas *c, const ui_assets *a, const gr_config *cfg, int cursor, bool system_spanish,

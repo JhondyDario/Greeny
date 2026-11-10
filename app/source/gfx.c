@@ -21,17 +21,46 @@ bool gfx_font_from_file(const char *path) {
     return ft_ready() && FT_New_Face(g_ft, path, 0, &g_face) == 0;
 }
 
-/* mezcla `col` sobre el pixel con cobertura a (0..255) */
+/* mezcla `col` sobre el pixel con cobertura a (0..255). El destino puede ser
+ * transparente (capa): se compone "encima" conservando el alfa resultante. */
 static inline void blend(gfx_canvas *c, int x, int y, gfx_color col, unsigned a) {
     if (x < 0 || y < 0 || x >= c->w || y >= c->h || a == 0) return;
     uint32_t *d = &c->px[y * c->stride + x];
     if (a >= 255) { *d = col | 0xFF000000u; return; }
-    unsigned dr = *d & 0xFF, dg = (*d >> 8) & 0xFF, db = (*d >> 16) & 0xFF;
+    unsigned da = *d >> 24;
     unsigned sr = col & 0xFF, sg = (col >> 8) & 0xFF, sb = (col >> 16) & 0xFF;
-    dr = (sr * a + dr * (255 - a)) / 255;
-    dg = (sg * a + dg * (255 - a)) / 255;
-    db = (sb * a + db * (255 - a)) / 255;
-    *d = dr | (dg << 8) | (db << 16) | 0xFF000000u;
+    if (da == 0) { *d = sr | (sg << 8) | (sb << 16) | (a << 24); return; }
+    unsigned dr = *d & 0xFF, dg = (*d >> 8) & 0xFF, db = (*d >> 16) & 0xFF;
+    unsigned dw = da * (255 - a) / 255;   /* peso del destino */
+    unsigned oa = a + dw;                 /* alfa resultante, 1..255 */
+    dr = (sr * a + dr * dw) / oa;
+    dg = (sg * a + dg * dw) / oa;
+    db = (sb * a + db * dw) / oa;
+    *d = dr | (dg << 8) | (db << 16) | (oa << 24);
+}
+
+void gfx_clear_transparent(gfx_canvas *c) {
+    for (int y = 0; y < c->h; y++) memset(&c->px[y * c->stride], 0, (size_t)c->w * sizeof(uint32_t));
+}
+
+void gfx_compose(gfx_canvas *dst, const gfx_canvas *layer) {
+    int w = dst->w < layer->w ? dst->w : layer->w, h = dst->h < layer->h ? dst->h : layer->h;
+    for (int y = 0; y < h; y++) {
+        const uint32_t *s = &layer->px[y * layer->stride];
+        uint32_t *d = &dst->px[y * dst->stride];
+        for (int x = 0; x < w; x++) {
+            uint32_t p = s[x];
+            unsigned a = p >> 24;
+            if (a == 255) d[x] = p;
+            else if (a) {
+                uint32_t q = d[x];
+                unsigned r = ((p & 0xFF) * a + (q & 0xFF) * (255 - a)) / 255;
+                unsigned g = (((p >> 8) & 0xFF) * a + ((q >> 8) & 0xFF) * (255 - a)) / 255;
+                unsigned b = (((p >> 16) & 0xFF) * a + ((q >> 16) & 0xFF) * (255 - a)) / 255;
+                d[x] = r | (g << 8) | (b << 16) | 0xFF000000u;
+            }
+        }
+    }
 }
 
 void gfx_clear(gfx_canvas *c, gfx_color col) {
@@ -59,6 +88,14 @@ void gfx_circle(gfx_canvas *c, int cx, int cy, int r, gfx_color col) {
     for (int y = -r - 1; y <= r + 1; y++)
         for (int x = -r - 1; x <= r + 1; x++)
             blend(c, cx + x, cy + y, col, disc_cov((float)x, (float)y, (float)r));
+}
+
+void gfx_circle_alpha(gfx_canvas *c, int cx, int cy, int r, gfx_color col, unsigned alpha) {
+    for (int y = -r - 1; y <= r + 1; y++) {
+        if (cy + y < 0 || cy + y >= c->h) continue;
+        for (int x = -r - 1; x <= r + 1; x++)
+            blend(c, cx + x, cy + y, col, disc_cov((float)x, (float)y, (float)r) * alpha / 255);
+    }
 }
 
 void gfx_round_rect(gfx_canvas *c, int x, int y, int w, int h, int r, gfx_color col) {

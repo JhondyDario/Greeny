@@ -399,12 +399,13 @@ static void test_i18n_config(void) {
     CHECK(c.theme == GR_THEME_AUTO && c.games_view == GR_VIEW_LIST && c.ach_view == GR_VIEW_LIST);
 
     c.lang = GR_LANG_EN; c.sound = false; c.popup = true;
-    c.theme = GR_THEME_DARK; c.games_view = GR_VIEW_GRID; c.ach_view = GR_VIEW_LIST;
+    c.theme = GR_THEME_DARK; c.games_view = GR_VIEW_GRID; c.ach_view = GR_VIEW_LIST; c.animated_bg = false;
     CHECK(gr_config_save(&c, path) == 0);
     gr_config c2;
     gr_config_load(&c2, path);
     CHECK(c2.lang == GR_LANG_EN && !c2.sound && c2.popup);
     CHECK(c2.theme == GR_THEME_DARK && c2.games_view == GR_VIEW_GRID && c2.ach_view == GR_VIEW_LIST);
+    CHECK(!c2.animated_bg);
 
     /* un config.ini viejo (sin las claves nuevas) se lee con los valores por defecto en lo que falta */
     FILE *old = fopen(path, "w");
@@ -412,9 +413,10 @@ static void test_i18n_config(void) {
     fclose(old);
     gr_config_load(&c2, path);
     CHECK(c2.lang == GR_LANG_ES && !c2.sound && c2.theme == GR_THEME_AUTO && c2.ach_view == GR_VIEW_LIST);
+    CHECK(c2.animated_bg);
 
     /* valores fuera de rango no escriben basura */
-    gr_config bad_cfg = { 99, -4, 7, 2, true, true };
+    gr_config bad_cfg = { 99, -4, 7, 2, true, true, true };
     CHECK(gr_config_save(&bad_cfg, path) == 0);
     gr_config_load(&c2, path);
     CHECK(c2.lang == GR_LANG_AUTO && c2.theme == GR_THEME_AUTO && c2.games_view == GR_VIEW_LIST);

@@ -21,7 +21,16 @@ static uint8_t *slurp(const char *dir, const char *name, size_t expect) {
     return buf;
 }
 
-static void save(const gfx_canvas *c, const char *dir, const char *name, const char *sfx) {
+static float g_time; /* instante del fondo animado con el que se guarda la captura */
+
+/* `layer` es la capa transparente de la pantalla: se compone sobre el fondo como hace la app */
+static void save(const gfx_canvas *layer, const char *dir, const char *name, const char *sfx) {
+    static uint32_t *final_px;
+    if (!final_px) final_px = malloc(UI_W * UI_H * 4);
+    gfx_canvas out = { final_px, UI_W, UI_H, UI_W };
+    ui_background(&out, g_time);
+    gfx_compose(&out, layer);
+    const gfx_canvas *c = &out;
     char path[512];
     snprintf(path, sizeof(path), "%s/%s%s.ppm", dir, name, sfx);
     FILE *f = fopen(path, "wb");
@@ -77,6 +86,7 @@ int main(int argc, char **argv) {
         snprintf(sfx, sizeof(sfx), "%s%s", dark ? "_dark" : "", en ? "_en" : "");
         ui_set_dark(dark);
         ui_set_english(en);
+        g_time = 0;
 
         for (int grid = 0; grid < 2; grid++) {
             gr_config cfg;
@@ -110,6 +120,13 @@ int main(int argc, char **argv) {
         save(&c, out, "settings", sfx);
         ui_diag(&c, &a, items, nitems);
         save(&c, out, "diag", sfx);
+
+        /* el mismo inicio en otros dos instantes, para ver que el fondo se mueve */
+        cfg.games_view = GR_VIEW_LIST;
+        ui_home(&c, &a, &m, &cfg, 0, 0);
+        g_time = 12.0f; save(&c, out, "home_t12", sfx);
+        g_time = 300.0f; save(&c, out, "home_t300", sfx);
+        g_time = 0;
 
         static gr_model empty;
         static ui_assets bare;
