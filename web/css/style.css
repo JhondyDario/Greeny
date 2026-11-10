@@ -190,3 +190,12 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fo
 .icon { border: 3px solid var(--green-dk); border-radius: 14px; }
 .icon:not(.done) { border-color: var(--line); }
 .locked .icon { border-color: var(--line); }
+
+/* estado de los juegos */
+.pill.st-sin_empezar { background: var(--line); color: var(--ink); }
+.pill.st-prueba { background: #e8912d; color: #1e2a1f; }
+.pill.st-jugable { background: var(--green); color: #fff; }
+.pill.st-perfecto { background: var(--yellow); color: var(--on-yellow); }
+/* frases sugeridas (Desarrollador) */
+.preset-row { display: grid; grid-template-columns: 1fr 1fr auto auto; gap: 8px; align-items: center; }
+@media (max-width: 620px) { .preset-row { grid-template-columns: 1fr; } }

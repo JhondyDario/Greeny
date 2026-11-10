@@ -11,6 +11,7 @@
 #include <switch.h>
 
 #include "account.h"
+#include "catalog.h"
 #include "config.h"
 #include "diag.h"
 #include "gfx.h"
@@ -25,6 +26,9 @@
 #include "bg_claro_bin.h"
 #include "bg_oscuro_bin.h"
 #include "buttons_bin.h"
+#include "snd_cargado_bin.h"
+#include "snd_logro_bin.h"
+#include "sysmodule_bin.h"
 #include "mascot_big_bin.h"
 #include "mascot_small_bin.h"
 
@@ -83,6 +87,14 @@ static bool g_icon_thread_live;
 static volatile int g_icon_state;     /* 0 nada, 1 bajando, 2 termino */
 static int g_icon_downloaded;
 static char g_icon_tid[17];           /* juego cuyos iconos se estan bajando */
+
+/* juegos instalados en la consola, para pedir al catalogo solo los suyos */
+#define MAX_TITLES 512
+static char g_titles[MAX_TITLES][17];
+static int g_ntitles;
+static int g_cat_downloaded;          /* archivos de logros que bajo el catalogo esta vez */
+static volatile bool g_bg_done;       /* el hilo de fondo termino */
+static bool g_sysmodule_updated;      /* esta vez se escribio un sysmodule nuevo en la SD */
 
 static uint32_t g_bg_px[UI_W * UI_H]; /* fondo del tema actual, ya decodificado */
 static int g_bg_loaded = -1;          /* 0 claro, 1 oscuro, -1 ninguno */
@@ -228,6 +240,68 @@ static void console_nickname(char *out, size_t cap) {
     accountExit();
 }
 
+/* ---------- instalacion ----------
+ * La app trae dentro el sysmodule y sus sonidos, y los pone en la SD si faltan
+ * o si son de otra version. Asi basta con copiar greeny.nro para instalar todo. */
+
+/* Escribe el archivo solo si no existe o es distinto. Devuelve true si lo escribio. */
+static bool install_file(const char *path, const void *data, size_t size) {
+    FILE *f = fopen(path, "rb");
+    if (f) {
+        bool same = false;
+        fseek(f, 0, SEEK_END);
+        if ((size_t)ftell(f) == size) {
+            fseek(f, 0, SEEK_SET);
+            void *have = malloc(size ? size : 1);
+            same = have && fread(have, 1, size, f) == size && !memcmp(have, data, size);
+            free(have);
+        }
+        fclose(f);
+        if (same) return false;
+    }
+    /* se escribe con otro nombre y se cambia al final: si se corta la luz no queda un archivo a medias */
+    char tmp[256];
+    snprintf(tmp, sizeof(tmp), "%s.tmp", path);
+    f = fopen(tmp, "wb");
+    if (!f) return false;
+    bool ok = fwrite(data, 1, size, f) == size;
+    if (fclose(f) != 0) ok = false;
+    if (!ok) { remove(tmp); return false; }
+    remove(path);
+    return rename(tmp, path) == 0;
+}
+
+static void install_sysmodule(void) {
+    static const char toolbox[] = "{\n    \"name\": \"Greeny\",\n    \"tid\": \"4200000000010690\",\n    \"requires_reboot\": true\n}\n";
+#define SYS_DIR SD "/atmosphere/contents/4200000000010690"
+    mkdir(SD "/atmosphere", 0777);
+    mkdir(SD "/atmosphere/contents", 0777);
+    mkdir(SYS_DIR, 0777);
+    mkdir(SYS_DIR "/flags", 0777);
+    mkdir(SD "/config", 0777);
+    mkdir(ROOT, 0777);
+    mkdir(ROOT "/games", 0777);
+    mkdir(ROOT "/sounds", 0777);
+
+    g_sysmodule_updated = install_file(SYS_DIR "/exefs.nsp", sysmodule_bin, sysmodule_bin_size);
+    install_file(SYS_DIR "/toolbox.json", toolbox, sizeof(toolbox) - 1);
+    install_file(SYS_DIR "/flags/boot2.flag", "", 0);
+    install_file(ROOT "/sounds/cargado.pcm", snd_cargado_bin, snd_cargado_bin_size);
+    install_file(ROOT "/sounds/logro.pcm", snd_logro_bin, snd_logro_bin_size);
+    trace("instalacion revisada: sysmodule %s", g_sysmodule_updated ? "escrito (hay que reiniciar)" : "al dia");
+#undef SYS_DIR
+}
+
+/* Lista los juegos instalados en la consola. */
+static void list_installed_titles(void) {
+    static NsApplicationRecord records[MAX_TITLES];
+    s32 count = 0;
+    g_ntitles = 0;
+    if (!g_ns_ok || R_FAILED(nsListApplicationRecord(records, MAX_TITLES, 0, &count))) return;
+    for (s32 i = 0; i < count && g_ntitles < MAX_TITLES; i++)
+        snprintf(g_titles[g_ntitles++], 17, "%016lX", records[i].application_id);
+}
+
 /* ---------- iconos de logros ---------- */
 
 /* Carga de la SD los iconos del juego abierto (los que haya). */
@@ -314,42 +388,54 @@ static void device_name(char *out, size_t cap) {
     else snprintf(out, cap, "Switch");
 }
 
-/* Hilo de sincronizacion: confirma de quien es la consola y sube los logros. Nunca bloquea la interfaz. */
+/* Hilo de fondo. Nunca bloquea la interfaz. Hace dos cosas, las dos opcionales:
+ * baja los archivos de logros de los juegos instalados y, si hay cuenta, sube los logros. */
 static void sync_thread(void *arg) {
     (void)arg;
-    bool exists = false;
-    gr_net_result r = gr_whoami(net_http, &g_sync_account, &exists);
-    if (r == GR_NET_OFFLINE) { g_sync = SYNC_OFFLINE; return; }
-    if (r != GR_NET_OK) { snprintf(g_sync_err, sizeof(g_sync_err), "No se pudo consultar la cuenta."); g_sync = SYNC_FAILED; return; }
-    if (!exists || !g_sync_account.linked) { g_sync = SYNC_UNLINKED; return; }
-    gr_fetch_social(net_http, &g_sync_account); /* si falla, quedan los numeros de la ultima vez */
+    g_cat_downloaded = 0;
+    gr_catalog_sync(net_get, ROOT, g_titles, g_ntitles, &g_cat_downloaded);
 
-    r = gr_push_unlocks(net_http, &g_sync_account, ROOT, &g_sync_sent, &g_sync_added, g_sync_err, sizeof(g_sync_err));
-    g_sync = r == GR_NET_OK ? SYNC_OK : r == GR_NET_OFFLINE ? SYNC_OFFLINE : SYNC_FAILED;
+    if (g_sync == SYNC_RUNNING) {
+        bool exists = false;
+        gr_net_result r = gr_whoami(net_http, &g_sync_account, &exists);
+        if (r == GR_NET_OFFLINE) g_sync = SYNC_OFFLINE;
+        else if (r != GR_NET_OK) { snprintf(g_sync_err, sizeof(g_sync_err), "No se pudo consultar la cuenta."); g_sync = SYNC_FAILED; }
+        else if (!exists || !g_sync_account.linked) g_sync = SYNC_UNLINKED;
+        else {
+            gr_fetch_social(net_http, &g_sync_account); /* si falla, quedan los numeros de la ultima vez */
+            r = gr_push_unlocks(net_http, &g_sync_account, ROOT, &g_sync_sent, &g_sync_added, g_sync_err, sizeof(g_sync_err));
+            g_sync = r == GR_NET_OK ? SYNC_OK : r == GR_NET_OFFLINE ? SYNC_OFFLINE : SYNC_FAILED;
+        }
+    }
+    g_bg_done = true;
 }
 
 static void sync_start(void) {
-    if (g_sync == SYNC_RUNNING || g_sync_thread_live || !g_account.token[0] || !g_account.linked) return;
-    if (!net_online()) { g_sync = SYNC_OFFLINE; return; }
+    bool linked = g_account.token[0] && g_account.linked;
+    if (g_sync_thread_live) return;
+    if (!net_online()) { if (linked) g_sync = SYNC_OFFLINE; return; }
     g_sync_account = g_account;
-    g_sync = SYNC_RUNNING;
+    g_sync = linked ? SYNC_RUNNING : SYNC_IDLE;
+    g_bg_done = false;
     if (R_SUCCEEDED(threadCreate(&g_sync_thread, sync_thread, NULL, NULL, 0x40000, 0x2C, -2)) &&
         R_SUCCEEDED(threadStart(&g_sync_thread))) {
         g_sync_thread_live = true;
-    } else {
+    } else if (linked) {
         snprintf(g_sync_err, sizeof(g_sync_err), "No se pudo iniciar la sincronización.");
         g_sync = SYNC_FAILED;
     }
 }
 
+static void rescan(void);
+
 /* Recoge el resultado del hilo cuando termina. Devuelve true si hay que redibujar. */
 static bool sync_collect(void) {
-    if (!g_sync_thread_live || g_sync == SYNC_RUNNING) return false;
+    if (!g_sync_thread_live || !g_bg_done) return false;
     threadWaitForExit(&g_sync_thread);
     threadClose(&g_sync_thread);
     g_sync_thread_live = false;
-    trace("sincronizacion: estado %d, enviados %d, nuevos %d%s%s", (int)g_sync, g_sync_sent, g_sync_added,
-          g_sync == SYNC_OFFLINE ? ", " : "", g_sync == SYNC_OFFLINE ? net_last_error() : "");
+    trace("fondo: catalogo %d archivo(s) nuevo(s); cuenta estado %d, enviados %d, nuevos %d%s%s", g_cat_downloaded, (int)g_sync,
+          g_sync_sent, g_sync_added, g_sync == SYNC_OFFLINE ? ", " : "", g_sync == SYNC_OFFLINE ? net_last_error() : "");
 
     if (g_sync == SYNC_UNLINKED) {
         /* la desvincularon desde la web: olvidar la llave */
@@ -359,7 +445,8 @@ static bool sync_collect(void) {
         g_account = g_sync_account; /* trae el nombre y la frase al dia */
         gr_account_save(&g_account, ACCOUNT_PATH);
     }
-    refresh_greeting();
+    if (g_cat_downloaded > 0) rescan();  /* llegaron juegos nuevos: que aparezcan en la lista */
+    else refresh_greeting();
     return true;
 }
 
@@ -426,7 +513,7 @@ static void login_with_password(void) {
 static void follow_with_code(void) {
     char code[32], who[40], err[160] = "";
     if (!net_online()) { show_message(false, "Sin conexión", "Conecta la consola a internet e inténtalo de nuevo.", NULL); return; }
-    if (!ask_text("Código de amigo: 12 números", false, true, code, sizeof(code))) {
+    if (!ask_text("Código de amigo: 6 números", false, true, code, sizeof(code))) {
         show_message(false, "Cancelado", "No se escribió ningún código.", NULL);
         return;
     }
@@ -553,6 +640,10 @@ int main(int argc, char *argv[]) {
     g_assets.small_w = SMALL_W;
     g_assets.small_h = SMALL_H;
 
+    trace("instalacion");
+    install_sysmodule();
+    list_installed_titles();
+
     trace("configuracion");
     gr_config_load(&g_config, CONFIG_PATH);
     apply_config();
@@ -576,6 +667,12 @@ int main(int argc, char *argv[]) {
         trace("introduccion");
         run_diag();
         screen = SCREEN_INTRO;
+    } else if (g_sysmodule_updated) {
+        /* la app ya estaba en uso y trajo un sysmodule mas nuevo */
+        show_message(true, "Greeny se actualizó", "Reinicia la consola para usar la versión nueva del sistema de logros.",
+                     "Apagar y encender; suspender no basta.");
+        g_msg_return = SCREEN_HOME;
+        screen = SCREEN_MSG;
     } else if (g_config.start_page == GR_START_PROFILE) {
         screen = SCREEN_PROFILE;
     }

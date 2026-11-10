@@ -21,7 +21,7 @@ end $$;
 do $$
 declare n int; u text;
 begin
-    select count(distinct friend_code) into n from public.profiles where friend_code ~ '^GR-[0-9]{4}-[0-9]{4}-[0-9]{4}$';
+    select count(distinct friend_code) into n from public.profiles where friend_code ~ '^GR-[0-9]{6}$';
     assert n = 4, 'cada perfil nuevo recibe un codigo de amigo distinto: ' || n;
     select count(*) into n from public.profiles;
     assert n = 4, 'deben existir 4 perfiles, hay ' || n;
@@ -164,11 +164,30 @@ begin
     assert ok, 'quien no es admin no crea juegos';
 
     ok := false;
+    begin insert into public.caption_presets (id, text_es, text_en) values (99, 'x', 'x');
+    exception when insufficient_privilege then ok := true; end;
+    assert ok, 'quien no es admin no toca las frases sugeridas';
+
+    ok := false;
     begin insert into storage.objects (bucket_id, name) values ('icons', 'x.png');
     exception when insufficient_privilege then ok := true; end;
     assert ok, 'quien no es admin no sube imagenes';
 
     assert not public.is_admin(), 'Ana no es admin';
+
+    -- foto de perfil: solo en su propia carpeta
+    insert into storage.objects (bucket_id, name) values ('avatars', auth.uid()::text || '/foto.jpg');
+    ok := false;
+    begin insert into storage.objects (bucket_id, name) values ('avatars', '00000000-0000-0000-0000-00000000000d/foto.jpg');
+    exception when insufficient_privilege then ok := true; end;
+    assert ok, 'no puede subir una foto a la carpeta de otro';
+    ok := false;
+    begin insert into storage.objects (bucket_id, name) values ('avatars', 'suelta.jpg');
+    exception when insufficient_privilege then ok := true; end;
+    assert ok, 'ni fuera de una carpeta';
+    delete from storage.objects o where o.bucket_id = 'avatars' and o.name = auth.uid()::text || '/foto.jpg';
+    get diagnostics n = row_count;
+    assert n = 1, 'puede borrar su propia foto';
 end $$;
 reset role;
 reset request.jwt.claim.sub;
@@ -247,20 +266,21 @@ begin
     declare code text; who text;
     begin
         select friend_code into code from public.profiles where username = 'Eland';
-        assert code ~ '^GR-[0-9]{4}-[0-9]{4}-[0-9]{4}$', 'formato del codigo: ' || coalesce(code, 'null');
+        assert code ~ '^GR-[0-9]{6}$', 'formato del codigo: ' || coalesce(code, 'null');
         who := public.follow_by_code(lower(replace(code, '-', ' ')));   -- con espacios y en minusculas tambien vale
+        assert public.follow_by_code(substr(code, 4)) = 'Eland', 'solo los seis numeros tambien vale';
         assert who = 'Eland', 'seguir por codigo: ' || who;
         who := public.follow_by_code(code);                              -- repetir no falla ni duplica
         select count(*) into n from public.follows where follower_id = auth.uid();
         assert n = 2, 'jefe sigue a dos: ' || n;
 
         ok := false;
-        begin perform public.follow_by_code('GR-0000-0000-0000');
+        begin perform public.follow_by_code(case when code = 'GR-000000' then 'GR-000001' else 'GR-000000' end);
         exception when others then ok := sqlerrm = 'no hay nadie con ese codigo de amigo'; end;
         assert ok, 'codigo que no existe';
         ok := false;
         begin perform public.follow_by_code('123');
-        exception when others then ok := sqlerrm = 'el codigo de amigo tiene 12 numeros'; end;
+        exception when others then ok := sqlerrm = 'el codigo de amigo tiene 6 numeros'; end;
         assert ok, 'codigo corto';
         ok := false;
         begin perform public.follow_by_code((select friend_code from public.profiles where id = auth.uid()));
@@ -271,7 +291,7 @@ begin
         exception when insufficient_privilege then ok := true; end;
         assert ok, 'la funcion interna no se puede llamar directo (permitiria seguir en nombre de otro)';
         ok := false;
-        begin update public.profiles set friend_code = 'GR-1111-1111-1111' where id = auth.uid();
+        begin update public.profiles set friend_code = 'GR-111111' where id = auth.uid();
         exception when insufficient_privilege then ok := true; end;
         assert ok, 'nadie se cambia el codigo a mano';
     end;
@@ -306,6 +326,19 @@ begin
     select count(*) into n from public.games;
     assert n = 2, 'el admin ve tambien los no publicados: ' || n;
     insert into public.games (title_id, name, definition) values ('0100BBBBBBBBB000', 'Nuevo', 'game = z');
+    declare st text; ok boolean := false;
+    begin
+        select status into st from public.games where title_id = '0100BBBBBBBBB000';
+        assert st = 'jugable', 'estado por defecto: ' || st;
+        update public.games set status = 'perfecto', name = 'Nuevo nombre', version = '2.0.0' where title_id = '0100BBBBBBBBB000';
+        begin update public.games set status = 'inventado' where title_id = '0100BBBBBBBBB000';
+        exception when check_violation then ok := true; end;
+        assert ok, 'un estado que no existe se rechaza';
+        -- frases sugeridas: el admin puede añadir, cambiar y quitar
+        insert into public.caption_presets (id, text_es, text_en, sort) values (50, 'Nueva frase', 'New phrase', 500);
+        update public.caption_presets set text_es = 'Frase cambiada' where id = 50;
+        delete from public.caption_presets where id = 50;
+    end;
     insert into public.achievements (title_id, ach_id, name_es) values ('0100BBBBBBBBB000', 'a', 'A');
     insert into storage.objects (bucket_id, name) values ('icons', '0100BBBBBBBBB000/a.png');
     select updated_at into t1 from public.games where title_id = '0100BBBBBBBBB000';

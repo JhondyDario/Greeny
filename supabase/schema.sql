@@ -36,7 +36,7 @@ alter table public.profiles add constraint profiles_username_reserved check (low
 -- el nombre de usuario es unico sin importar mayusculas
 create unique index if not exists profiles_username_lower_idx on public.profiles (lower(username));
 
--- Codigo de amigo, al estilo de la Switch: GR-1234-5678-9012. Sirve para seguir a
+-- Codigo de amigo: GR-123456 (seis numeros). Sirve para seguir a
 -- alguien sin tener que buscar su nombre. Se genera solo al crear el perfil.
 alter table public.profiles add column if not exists friend_code text;
 
@@ -47,10 +47,10 @@ declare
     bytes bytea := uuid_send(gen_random_uuid());
     digits text := '';
 begin
-    for i in 0..11 loop
+    for i in 0..5 loop
         digits := digits || (get_byte(bytes, i) % 10)::text;
     end loop;
-    return 'GR-' || substr(digits, 1, 4) || '-' || substr(digits, 5, 4) || '-' || substr(digits, 9, 4);
+    return 'GR-' || digits;
 end;
 $$;
 
@@ -71,11 +71,11 @@ drop trigger if exists profiles_friend_code on public.profiles;
 create trigger profiles_friend_code before insert on public.profiles
     for each row execute function public.set_friend_code();
 
--- perfiles creados antes de que existiera el codigo
+-- perfiles sin codigo, o con el formato largo de una version anterior
 do $$
 declare r record; code text;
 begin
-    for r in select id from public.profiles where friend_code is null loop
+    for r in select id from public.profiles where friend_code is null or friend_code !~ '^GR-[0-9]{6}$' loop
         loop
             code := public.new_friend_code();
             exit when not exists (select 1 from public.profiles p where p.friend_code = code);
@@ -145,6 +145,15 @@ create table if not exists public.games (
     constraint games_title_id_format check (title_id ~ '^[0-9A-F]{16}$'),
     constraint games_definition_size check (octet_length(definition) <= 65536)
 );
+
+-- En que punto va el trabajo de logros de cada juego. Lo ven los usuarios.
+--   sin_empezar: el juego esta en la lista pero aun no tiene logros utiles
+--   prueba:      hay logros, pero pueden fallar o cambiar
+--   jugable:     funciona bien; faltan logros por añadir
+--   perfecto:    lista de logros completa y probada
+alter table public.games add column if not exists status text not null default 'jugable';
+alter table public.games drop constraint if exists games_status_valid;
+alter table public.games add constraint games_status_valid check (status in ('sin_empezar', 'prueba', 'jugable', 'perfecto'));
 
 create table if not exists public.achievements (
     title_id   text not null references public.games (title_id) on delete cascade,
@@ -465,7 +474,7 @@ select p.id, p.username,
             on t.title_id = g.title_id
        ) s on true;
 
--- Seguir a alguien por su codigo de amigo. Acepta el codigo con o sin "GR" y guiones.
+-- Seguir a alguien por su codigo de amigo. Acepta el codigo con o sin "GR", guiones o espacios.
 -- Devuelve el nombre de usuario de la persona seguida.
 create or replace function public.follow_code(who uuid, code text)
 returns text
@@ -475,11 +484,10 @@ declare
     digits text := regexp_replace(coalesce(code, ''), '[^0-9]', '', 'g');
     target record;
 begin
-    if char_length(digits) <> 12 then
-        raise exception 'el codigo de amigo tiene 12 numeros';
+    if char_length(digits) <> 6 then
+        raise exception 'el codigo de amigo tiene 6 numeros';
     end if;
-    select p.id, p.username into target from public.profiles p
-     where p.friend_code = 'GR-' || substr(digits, 1, 4) || '-' || substr(digits, 5, 4) || '-' || substr(digits, 9, 4);
+    select p.id, p.username into target from public.profiles p where p.friend_code = 'GR-' || digits;
     if target.id is null then
         raise exception 'no hay nadie con ese codigo de amigo';
     end if;
@@ -559,6 +567,9 @@ create policy profiles_update_own on public.profiles for update
 
 drop policy if exists caption_presets_read on public.caption_presets;
 create policy caption_presets_read on public.caption_presets for select using (true);
+drop policy if exists caption_presets_admin_write on public.caption_presets;
+create policy caption_presets_admin_write on public.caption_presets for all
+    using (public.is_admin()) with check (public.is_admin());
 
 -- admins: cada quien puede ver si el mismo lo es; nadie escribe desde la web
 drop policy if exists admins_read_self on public.admins;
@@ -605,7 +616,7 @@ grant select on public.admins to authenticated;
 grant select on public.follows to anon, authenticated;
 grant insert, delete on public.follows to authenticated;
 grant select, delete on public.devices to authenticated;
-grant insert, update, delete on public.games, public.achievements to authenticated;
+grant insert, update, delete on public.games, public.achievements, public.caption_presets to authenticated;
 
 -- del perfil solo se pueden cambiar estas columnas (no el id ni la fecha de alta)
 revoke update on public.profiles from anon, authenticated;
@@ -634,8 +645,26 @@ grant execute on function public.device_register(text) to authenticated;
 --   icons/<TITLE_ID>/<ach_id>.png      covers/<TITLE_ID>.jpg
 -- -----------------------------------------------------------------------------
 
-insert into storage.buckets (id, name, public) values ('icons', 'icons', true), ('covers', 'covers', true)
+insert into storage.buckets (id, name, public) values ('icons', 'icons', true), ('covers', 'covers', true), ('avatars', 'avatars', true)
 on conflict (id) do update set public = excluded.public;
+
+-- Fotos de perfil: cada usuario sube y borra solo dentro de su propia carpeta,
+--   avatars/<id del usuario>/<archivo>.jpg
+drop policy if exists greeny_avatars_read on storage.objects;
+create policy greeny_avatars_read on storage.objects for select using (bucket_id = 'avatars');
+
+drop policy if exists greeny_avatars_insert_own on storage.objects;
+create policy greeny_avatars_insert_own on storage.objects for insert
+    with check (bucket_id = 'avatars' and split_part(name, '/', 1) = (select auth.uid())::text);
+
+drop policy if exists greeny_avatars_update_own on storage.objects;
+create policy greeny_avatars_update_own on storage.objects for update
+    using (bucket_id = 'avatars' and split_part(name, '/', 1) = (select auth.uid())::text)
+    with check (bucket_id = 'avatars' and split_part(name, '/', 1) = (select auth.uid())::text);
+
+drop policy if exists greeny_avatars_delete_own on storage.objects;
+create policy greeny_avatars_delete_own on storage.objects for delete
+    using (bucket_id = 'avatars' and split_part(name, '/', 1) = (select auth.uid())::text);
 
 drop policy if exists greeny_images_read on storage.objects;
 create policy greeny_images_read on storage.objects for select

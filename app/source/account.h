@@ -33,7 +33,7 @@ typedef struct {
     char caption[64];
     bool social_known;   /* ya se consultaron seguidores y siguiendo alguna vez */
     int  followers, following;
-    char friend_code[24];  /* GR-1234-5678-9012; "" si aun no se sabe */
+    char friend_code[24];  /* GR-123456; "" si aun no se sabe */
 } gr_account;
 
 void gr_account_load(gr_account *a, const char *path);

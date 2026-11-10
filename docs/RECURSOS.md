@@ -16,7 +16,7 @@ tipografías ni personajes de Nintendo.
 | Logo con el nombre "Greeny" completo | PNG transparente, ~1200×400 | Portada de la web y banner | Falta |
 | Icono de la app | 256×256, sin transparencia | Menú de homebrew | Listo (`assets/app-icon.png`) |
 | Insignia genérica desbloqueada y bloqueada | PNG transparente, 128×128 | Logros sin icono propio | Falta |
-| Icono por logro | Cualquier imagen; la web la convierte a PNG cuadrado de 128×128 al subirla | App y web (el aviso en el juego aún no los usa) | Se suben desde la web, en Publicar |
+| Icono por logro | Cualquier imagen; la web la convierte a PNG cuadrado de 128×128 al subirla | App y web (el aviso en el juego aún no los usa) | Se suben desde la web, en Desarrollador |
 | Carátula por juego para la web | JPG o PNG, 512×512 | Solo la web; la app usa la del juego instalado | Falta |
 | Fondos claro y oscuro | PNG 1280×720 | Fondo de las pantallas de la app | Listo (`assets/fondo_claro.png`, `assets/fondo_oscuro.png`) |
 | Botones L y R | PNG transparente | Pestañas de Opciones | Listo (`assets/icons/`) |

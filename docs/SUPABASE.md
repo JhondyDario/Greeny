@@ -41,7 +41,7 @@ una página que no existe.
 
 1. Crea tu cuenta en la web y hazte administrador (la consulta está al final de
    `supabase/schema.sql`).
-2. Vuelve a cargar la web: aparece **Publicar** en el menú.
+2. Vuelve a cargar la web: aparece **Desarrollador** en el menú.
 3. Sube `juegos/010028600EBDA000.txt`. El nombre del archivo es el Title ID.
 4. Sube los iconos: PNG de 128×128, cada uno con el id del logro como nombre
    (`monedas_5.png`).

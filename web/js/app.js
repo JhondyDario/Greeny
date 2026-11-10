@@ -32,6 +32,18 @@
     return el;
   }
 
+  // En que punto va el trabajo de logros de un juego (lo elige el desarrollador).
+  const STATUS = {
+    sin_empezar: { label: "Sin empezar", help: "Todavía no tiene logros útiles." },
+    prueba:      { label: "En prueba",   help: "Tiene logros, pero pueden fallar o cambiar." },
+    jugable:     { label: "Jugable",     help: "Funciona bien; faltan logros por añadir." },
+    perfecto:    { label: "Perfecto",    help: "Lista de logros completa y probada." },
+  };
+  function statusPill(status) {
+    const st = STATUS[status];
+    return st ? h("span", { class: "pill st-" + status, title: st.help }, st.label) : null;
+  }
+
   const fmtDate = (iso) => new Date(iso).toLocaleDateString("es", { day: "numeric", month: "short", year: "numeric" });
   const fmtNum = (n) => Number(n || 0).toLocaleString("es");
   const imgUrl = (bucket, path) => (path ? sb.storage.from(bucket).getPublicUrl(path).data.publicUrl : null);
@@ -55,7 +67,7 @@
       [/failed to fetch|networkerror/i, "No se pudo conectar. Revisa tu conexión."],
       // mensajes de nuestras funciones de la base de datos (van sin acentos)
       [/no hay nadie con ese codigo/i, "No hay nadie con ese código de amigo."],
-      [/12 numeros/i, "El código de amigo tiene 12 números."],
+      [/6 numeros/i, "El código de amigo tiene 6 números."],
       [/tu propio codigo/i, "Ese es tu propio código."],
       [/could not find the function/i, "El servidor todavía no tiene esta función. Hay que actualizar la base de datos."],
       [/codigo incorrecto o vencido/i, "Código incorrecto o vencido. Pide uno nuevo en la consola."],
@@ -133,6 +145,24 @@
     return el;
   }
 
+  // Lo que se sube se convierte aqui a una imagen cuadrada del tamaño justo.
+  // Asi da igual si el archivo era WebP, AVIF o JPEG con nombre .png, o si no
+  // era cuadrado: la consola solo sabe abrir PNG y JPEG de verdad.
+  async function squareImage(file, size, type) {
+    let bitmap;
+    try { bitmap = await createImageBitmap(file); }
+    catch (e) { throw new Error("No se pudo abrir " + file.name + " como imagen."); }
+    const side = Math.min(bitmap.width, bitmap.height);
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = size;
+    const ctx = canvas.getContext("2d");
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(bitmap, (bitmap.width - side) / 2, (bitmap.height - side) / 2, side, side, 0, 0, size, size);
+    const blob = await new Promise((done) => canvas.toBlob(done, type, 0.9));
+    if (!blob) throw new Error("No se pudo convertir " + file.name + ".");
+    return blob;
+  }
+
   // Campo de contraseña con boton para ver lo que se escribe.
   function passwordField(label, name, autocomplete, hint) {
     const input = h("input", { name, type: "password", autocomplete, required: true, minlength: autocomplete === "new-password" ? 8 : null });
@@ -166,7 +196,7 @@
       slot.replaceChildren(...[
         me ? h("a", { href: "#/u/" + encodeURIComponent(me.username) }, h("img", { src: "img/usuario.png", alt: "", width: 22, height: 22 }), "Mi perfil") : null,
         h("a", { href: "#/cuenta", "data-nav": "cuenta" }, "Cuenta"),
-        admin ? h("a", { href: "#/admin", "data-nav": "admin" }, "Publicar") : null,
+        admin ? h("a", { href: "#/desarrollador", "data-nav": "desarrollador" }, "Desarrollador") : null,
         h("button", { type: "button", onclick: async () => { await sb.auth.signOut(); location.hash = "#/"; } },
           h("img", { src: "img/salir.png", alt: "", width: 22, height: 22 }), "Salir"),
       ].filter(Boolean));
@@ -239,7 +269,7 @@
 
   async function viewGames() {
     const [games, achs] = await Promise.all([
-      sb.from("games").select("title_id,name,version,cover_path,published").order("name"),
+      sb.from("games").select("*").order("name"),
       sb.from("achievements").select("title_id,points"),
     ]);
     const list = must(games);
@@ -259,6 +289,7 @@
         return h("a", { class: "card", href: "#/juego/" + g.title_id },
           cover(g),
           h("strong", { class: "clip", style: "display:block" }, g.name),
+          h("div", { style: "margin:4px 0" }, statusPill(g.status)),
           h("div", { class: "muted small" }, g.version ? "Versión " + g.version : "Versión sin indicar", g.published ? "" : " · sin publicar"),
           h("div", { class: "small", style: "margin-top:6px" }, t.n + " logros · " + t.pts + " pts"));
       })),
@@ -285,6 +316,7 @@
       h("section", { class: "row" }, cover(game, true),
         h("div", { class: "grow" },
           h("h1", { style: "margin-bottom:4px" }, game.name),
+          STATUS[game.status] ? h("p", { style: "margin:0 0 4px" }, statusPill(game.status), " ", h("span", { class: "muted small" }, STATUS[game.status].help)) : null,
           h("p", { class: "muted", style: "margin:0" },
             game.version ? "Logros para la versión " + game.version + " del juego" : "Versión sin indicar",
             " · " + achs.length + " logros · " + totalPts + " pts · " + fmtNum(players) + (players === 1 ? " jugador" : " jugadores")))),
@@ -515,6 +547,49 @@
     ]);
     const identities = (identRes.data && identRes.data.identities) || session.user.identities || [];
     const discord = identities.find((i) => i.provider === "discord");
+
+    // Si vinculaste Discord y todavia no tienes foto, se usa la de Discord.
+    const discordAvatar = discord && discord.identity_data && (discord.identity_data.avatar_url || discord.identity_data.picture);
+    if (!me.avatar_url && discordAvatar) {
+      const res = await sb.from("profiles").update({ avatar_url: discordAvatar }).eq("id", me.id);
+      if (!res.error) me.avatar_url = discordAvatar;
+    }
+
+    // Foto de perfil: se sube a la carpeta propia del usuario, ya recortada y reducida.
+    const ownPrefix = sb.storage.from("avatars").getPublicUrl(me.id + "/").data.publicUrl;
+    const oldOwnPath = () => (me.avatar_url && me.avatar_url.startsWith(ownPrefix) ? me.id + "/" + me.avatar_url.slice(ownPrefix.length) : null);
+    const photoInput = h("input", { type: "file", accept: "image/*", hidden: true, "aria-label": "Foto de perfil" });
+    const photoMsg = h("span", { class: "muted small", role: "status", "aria-live": "polite" });
+    const photoBtn = h("button", { type: "button", class: "btn alt", onclick: () => photoInput.click() }, me.avatar_url ? "Cambiar foto" : "Subir foto");
+    async function setAvatar(url, removePath) {
+      must(await sb.from("profiles").update({ avatar_url: url }).eq("id", me.id));
+      if (removePath) await sb.storage.from("avatars").remove([removePath]);
+      await loadMe();
+      render();
+    }
+    photoInput.addEventListener("change", async () => {
+      if (!photoInput.files.length) return;
+      photoBtn.disabled = true;
+      photoMsg.textContent = "Subiendo…";
+      try {
+        const jpg = await squareImage(photoInput.files[0], 256, "image/jpeg");
+        const path = me.id + "/" + Date.now().toString(36) + ".jpg";
+        must(await sb.storage.from("avatars").upload(path, jpg, { contentType: "image/jpeg", cacheControl: "31536000" }));
+        await setAvatar(sb.storage.from("avatars").getPublicUrl(path).data.publicUrl, oldOwnPath());
+      } catch (err) {
+        photoMsg.textContent = explain(err);
+        photoBtn.disabled = false;
+      }
+    });
+    const photoRow = h("div", { class: "row", style: "margin-bottom:16px" }, avatar(me, "big"),
+      h("div", { class: "stack" },
+        h("div", { class: "row", style: "flex-wrap:wrap" }, photoBtn, photoInput,
+          discordAvatar && me.avatar_url !== discordAvatar
+            ? h("button", { type: "button", class: "btn alt", onclick: () => setAvatar(discordAvatar, oldOwnPath()).catch((e) => alert(explain(e))) }, "Usar la de Discord") : null,
+          me.avatar_url
+            ? h("button", { type: "button", class: "btn danger", onclick: () => setAvatar(null, oldOwnPath()).catch((e) => alert(explain(e))) }, "Quitar") : null),
+        photoMsg,
+        h("span", { class: "muted small" }, "Cualquier imagen; se recorta cuadrada. Si vinculas Discord y no tienes foto, se pone la de Discord.")));
     const discordName = discord && discord.identity_data &&
       (discord.identity_data.full_name || discord.identity_data.name || (discord.identity_data.custom_claims || {}).global_name);
     const presets = (presetRes.data || []).map((p) => p.text_es);
@@ -561,7 +636,7 @@
     return [
       h("h1", {}, "Cuenta"),
       h("p", { class: "muted" }, "Tu perfil público: ", h("a", { href: "#/u/" + encodeURIComponent(me.username) }, "@" + me.username)),
-      h("h2", {}, "Perfil"), h("div", { class: "card" }, profileForm),
+      h("h2", {}, "Perfil"), h("div", { class: "card" }, photoRow, profileForm),
       h("h2", {}, "Contraseña"),
       h("div", { class: "card" }, form([passwordField("Contraseña nueva", "password", "new-password", "Mínimo 8 caracteres.")],
         "Cambiar contraseña", async (fd, el) => {
@@ -591,8 +666,8 @@
               h("span", { class: "muted small" }, "Compártelo para que te sigan."))
           : h("p", { class: "muted", style: "margin:0" }, "Tu código aparecerá aquí cuando se actualice la base de datos."),
         form([
-          h("label", {}, "Seguir a alguien con su código", h("span", { class: "hint" }, "12 números. Los guiones y el GR son opcionales."),
-            h("input", { name: "friend_code", required: true, inputmode: "numeric", autocomplete: "off", placeholder: "GR-0000-0000-0000", maxlength: 20, style: "max-width:260px" })),
+          h("label", {}, "Seguir a alguien con su código", h("span", { class: "hint" }, "6 números. El GR y el guion son opcionales."),
+            h("input", { name: "friend_code", required: true, inputmode: "numeric", autocomplete: "off", placeholder: "GR-000000", maxlength: 12, style: "max-width:200px" })),
         ], "Seguir", async (fd, el) => {
           const who = must(await sb.rpc("follow_by_code", { code: fd.get("friend_code") }));
           el.reset();
@@ -623,8 +698,9 @@
 
   async function viewAdmin() {
     if (!session) { location.hash = "#/entrar"; return []; }
-    if (!admin) return notFound("Esta página es solo para administradores.");
-    const games = (await sb.from("games").select("title_id,name").order("name")).data || [];
+    if (!admin) return notFound("Esta página es solo para el desarrollador.");
+    const games = (await sb.from("games").select("*").order("name")).data || [];
+    const presets = (await sb.from("caption_presets").select("*").order("sort")).data || [];
     const gameSelect = () => h("select", { name: "title_id", required: true },
       games.length ? games.map((g) => h("option", { value: g.title_id }, g.name + " (" + g.title_id + ")")) : h("option", { value: "" }, "Primero publica un juego"));
 
@@ -637,7 +713,12 @@
       const file = fd.get("file");
       const tid = file.name.replace(/\.txt$/i, "").toUpperCase();
       if (!/^[0-9A-F]{16}$/.test(tid)) throw new Error("El nombre del archivo tiene que ser el Title ID (16 dígitos hexadecimales) seguido de .txt");
-      const text = await file.text();
+      // Las lineas de busqueda y de depuracion son para desarrollar: no se publican,
+      // porque le gastarian CPU y llenarian el registro a todos los usuarios.
+      const raw = await file.text();
+      const kept = raw.split(/\r?\n/).filter((l) => !/^\s*(scan|debug)\s*=/.test(l));
+      const removed = raw.split(/\r?\n/).length - kept.length;
+      const text = kept.join("\n");
       const def = window.GreenyDefs.parseDefinition(text);
       must(await sb.from("games").upsert({
         title_id: tid, name: def.name || tid, version: def.version || null, build_id: def.build || null,
@@ -648,26 +729,9 @@
         title_id: tid, ach_id: a.id, name_es: a.name, desc_es: a.desc, name_en: a.name_en, desc_en: a.desc_en, points: a.points, sort: i,
       }))));
       setTimeout(render, 2000);
-      return "Publicado: " + (def.name || tid) + " con " + def.achievements.length + " logros.";
+      return "Publicado: " + (def.name || tid) + " con " + def.achievements.length + " logros." +
+        (removed ? " Se quitaron " + removed + " línea(s) de scan/debug." : "");
     });
-
-    // Lo que se sube se convierte aqui a una imagen cuadrada del tamaño justo.
-    // Asi da igual si el archivo era WebP, AVIF o JPEG con nombre .png, o si no
-    // era cuadrado: la consola solo sabe abrir PNG y JPEG de verdad.
-    async function squareImage(file, size, type) {
-      let bitmap;
-      try { bitmap = await createImageBitmap(file); }
-      catch (e) { throw new Error("No se pudo abrir " + file.name + " como imagen."); }
-      const side = Math.min(bitmap.width, bitmap.height);
-      const canvas = document.createElement("canvas");
-      canvas.width = canvas.height = size;
-      const ctx = canvas.getContext("2d");
-      ctx.imageSmoothingQuality = "high";
-      ctx.drawImage(bitmap, (bitmap.width - side) / 2, (bitmap.height - side) / 2, side, side, 0, 0, size, size);
-      const blob = await new Promise((done) => canvas.toBlob(done, type, 0.9));
-      if (!blob) throw new Error("No se pudo convertir " + file.name + ".");
-      return blob;
-    }
 
     // Cada subida usa un nombre nuevo: si se reusara el mismo, el navegador y la
     // consola seguirian mostrando la imagen vieja que tienen guardada.
@@ -768,12 +832,86 @@
       return "Carátula subida.";
     });
 
+    // Datos del juego: nombre, version, estado y si se ve.
+    const infoFields = h("div", { class: "stack" });
+    const infoGame = gameSelect();
+    function showInfo() {
+      const g = games.find((x) => x.title_id === infoGame.value);
+      if (!g) { infoFields.replaceChildren(); return; }
+      infoFields.replaceChildren(
+        h("label", {}, "Nombre", h("input", { name: "name", required: true, maxlength: 60, value: g.name })),
+        h("label", {}, "Versión del juego requerida", h("span", { class: "hint" }, "La que tienen que tener los jugadores. Ejemplo: 1.1.0"),
+          h("input", { name: "version", maxlength: 16, value: g.version || "", style: "max-width:200px" })),
+        h("label", {}, "Estado", h("span", { class: "hint" }, "Lo ven los usuarios en la lista de juegos."),
+          h("select", { name: "status", style: "max-width:260px" },
+            Object.entries(STATUS).map(([k, v]) => h("option", { value: k, selected: (g.status || "jugable") === k }, v.label + " — " + v.help)))),
+        h("label", { style: "display:flex;gap:8px;align-items:center" },
+          h("input", { name: "published", type: "checkbox", checked: g.published, style: "width:auto" }), "Visible para todos"),
+        h("p", { class: "muted small", style: "margin:0" }, "Title ID: ", h("code", {}, g.title_id),
+          " · Build: ", h("code", {}, g.build_id || "sin indicar"),
+          " · Si vuelves a publicar el archivo .txt, el nombre y la versión se toman del archivo."));
+    }
+    infoGame.addEventListener("change", showInfo);
+    showInfo();
+    const infoForm = form([h("label", {}, "Juego", infoGame), infoFields], "Guardar datos", async (fd) => {
+      const tid = fd.get("title_id");
+      const patch = { name: String(fd.get("name")).trim(), version: String(fd.get("version")).trim() || null,
+                      status: fd.get("status"), published: fd.get("published") === "on" };
+      must(await sb.from("games").update(patch).eq("title_id", tid));
+      Object.assign(games.find((x) => x.title_id === tid), patch);
+      return "Datos guardados.";
+    });
+
+    // Frases sugeridas del perfil (las del desplegable de Cuenta).
+    const presetList = h("div", { class: "stack" });
+    function drawPresets() {
+      presetList.replaceChildren(...presets.map((p) => {
+        const es = h("input", { value: p.text_es, maxlength: 60, "aria-label": "Frase en español" });
+        const en = h("input", { value: p.text_en, maxlength: 60, "aria-label": "Frase en inglés" });
+        const save = h("button", { type: "button", class: "btn alt mini" }, "Guardar");
+        const del = h("button", { type: "button", class: "btn danger mini" }, "Quitar");
+        save.addEventListener("click", async () => {
+          if (!es.value.trim() || !en.value.trim()) { alert("La frase no puede quedar vacía."); return; }
+          save.disabled = true;
+          const { error } = await sb.from("caption_presets").update({ text_es: es.value.trim(), text_en: en.value.trim() }).eq("id", p.id);
+          save.disabled = false;
+          if (error) alert(explain(error)); else { p.text_es = es.value.trim(); p.text_en = en.value.trim(); save.textContent = "Guardado"; setTimeout(() => { save.textContent = "Guardar"; }, 1500); }
+        });
+        del.addEventListener("click", async () => {
+          if (!confirm("¿Quitar la frase “" + p.text_es + "”? Quien ya la tenga puesta la conserva.")) return;
+          const { error } = await sb.from("caption_presets").delete().eq("id", p.id);
+          if (error) { alert(explain(error)); return; }
+          presets.splice(presets.indexOf(p), 1);
+          drawPresets();
+        });
+        return h("div", { class: "preset-row" }, es, en, save, del);
+      }));
+    }
+    drawPresets();
+    const presetForm = form([
+      h("div", { class: "preset-row" },
+        h("input", { name: "text_es", required: true, maxlength: 60, placeholder: "Frase nueva en español" }),
+        h("input", { name: "text_en", required: true, maxlength: 60, placeholder: "La misma en inglés" })),
+    ], "Añadir frase", async (fd, el) => {
+      const row = { id: presets.reduce((m, p) => Math.max(m, p.id), 0) + 1, text_es: String(fd.get("text_es")).trim(),
+                    text_en: String(fd.get("text_en")).trim(), sort: presets.reduce((m, p) => Math.max(m, p.sort), 0) + 10 };
+      must(await sb.from("caption_presets").insert(row));
+      presets.push(row);
+      el.reset();
+      drawPresets();
+      return "Frase añadida.";
+    });
+
     return [
-      h("h1", {}, "Publicar"),
+      h("h1", {}, "Desarrollador"),
       h("p", { class: "muted" }, "Publicar de nuevo un juego actualiza sus textos y puntos. No borra logros que ya no estén en el archivo, porque eso borraría el progreso de la gente."),
       h("h2", {}, "1. Juego y logros"), h("div", { class: "card" }, publish),
-      h("h2", {}, "2. Iconos de logros"), h("div", { class: "card" }, icons),
-      h("h2", {}, "3. Carátula"), h("div", { class: "card" }, coverForm),
+      h("h2", {}, "2. Datos del juego"), h("div", { class: "card" }, games.length ? infoForm : h("p", { class: "muted", style: "margin:0" }, "Primero publica un juego.")),
+      h("h2", {}, "3. Iconos de logros"), h("div", { class: "card" }, icons),
+      h("h2", {}, "4. Carátula"), h("div", { class: "card" }, coverForm),
+      h("h2", {}, "Frases sugeridas del perfil"),
+      h("p", { class: "muted" }, "Son las que salen en el desplegable de Cuenta. Tu propia frase la cambias en Cuenta → Perfil."),
+      h("div", { class: "card stack" }, presetList, presetForm),
     ];
   }
 
@@ -787,7 +925,7 @@
   async function render() {
     const id = ++renderId;
     const parts = location.hash.replace(/^#\/?/, "").split("/").map(decodeURIComponent);
-    const routes = { "": viewHome, juegos: viewGames, juego: viewGame, u: viewProfile, entrar: viewLogin, registro: viewRegister, recuperar: viewForgot, "nueva-clave": viewNewPassword, cuenta: viewAccount, admin: viewAdmin };
+    const routes = { "": viewHome, juegos: viewGames, juego: viewGame, u: viewProfile, entrar: viewLogin, registro: viewRegister, recuperar: viewForgot, "nueva-clave": viewNewPassword, cuenta: viewAccount, admin: viewAdmin, desarrollador: viewAdmin };
     const view = routes[parts[0]];
     renderNav();
     try {

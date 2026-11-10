@@ -113,7 +113,7 @@ static void server_error(const char *resp, char *err, size_t errlen) {
     else if (strstr(msg, "Email not confirmed")) snprintf(err, errlen, "Falta confirmar el correo de la cuenta.");
     else if (strstr(msg, "consola no vinculada")) snprintf(err, errlen, "Esta consola ya no está vinculada.");
     else if (strstr(msg, "no hay nadie con ese codigo")) snprintf(err, errlen, "No hay nadie con ese código de amigo.");
-    else if (strstr(msg, "12 numeros")) snprintf(err, errlen, "El código de amigo tiene 12 números.");
+    else if (strstr(msg, "6 numeros")) snprintf(err, errlen, "El código de amigo tiene 6 números.");
     else if (strstr(msg, "tu propio codigo")) snprintf(err, errlen, "Ese es tu propio código.");
     else if (strstr(msg, "Could not find the function")) snprintf(err, errlen, "El servidor todavía no tiene esta función.");
     else snprintf(err, errlen, "%s", msg);

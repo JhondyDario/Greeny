@@ -12,3 +12,8 @@ test/test_engine
 test/lgcheck
 test/ui/ui_host
 test/*.tmp
+# copias que hace scripts/build.sh para meter el sysmodule dentro de la app
+app/data/sysmodule.bin
+app/data/snd_cargado.bin
+app/data/snd_logro.bin
+test/net/test_catalog

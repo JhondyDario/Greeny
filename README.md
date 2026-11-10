@@ -25,12 +25,14 @@ carátula real del juego.*
 | **Sysmodule** (`source/`) | Detecta el juego, lee su memoria por `dmnt:cht`, desbloquea logros, muestra el aviso y reproduce el sonido. |
 | **App Greeny** (`app/`) | Lista tus juegos con carátula, progreso y puntos; muestra cada logro, cómo se consigue y si ya lo tienes. Español e inglés, tema claro y oscuro, fondo animado, vista de lista o cuadrícula (se cambia con −), opciones por pestañas (L y R), sonidos, introducción de primera vez, cuenta opcional para subir tus logros a la web y una pantalla de diagnóstico. |
 | **Motor** (`common/`) | Formato de logros y evaluación de condiciones. Portable: se prueba en PC. |
-| **Web** (`web/`) | Perfiles, progreso, rareza de cada logro, vincular consola y publicar juegos. Se publica en GitHub Pages. |
+| **Web** (`web/`) | Perfiles, progreso, rareza de cada logro, vincular consola y página de desarrollador para publicar juegos. Se publica en GitHub Pages. |
 | **Logros** (`juegos/`) | Un archivo por juego. Por ahora: Super Mario 3D World + Bowser's Fury v1.1.0 (12 logros). |
 
 ## Instalar
 
-1. Descarga `greeny.zip` y descomprímelo en la raíz de la tarjeta SD.
+1. Descarga `greeny.zip` y descomprímelo en la raíz de la tarjeta SD. También
+   vale copiar solo `switch/greeny.nro`: al abrirla, la app instala el sysmodule
+   y los sonidos, y con internet baja los logros de los juegos que tengas.
 2. Reinicia la consola (apagar y encender, no suspender).
 3. Abre un juego que tenga logros: sale el aviso "LOGROS ACTIVOS".
 4. Abre **Greeny** desde el menú de homebrew para ver tu progreso.
@@ -129,6 +131,9 @@ make -C test
 | Perfil, nivel, medallas y seguidores (app y web) | Revisado en PC y en navegador; falta probarlo en consola y contra el servidor real |
 | Iconos de logros en la app (se bajan del catálogo y se guardan en la SD) | Descarga probada contra el servidor real desde PC; falta probarla en consola |
 | Código de amigo y soporte táctil en la app | Falta probarlos en consola |
+| App: instala el sysmodule y baja los logros de los juegos instalados | Descarga probada contra el servidor real desde PC; falta probarlo en consola |
+| Web: página Desarrollador (datos y estado del juego, frases), foto de perfil | Probada en navegador con servidor simulado |
+| Foto de perfil en la app (verla y cambiarla desde la SD) | Pendiente |
 | Buscador de juegos del catálogo en la app | Pendiente |
 | Iconos por logro, música y animaciones en la app | Pendiente ([docs/RECURSOS.md](docs/RECURSOS.md)) |
 

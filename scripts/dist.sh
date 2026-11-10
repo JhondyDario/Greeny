@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Arma la estructura de carpetas lista para copiar a la raiz de la SD.
-# Correr despues de `make` y `make -C app`.
+# Correr despues de scripts/build.sh.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
