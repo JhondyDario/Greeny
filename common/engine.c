@@ -114,7 +114,7 @@ static const char *parse_addr(char *s, lg_cond *c) {
         p = arrow + 2;
         arrow = strstr(p, "->");
         if (arrow) *arrow = 0;
-        if (c->nderef >= LG_MAX_DEREF) return "demasiados niveles de puntero (max 4)";
+        if (c->nderef >= LG_MAX_DEREF) return "demasiados niveles de puntero (max 8)";
         if (!parse_u64(p, &c->deref[c->nderef])) return "offset de puntero invalido";
         c->nderef++;
     }

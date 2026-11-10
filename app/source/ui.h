@@ -11,13 +11,16 @@
 #define UI_COVER_BIG  150  /* caratula en la cuadricula */
 
 #define UI_APP_NAME    "Greeny"
-#define UI_APP_VERSION "0.0.4"
+#define UI_APP_VERSION "0.0.5"
 
-/* filas de la pantalla de opciones */
+/* opciones, agrupadas en pestañas que se cambian con L y R */
 enum {
     UI_OPT_LANG, UI_OPT_THEME, UI_OPT_ANIM, UI_OPT_GAMES_VIEW, UI_OPT_ACH_VIEW, UI_OPT_SOUND, UI_OPT_POPUP, UI_OPT_DIAG,
     UI_OPT_ABOUT, UI_OPT_COUNT
 };
+#define UI_TABS 4
+int ui_tab_count(int tab);            /* cuantas opciones tiene la pestaña */
+int ui_tab_option(int tab, int row);  /* cual UI_OPT_* esta en esa fila */
 
 typedef struct {
     const uint8_t *mascot_big;   int big_w, big_h;     /* RGBA; introduccion y Acerca de */
@@ -46,7 +49,7 @@ void ui_background(gfx_canvas *c, float t);
  * `top` es la primera fila visible (en filas, no en elementos). */
 void ui_home(gfx_canvas *c, const ui_assets *a, const gr_model *m, const gr_config *cfg, int cursor, int top);
 void ui_detail(gfx_canvas *c, const ui_assets *a, const gr_model *m, const gr_config *cfg, int game, int cursor, int top);
-void ui_settings(gfx_canvas *c, const ui_assets *a, const gr_config *cfg, int cursor, bool system_spanish,
+void ui_settings(gfx_canvas *c, const ui_assets *a, const gr_config *cfg, int tab, int row, bool system_spanish,
                  bool system_dark);
 void ui_diag(gfx_canvas *c, const ui_assets *a, const gr_diag_item *items, int count);
 void ui_about(gfx_canvas *c, const ui_assets *a);

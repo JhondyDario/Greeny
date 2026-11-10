@@ -35,8 +35,8 @@
 /* tamaños con los que se generaron los .bin (scripts/assets.py) */
 #define BIG_W 220
 #define BIG_H 330
-#define SMALL_W 50
-#define SMALL_H 75
+#define SMALL_W 66
+#define SMALL_H 66
 
 typedef enum { SCREEN_HOME, SCREEN_DETAIL, SCREEN_SETTINGS, SCREEN_DIAG, SCREEN_ABOUT, SCREEN_INTRO } screen_t;
 
@@ -287,7 +287,7 @@ int main(int argc, char *argv[]) {
     trace("listo: %d juego(s), audio %s, caratulas %s, modo %s", g_model.ngames, sfx_ok ? "si" : "no",
           g_ns_ok ? "si" : "no", g_env.applet_mode ? "applet" : "aplicacion");
 
-    int cursor = 0, top = 0, dcursor = 0, dtop = 0, scursor = 0, intro_page = 0;
+    int cursor = 0, top = 0, dcursor = 0, dtop = 0, stab = 0, srow = 0, intro_page = 0;
     screen_t screen = SCREEN_HOME;
     if (!g_config.intro_done) {
         /* primera vez: introduccion con la revision de la instalacion */
@@ -300,7 +300,7 @@ int main(int argc, char *argv[]) {
         console_nickname(nick, sizeof(nick));
         ui_set_user(nick);
     }
-    bool dirty = true;
+    bool dirty = true, plus_pressed = false;
     const u64 dirs = HidNpadButton_AnyUp | HidNpadButton_AnyDown | HidNpadButton_AnyLeft | HidNpadButton_AnyRight;
 
     while (appletMainLoop()) {
@@ -308,9 +308,9 @@ int main(int argc, char *argv[]) {
         padRepeaterUpdate(&rep, padGetButtons(&pad) & dirs);
         u64 down = padGetButtonsDown(&pad);
         u64 nav = (down | padRepeaterGetButtons(&rep)) & dirs;
-        if (down & HidNpadButton_Plus) break;
+        if (down & HidNpadButton_Plus) { plus_pressed = true; break; }
 
-        bool moved = false, accepted = false, back = false;
+        bool moved = false, accepted = false, accepted_alt = false, opened = false, back = false;
 
         if (screen == SCREEN_HOME) {
             ui_layout l = ui_home_layout(&g_config);
@@ -319,27 +319,46 @@ int main(int argc, char *argv[]) {
                 rescan();
                 if (cursor >= g_model.ngames) cursor = g_model.ngames ? g_model.ngames - 1 : 0;
                 top = 0;
-                accepted = true;
+                accepted_alt = true;
+            }
+            if ((down & HidNpadButton_Minus) && g_model.ngames > 0) {
+                g_config.games_view = (g_config.games_view + 1) % GR_VIEW_COUNT;
+                save_config();
+                top = 0;
+                l = ui_home_layout(&g_config);
+                accepted_alt = true;
             }
             follow(cursor, &top, l);
             if ((down & HidNpadButton_A) && g_model.ngames > 0) {
                 gr_open(&g_model, cursor, ROOT);
                 screen = SCREEN_DETAIL;
                 dcursor = dtop = 0;
-                accepted = true;
+                opened = true;
             }
-            if (down & HidNpadButton_X) { screen = SCREEN_SETTINGS; scursor = 0; accepted = true; }
+            if (down & HidNpadButton_X) { screen = SCREEN_SETTINGS; stab = srow = 0; opened = true; }
         } else if (screen == SCREEN_DETAIL) {
             ui_layout l = ui_detail_layout(&g_config);
             int n = g_model.games[cursor].broken ? 0 : g_model.cur.nach;
             if (n > 0) moved = move_cursor(&dcursor, n, l.cols, nav);
+            if ((down & HidNpadButton_Minus) && n > 0) {
+                g_config.ach_view = (g_config.ach_view + 1) % GR_VIEW_COUNT;
+                save_config();
+                dtop = 0;
+                l = ui_detail_layout(&g_config);
+                accepted_alt = true;
+            }
             follow(dcursor, &dtop, l);
             if (down & HidNpadButton_B) { screen = SCREEN_HOME; back = true; }
         } else if (screen == SCREEN_SETTINGS) {
-            moved = move_cursor(&scursor, UI_OPT_COUNT, 1, nav);
+            if (down & (HidNpadButton_L | HidNpadButton_R)) {
+                stab = (stab + ((down & HidNpadButton_R) ? 1 : UI_TABS - 1)) % UI_TABS;
+                srow = 0;
+                accepted_alt = true;
+            }
+            moved = move_cursor(&srow, ui_tab_count(stab), 1, nav);
             if (down & HidNpadButton_A) {
-                accepted = true;
-                switch (scursor) {
+                int opt = ui_tab_option(stab, srow);
+                switch (opt) {
                     case UI_OPT_LANG:       g_config.lang = (g_config.lang + 1) % GR_LANG_COUNT; break;
                     case UI_OPT_THEME:      g_config.theme = (g_config.theme + 1) % GR_THEME_COUNT; break;
                     case UI_OPT_ANIM:       g_config.animated_bg = !g_config.animated_bg; break;
@@ -350,15 +369,18 @@ int main(int argc, char *argv[]) {
                     case UI_OPT_ABOUT:      screen = SCREEN_ABOUT; break;
                     default:                run_diag(); screen = SCREEN_DIAG; break;
                 }
-                if (scursor < UI_OPT_DIAG) {
+                if (opt < UI_OPT_DIAG) {
+                    accepted = true;
                     save_config();
                     top = 0; /* la vista pudo cambiar de forma */
                     follow(cursor, &top, ui_home_layout(&g_config));
+                } else {
+                    opened = true;
                 }
             }
             if (down & HidNpadButton_B) { screen = SCREEN_HOME; back = true; }
         } else if (screen == SCREEN_DIAG) {
-            if (down & HidNpadButton_Y) { rescan(); run_diag(); accepted = true; }
+            if (down & HidNpadButton_Y) { rescan(); run_diag(); accepted_alt = true; }
             if (down & HidNpadButton_B) { screen = SCREEN_SETTINGS; back = true; }
         } else if (screen == SCREEN_ABOUT) {
             if (down & HidNpadButton_B) { screen = SCREEN_SETTINGS; back = true; }
@@ -375,9 +397,11 @@ int main(int argc, char *argv[]) {
         }
 
         if (back) sfx_play(SFX_BACK);
+        else if (opened) sfx_play(SFX_OPEN);
         else if (accepted) sfx_play(SFX_ACCEPT);
+        else if (accepted_alt) sfx_play(SFX_ACCEPT_ALT);
         else if (moved) sfx_play(SFX_NAV);
-        if (moved || accepted || back) dirty = true;
+        if (moved || accepted || accepted_alt || opened || back) dirty = true;
         sfx_update();
 
         /* La pantalla (texto, tarjetas) solo se redibuja en su capa cuando algo cambia.
@@ -385,7 +409,7 @@ int main(int argc, char *argv[]) {
         bool redraw = dirty;
         if (dirty) {
             if (screen == SCREEN_DETAIL) ui_detail(&layer, &g_assets, &g_model, &g_config, cursor, dcursor, dtop);
-            else if (screen == SCREEN_SETTINGS) ui_settings(&layer, &g_assets, &g_config, scursor, g_system_spanish, g_system_dark);
+            else if (screen == SCREEN_SETTINGS) ui_settings(&layer, &g_assets, &g_config, stab, srow, g_system_spanish, g_system_dark);
             else if (screen == SCREEN_DIAG) ui_diag(&layer, &g_assets, g_diag, g_ndiag);
             else if (screen == SCREEN_ABOUT) ui_about(&layer, &g_assets);
             else if (screen == SCREEN_INTRO) ui_intro(&layer, &g_assets, intro_page, g_diag, g_ndiag, g_env.sysmodule_running);
@@ -404,10 +428,16 @@ int main(int argc, char *argv[]) {
         framebufferEnd(&fb);
     }
 
-    trace("cerrando");
+    /* Cada paso del cierre queda anotado: si la app se congela al salir (por
+     * ejemplo con HOME), app-log.txt dice en cual. */
+    trace("saliendo del bucle (%s)", plus_pressed ? "boton +" : "lo pidio el sistema: HOME o cierre");
+    trace("cerrando audio");
     sfx_exit();
+    trace("cerrando caratulas");
     if (g_ns_ok) nsExit();
+    trace("cerrando pantalla");
     framebufferClose(&fb);
+    trace("cerrando fuente");
     plExit();
     trace(TRACE_DONE);
     return 0;

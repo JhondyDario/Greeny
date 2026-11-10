@@ -4,7 +4,9 @@
 #include <string.h>
 #include <switch.h>
 
-#include "sfx_aceptar_bin.h"
+#include "sfx_abrir_menu_bin.h"
+#include "sfx_aceptar_1_bin.h"
+#include "sfx_aceptar_2_bin.h"
 #include "sfx_navegar_bin.h"
 #include "sfx_regresar_bin.h"
 
@@ -25,8 +27,10 @@ static AudioDriverWaveBuf g_wave[SFX_COUNT];
 static void *g_pool;
 
 bool sfx_init(void) {
-    const u8 *src[SFX_COUNT] = { sfx_navegar_bin, sfx_aceptar_bin, sfx_regresar_bin };
-    size_t size[SFX_COUNT] = { sfx_navegar_bin_size, sfx_aceptar_bin_size, sfx_regresar_bin_size };
+    /* mismo orden que sfx_id */
+    const u8 *src[SFX_COUNT] = { sfx_navegar_bin, sfx_aceptar_1_bin, sfx_aceptar_2_bin, sfx_abrir_menu_bin, sfx_regresar_bin };
+    size_t size[SFX_COUNT] = { sfx_navegar_bin_size, sfx_aceptar_1_bin_size, sfx_aceptar_2_bin_size, sfx_abrir_menu_bin_size,
+                               sfx_regresar_bin_size };
     size_t offset[SFX_COUNT], total = 0;
     for (int i = 0; i < SFX_COUNT; i++) {
         size[i] &= ~(size_t)1;

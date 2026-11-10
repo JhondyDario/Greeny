@@ -285,7 +285,8 @@ void ui_home(gfx_canvas *c, const ui_assets *a, const gr_model *m, const gr_conf
     if (m->ngames > 0) hx = hint(c, hx, "A", T("Ver logros", "View achievements"));
     hx = hint(c, hx, "X", T("Opciones", "Options"));
     hx = hint(c, hx, "Y", T("Recargar", "Reload"));
-    hint(c, hx, "+", T("Salir de la app", "Exit app"));
+    if (m->ngames > 0) hx = hint(c, hx, "−", cfg->games_view == GR_VIEW_GRID ? T("Lista", "List") : T("Cuadrícula", "Grid"));
+    hint(c, hx, "+", T("Salir", "Exit"));
 }
 
 /* ---------- detalle: logros de un juego ---------- */
@@ -395,26 +396,56 @@ void ui_detail(gfx_canvas *c, const ui_assets *a, const gr_model *m, const gr_co
 
     footer_bar(c);
     int hx = hint(c, MARGIN, "B", T("Volver", "Back"));
-    hint(c, hx, "+", T("Salir de la app", "Exit app"));
+    if (!g->broken) hx = hint(c, hx, "−", cfg->ach_view == GR_VIEW_GRID ? T("Lista", "List") : T("Cuadrícula", "Grid"));
+    hint(c, hx, "+", T("Salir", "Exit"));
 }
 
 /* ---------- opciones ---------- */
 
-static void option_row(gfx_canvas *c, int row, bool selected, const char *label, const char *help, const char *value,
+static const struct { const char *es, *en; int n; int opt[3]; } k_tabs[UI_TABS] = {
+    { "General",     "General",  3, { UI_OPT_LANG, UI_OPT_THEME, UI_OPT_ANIM } },
+    { "Vista",       "View",     2, { UI_OPT_GAMES_VIEW, UI_OPT_ACH_VIEW } },
+    { "En el juego", "In-game",  2, { UI_OPT_SOUND, UI_OPT_POPUP } },
+    { "Ayuda",       "Help",     2, { UI_OPT_DIAG, UI_OPT_ABOUT } },
+};
+
+int ui_tab_count(int tab) { return k_tabs[tab].n; }
+int ui_tab_option(int tab, int row) { return k_tabs[tab].opt[row]; }
+
+static void option_row(gfx_canvas *c, int y, bool selected, const char *label, const char *help, const char *value,
                        gfx_color value_bg) {
-    const int x = MARGIN, w = CONTENT_W, h = 51, y = 112 + row * (h + 9);
+    const int x = MARGIN, w = CONTENT_W, h = 88;
     card(c, x, y, w, h, selected);
-    gfx_text(c, x + 24, y + 3, 21, P->ink, label);
-    gfx_text_fit(c, x + 24, y + 29, 15, P->gray, help, w - 48 - 300);
-    int vw = gfx_text_width(18, value) + 34;
-    gfx_round_rect(c, x + w - 24 - vw, y + 9, vw, 33, 16, value_bg);
-    gfx_text(c, x + w - 24 - vw + 17, y + 15, 18, C_WHITE, value);
+    gfx_text(c, x + 28, y + 12, 27, P->ink, label);
+    gfx_text_fit(c, x + 28, y + 51, 19, P->gray, help, w - 56 - 300);
+    int vw = gfx_text_width(21, value) + 42;
+    gfx_round_rect(c, x + w - 28 - vw, y + 23, vw, 42, 21, value_bg);
+    gfx_text(c, x + w - 28 - vw + 21, y + 31, 21, C_WHITE, value);
 }
 
-void ui_settings(gfx_canvas *c, const ui_assets *a, const gr_config *cfg, int cursor, bool system_spanish,
+/* boton L o R dibujado junto a las pestañas */
+static void shoulder(gfx_canvas *c, int x, int y, const char *letter) {
+    gfx_round_rect(c, x, y, 46, 34, 10, P->ink);
+    gfx_text(c, x + 23 - gfx_text_width(21, letter) / 2, y + 5, 21, P->footer, letter);
+}
+
+void ui_settings(gfx_canvas *c, const ui_assets *a, const gr_config *cfg, int tab, int row, bool system_spanish,
                  bool system_dark) {
     gfx_clear_transparent(c);
     header(c, a, NULL, T("Opciones", "Options"), T("Se guardan en la tarjeta SD", "Saved to the SD card"));
+
+    /* pestañas */
+    int tx = MARGIN + 60;
+    shoulder(c, MARGIN, 121, "L");
+    for (int i = 0; i < UI_TABS; i++) {
+        const char *name = T(k_tabs[i].es, k_tabs[i].en);
+        int w = gfx_text_width(23, name) + 44;
+        if (i == tab) gfx_round_rect(c, tx, 116, w, 44, 22, C_GREEN);
+        else gfx_round_rect(c, tx, 116, w, 44, 22, P->card);
+        gfx_text(c, tx + 22, 124, 23, i == tab ? C_WHITE : P->gray, name);
+        tx += w + 10;
+    }
+    shoulder(c, tx + 4, 121, "R");
 
     char lang[48], theme[48];
     if (cfg->lang == GR_LANG_ES) snprintf(lang, sizeof(lang), "Español");
@@ -426,41 +457,62 @@ void ui_settings(gfx_canvas *c, const ui_assets *a, const gr_config *cfg, int cu
     else snprintf(theme, sizeof(theme), "Auto (%s)", system_dark ? T("Oscuro", "Dark") : T("Claro", "Light"));
 
     const char *on = T("Activado", "On"), *off = T("Desactivado", "Off");
-    const char *list = T("Lista", "List"), *grid = T("Cuadrícula", "Grid");
+    const char *list = T("Lista", "List"), *grid = T("Cuadrícula", "Grid"), *open = T("Abrir", "Open");
 
-    option_row(c, UI_OPT_LANG, cursor == UI_OPT_LANG, T("Idioma", "Language"),
-               T("Idioma de la app y de los avisos de logros.", "Language for the app and achievement pop-ups."), lang, C_GREEN);
-    option_row(c, UI_OPT_THEME, cursor == UI_OPT_THEME, T("Tema", "Theme"),
-               T("Auto usa el tema claro u oscuro de la consola.", "Auto follows the console's light or dark theme."),
-               theme, C_GREEN);
-    option_row(c, UI_OPT_ANIM, cursor == UI_OPT_ANIM, T("Fondo animado", "Animated background"),
-               T("Burbujas que se mueven despacio detrás de las pantallas.", "Slow-moving bubbles behind the screens."),
-               cfg->animated_bg ? on : off, cfg->animated_bg ? C_GREEN : C_NEUTRAL);
-    option_row(c, UI_OPT_GAMES_VIEW, cursor == UI_OPT_GAMES_VIEW, T("Vista de juegos", "Games view"),
-               T("Cómo se muestran los juegos en el inicio.", "How games are shown on the home screen."),
-               cfg->games_view == GR_VIEW_GRID ? grid : list, C_GREEN);
-    option_row(c, UI_OPT_ACH_VIEW, cursor == UI_OPT_ACH_VIEW, T("Vista de logros", "Achievements view"),
-               T("Cómo se muestran los logros de un juego.", "How a game's achievements are shown."),
-               cfg->ach_view == GR_VIEW_GRID ? grid : list, C_GREEN);
-    option_row(c, UI_OPT_SOUND, cursor == UI_OPT_SOUND, T("Sonidos en el juego", "In-game sounds"),
-               T("Al cargar los logros y al desbloquear uno. Se aplica al abrir un juego.",
-                 "When achievements load and when one unlocks. Applies when a game starts."),
-               cfg->sound ? on : off, cfg->sound ? C_GREEN : C_NEUTRAL);
-    option_row(c, UI_OPT_POPUP, cursor == UI_OPT_POPUP, T("Avisos en el juego", "In-game pop-ups"),
-               T("Mensajes en pantalla mientras juegas. Se aplica al abrir un juego.",
-                 "On-screen messages while you play. Applies when a game starts."),
-               cfg->popup ? on : off, cfg->popup ? C_GREEN : C_NEUTRAL);
-    option_row(c, UI_OPT_DIAG, cursor == UI_OPT_DIAG, T("Diagnóstico", "Diagnostics"),
-               T("Revisa que Greeny esté bien instalado y funcionando.", "Checks that Greeny is installed and working."),
-               T("Abrir", "Open"), C_NEUTRAL);
-    option_row(c, UI_OPT_ABOUT, cursor == UI_OPT_ABOUT, T("Acerca de", "About"),
-               T("Créditos, versión y dónde contactar.", "Credits, version and where to get in touch."),
-               T("Abrir", "Open"), C_NEUTRAL);
+    for (int i = 0; i < k_tabs[tab].n; i++) {
+        int y = 184 + i * 104;
+        bool sel = i == row;
+        switch (k_tabs[tab].opt[i]) {
+            case UI_OPT_LANG:
+                option_row(c, y, sel, T("Idioma", "Language"),
+                           T("Idioma de la app y de los avisos de logros.", "Language for the app and achievement pop-ups."), lang, C_GREEN);
+                break;
+            case UI_OPT_THEME:
+                option_row(c, y, sel, T("Tema", "Theme"),
+                           T("Auto usa el tema claro u oscuro de la consola.", "Auto follows the console's light or dark theme."), theme, C_GREEN);
+                break;
+            case UI_OPT_ANIM:
+                option_row(c, y, sel, T("Fondo animado", "Animated background"),
+                           T("Burbujas que se mueven despacio detrás de las pantallas.", "Slow-moving bubbles behind the screens."),
+                           cfg->animated_bg ? on : off, cfg->animated_bg ? C_GREEN : C_NEUTRAL);
+                break;
+            case UI_OPT_GAMES_VIEW:
+                option_row(c, y, sel, T("Vista de juegos", "Games view"),
+                           T("Cómo se muestran los juegos. También se cambia con − en el inicio.", "How games are shown. Also toggled with − on the home screen."),
+                           cfg->games_view == GR_VIEW_GRID ? grid : list, C_GREEN);
+                break;
+            case UI_OPT_ACH_VIEW:
+                option_row(c, y, sel, T("Vista de logros", "Achievements view"),
+                           T("Cómo se muestran los logros. También se cambia con − dentro de un juego.", "How achievements are shown. Also toggled with − inside a game."),
+                           cfg->ach_view == GR_VIEW_GRID ? grid : list, C_GREEN);
+                break;
+            case UI_OPT_SOUND:
+                option_row(c, y, sel, T("Sonidos en el juego", "In-game sounds"),
+                           T("Al cargar los logros y al desbloquear uno. Se aplica al abrir un juego.",
+                             "When achievements load and when one unlocks. Applies when a game starts."),
+                           cfg->sound ? on : off, cfg->sound ? C_GREEN : C_NEUTRAL);
+                break;
+            case UI_OPT_POPUP:
+                option_row(c, y, sel, T("Avisos en el juego", "In-game pop-ups"),
+                           T("Mensajes en pantalla mientras juegas. Se aplica al abrir un juego.",
+                             "On-screen messages while you play. Applies when a game starts."),
+                           cfg->popup ? on : off, cfg->popup ? C_GREEN : C_NEUTRAL);
+                break;
+            case UI_OPT_DIAG:
+                option_row(c, y, sel, T("Diagnóstico", "Diagnostics"),
+                           T("Revisa que Greeny esté bien instalado y funcionando.", "Checks that Greeny is installed and working."), open, C_NEUTRAL);
+                break;
+            default:
+                option_row(c, y, sel, T("Acerca de", "About"),
+                           T("Créditos, versión y dónde contactar.", "Credits, version and where to get in touch."), open, C_NEUTRAL);
+                break;
+        }
+    }
 
     footer_bar(c);
-    int hx = hint(c, MARGIN, "A", cursor >= UI_OPT_DIAG ? T("Abrir", "Open") : T("Cambiar", "Change"));
+    int hx = hint(c, MARGIN, "A", k_tabs[tab].opt[row] >= UI_OPT_DIAG ? T("Abrir", "Open") : T("Cambiar", "Change"));
     hx = hint(c, hx, "B", T("Volver", "Back"));
-    hint(c, hx, "+", T("Salir de la app", "Exit app"));
+    hint(c, hx, "+", T("Salir", "Exit"));
 }
 
 /* ---------- diagnostico ---------- */
@@ -510,7 +562,7 @@ void ui_diag(gfx_canvas *c, const ui_assets *a, const gr_diag_item *items, int c
     footer_bar(c);
     int hx = hint(c, MARGIN, "Y", T("Revisar de nuevo", "Check again"));
     hx = hint(c, hx, "B", T("Volver", "Back"));
-    hint(c, hx, "+", T("Salir de la app", "Exit app"));
+    hint(c, hx, "+", T("Salir", "Exit"));
 }
 
 /* ---------- acerca de ---------- */
@@ -547,7 +599,7 @@ void ui_about(gfx_canvas *c, const ui_assets *a) {
 
     footer_bar(c);
     int hx = hint(c, MARGIN, "B", T("Volver", "Back"));
-    hint(c, hx, "+", T("Salir de la app", "Exit app"));
+    hint(c, hx, "+", T("Salir", "Exit"));
 }
 
 /* ---------- introduccion ---------- */
@@ -622,5 +674,5 @@ void ui_intro(gfx_canvas *c, const ui_assets *a, int page, const gr_diag_item *i
     footer_bar(c);
     int hx = hint(c, MARGIN, "A", page == UI_INTRO_PAGES - 1 ? T("Empezar", "Get started") : T("Siguiente", "Next"));
     if (page > 0) hx = hint(c, hx, "B", T("Atrás", "Back"));
-    hint(c, hx, "+", T("Salir de la app", "Exit app"));
+    hint(c, hx, "+", T("Salir", "Exit"));
 }

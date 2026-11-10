@@ -9,7 +9,7 @@
 
 #define LG_MAX_ACH    64
 #define LG_MAX_COND   6
-#define LG_MAX_DEREF  4
+#define LG_MAX_DEREF  8
 #define LG_ID_LEN     32
 #define LG_NAME_LEN   48
 #define LG_DESC_LEN   96

@@ -15,6 +15,14 @@ game    = Super Mario 3D World
 version = 1.1.0
 build   = 891687F016A18F17
 
+# BUSQUEDA TEMPORAL - estrellas verdes del nivel actual.
+# En la v1.0.0 la cadena salia de main+0x1A085E8 (cheat "All 3 green Stars") y el
+# dato es un byte con un bit por estrella (1, 2 y 4). Este scan busca a donde se
+# mudo el puntero en la 1.1.0: entra a un nivel, coge UNA estrella verde, espera
+# 20 segundos, coge otra, espera 20 segundos, y manda log.txt.
+# Quitar esta linea cuando se encuentre: cuesta CPU cada 10 segundos.
+scan = main+0x19F0000->0x10->0x8->0x40->0x8->0x40->0x20->0xD8->0x88 u8 0x80000 1 7
+
 [prueba_de_vida]
 name = Estamos vivos
 desc = El sistema de logros lee la memoria del juego

@@ -48,6 +48,7 @@
       [/profiles_username_lower_idx|duplicate key/i, "Ese nombre de usuario ya está ocupado."],
       [/profiles_username_format/i, "El usuario solo puede tener letras, números y _ (de 3 a 20)."],
       [/profiles_caption_len/i, "La frase puede tener hasta 60 caracteres."],
+      [/new password should be different/i, "La contraseña nueva tiene que ser distinta a la anterior."],
       [/rate limit|too many/i, "Demasiados intentos. Espera un momento y prueba de nuevo."],
       [/failed to fetch|networkerror/i, "No se pudo conectar. Revisa tu conexión."],
       // mensajes de nuestras funciones de la base de datos (van sin acentos)
@@ -113,6 +114,19 @@
     return el;
   }
 
+  // Campo de contraseña con boton para ver lo que se escribe.
+  function passwordField(label, name, autocomplete, hint) {
+    const input = h("input", { name, type: "password", autocomplete, required: true, minlength: autocomplete === "new-password" ? 8 : null });
+    const toggle = h("button", { type: "button", class: "peek", "aria-pressed": "false", onclick: () => {
+      const show = input.type === "password";
+      input.type = show ? "text" : "password";
+      toggle.textContent = show ? "Ocultar" : "Ver";
+      toggle.setAttribute("aria-pressed", String(show));
+      toggle.setAttribute("aria-label", show ? "Ocultar contraseña" : "Ver contraseña");
+    }, "aria-label": "Ver contraseña" }, "Ver");
+    return h("label", {}, label, hint ? h("span", { class: "hint" }, hint) : null, h("span", { class: "pw" }, input, toggle));
+  }
+
   // ---------- sesion ----------
 
   async function loadMe() {
@@ -131,10 +145,11 @@
     const slot = document.getElementById("nav-user");
     if (session) {
       slot.replaceChildren(...[
-        me ? h("a", { href: "#/u/" + encodeURIComponent(me.username) }, "Mi perfil") : null,
+        me ? h("a", { href: "#/u/" + encodeURIComponent(me.username) }, h("img", { src: "img/usuario.png", alt: "", width: 22, height: 22 }), "Mi perfil") : null,
         h("a", { href: "#/cuenta", "data-nav": "cuenta" }, "Cuenta"),
         admin ? h("a", { href: "#/admin", "data-nav": "admin" }, "Publicar") : null,
-        h("button", { type: "button", onclick: async () => { await sb.auth.signOut(); location.hash = "#/"; } }, "Salir"),
+        h("button", { type: "button", onclick: async () => { await sb.auth.signOut(); location.hash = "#/"; } },
+          h("img", { src: "img/salir.png", alt: "", width: 22, height: 22 }), "Salir"),
       ].filter(Boolean));
     } else {
       slot.replaceChildren(
@@ -358,11 +373,12 @@
       h("h1", {}, "Entrar"),
       form([
         h("label", {}, "Correo", h("input", { name: "email", type: "email", autocomplete: "email", required: true })),
-        h("label", {}, "Contraseña", h("input", { name: "password", type: "password", autocomplete: "current-password", required: true })),
+        passwordField("Contraseña", "password", "current-password"),
       ], "Entrar", async (fd) => {
         must(await sb.auth.signInWithPassword({ email: fd.get("email"), password: fd.get("password") }));
         location.hash = "#/cuenta";
       }),
+      h("p", { style: "margin-top:12px" }, h("a", { href: "#/recuperar" }, "¿Olvidaste tu contraseña?")),
       h("p", { class: "or", style: "margin:18px 0" }, "o"),
       discordButton(),
       h("p", { class: "muted", style: "margin-top:22px" }, "¿No tienes cuenta? ", h("a", { href: "#/registro" }, "Créala aquí"), "."),
@@ -377,8 +393,7 @@
         h("label", {}, "Nombre de usuario", h("span", { class: "hint" }, "Letras, números y _ (de 3 a 20). Es el de tu perfil público."),
           h("input", { name: "username", required: true, minlength: 3, maxlength: 20, pattern: "[A-Za-z0-9_]{3,20}", autocomplete: "username", autocapitalize: "none", spellcheck: "false" })),
         h("label", {}, "Correo", h("input", { name: "email", type: "email", autocomplete: "email", required: true })),
-        h("label", {}, "Contraseña", h("span", { class: "hint" }, "Mínimo 8 caracteres."),
-          h("input", { name: "password", type: "password", autocomplete: "new-password", required: true, minlength: 8 })),
+        passwordField("Contraseña", "password", "new-password", "Mínimo 8 caracteres."),
       ], "Crear cuenta", async (fd, el) => {
         const data = must(await sb.auth.signUp({
           email: fd.get("email"), password: fd.get("password"),
@@ -391,6 +406,37 @@
       h("p", { class: "or", style: "margin:18px 0" }, "o"),
       discordButton(),
       h("p", { class: "muted", style: "margin-top:22px" }, "¿Ya tienes cuenta? ", h("a", { href: "#/entrar" }, "Entra aquí"), "."),
+    ];
+  }
+
+  // Paso 1: pedir el correo con el enlace para cambiar la contraseña.
+  function viewForgot() {
+    return [
+      h("h1", {}, "Recuperar contraseña"),
+      h("p", { class: "muted" }, "Escribe el correo de tu cuenta y te enviamos un enlace para poner una contraseña nueva."),
+      form([
+        h("label", {}, "Correo", h("input", { name: "email", type: "email", autocomplete: "email", required: true })),
+      ], "Enviar enlace", async (fd, el) => {
+        must(await sb.auth.resetPasswordForEmail(fd.get("email"), { redirectTo: here }));
+        el.reset();
+        // el mismo mensaje exista o no la cuenta, para no revelar quien esta registrado
+        return "Si hay una cuenta con ese correo, te llegará un enlace en unos minutos. Revisa también el correo no deseado.";
+      }),
+      h("p", { class: "muted", style: "margin-top:22px" }, h("a", { href: "#/entrar" }, "Volver a entrar")),
+    ];
+  }
+
+  // Paso 2: al volver del enlace del correo ya hay sesion; solo falta la contraseña nueva.
+  function viewNewPassword() {
+    if (!session) return [h("h1", {}, "Nueva contraseña"), h("p", { class: "msg err" }, "El enlace ya no sirve o venció. Pide uno nuevo."),
+      h("p", {}, h("a", { href: "#/recuperar" }, "Recuperar contraseña"))];
+    return [
+      h("h1", {}, "Nueva contraseña"),
+      form([passwordField("Contraseña nueva", "password", "new-password", "Mínimo 8 caracteres.")], "Guardar contraseña", async (fd) => {
+        must(await sb.auth.updateUser({ password: fd.get("password") }));
+        setTimeout(() => { location.hash = "#/cuenta"; }, 1200);
+        return "Contraseña cambiada.";
+      }),
     ];
   }
 
@@ -448,6 +494,13 @@
       h("h1", {}, "Cuenta"),
       h("p", { class: "muted" }, "Tu perfil público: ", h("a", { href: "#/u/" + encodeURIComponent(me.username) }, "@" + me.username)),
       h("h2", {}, "Perfil"), h("div", { class: "card" }, profileForm),
+      h("h2", {}, "Contraseña"),
+      h("div", { class: "card" }, form([passwordField("Contraseña nueva", "password", "new-password", "Mínimo 8 caracteres.")],
+        "Cambiar contraseña", async (fd, el) => {
+          must(await sb.auth.updateUser({ password: fd.get("password") }));
+          el.reset();
+          return "Contraseña cambiada.";
+        })),
       h("h2", {}, "Vincular una consola"),
       h("div", { class: "card stack" },
         h("p", { class: "muted", style: "margin:0" }, "En tu Switch, abre Greeny y elige vincular cuenta. Te mostrará un código de 6 caracteres que dura 10 minutos."),
@@ -552,7 +605,7 @@
   async function render() {
     const id = ++renderId;
     const parts = location.hash.replace(/^#\/?/, "").split("/").map(decodeURIComponent);
-    const routes = { "": viewHome, juegos: viewGames, juego: viewGame, u: viewProfile, entrar: viewLogin, registro: viewRegister, cuenta: viewAccount, admin: viewAdmin };
+    const routes = { "": viewHome, juegos: viewGames, juego: viewGame, u: viewProfile, entrar: viewLogin, registro: viewRegister, recuperar: viewForgot, "nueva-clave": viewNewPassword, cuenta: viewAccount, admin: viewAdmin };
     const view = routes[parts[0]];
     renderNav();
     try {
@@ -574,9 +627,11 @@
   document.getElementById("repo-link").href = cfg.repoUrl;
 
   let signedInAs = undefined; // para no redibujar cuando Supabase solo refresca el token
-  sb.auth.onAuthStateChange((_event, s) => {
+  sb.auth.onAuthStateChange((event, s) => {
     session = s;
     const who = s ? s.user.id : null;
+    // vino del enlace de "olvide mi contraseña": llevarlo a poner la nueva
+    if (event === "PASSWORD_RECOVERY") location.hash = "#/nueva-clave";
     if (who === signedInAs) return;
     signedInAs = who;
     // fuera del callback: supabase-js no deja hacer consultas dentro de el

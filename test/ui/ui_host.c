@@ -64,7 +64,7 @@ int main(int argc, char **argv) {
 
     static ui_assets a;
     a.mascot_big = slurp(argv[4], "mascot_big.bin", 220 * 330 * 4);   a.big_w = 220;  a.big_h = 330;
-    a.mascot_small = slurp(argv[4], "mascot_small.bin", 50 * 75 * 4); a.small_w = 50; a.small_h = 75;
+    a.mascot_small = slurp(argv[4], "mascot_small.bin", 66 * 66 * 4); a.small_w = 66; a.small_h = 66;
     gfx_canvas c = { malloc(UI_W * UI_H * 4), UI_W, UI_H, UI_W };
 
     gr_scan(&m, root);
@@ -117,8 +117,12 @@ int main(int argc, char **argv) {
         gr_config_defaults(&cfg);
         cfg.popup = false;
         cfg.games_view = GR_VIEW_GRID;
-        ui_settings(&c, &a, &cfg, UI_OPT_THEME, true, dark);
-        save(&c, out, "settings", sfx);
+        for (int t = 0; t < UI_TABS; t++) {
+            char name[32];
+            snprintf(name, sizeof(name), "settings%d", t);
+            ui_settings(&c, &a, &cfg, t, ui_tab_count(t) - 1, true, dark);
+            save(&c, out, name, sfx);
+        }
         ui_diag(&c, &a, items, nitems);
         save(&c, out, "diag", sfx);
         ui_about(&c, &a);

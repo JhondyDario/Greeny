@@ -2,8 +2,9 @@
 """Genera los recursos binarios a partir de assets/.
 
   app/data/mascot_big.bin    RGBA crudo 220x330 (introduccion y Acerca de)
-  app/data/mascot_small.bin  RGBA crudo 50x75 (cabecera de la app)
-  app/icon.jpg               icono 256x256 para el menu de homebrew
+  app/data/mascot_small.bin  RGBA crudo 66x66 (insignia de la cabecera: el logo G)
+  app/icon.jpg               icono 256x256 para el menu de homebrew (de assets/app-icon.png)
+  web/img/*.png              logo e iconos de la web
   app/data/sfx_*.bin         sonidos de la app: PCM 16 bit mono 48 kHz
   data/snd_*.bin             sonidos del sysmodule: PCM 16 bit mono 32 kHz
 
@@ -30,16 +31,25 @@ def fit(img, w, h):
 
 
 os.makedirs(os.path.join(ROOT, "app", "data"), exist_ok=True)
-for name, (w, h) in {"mascot_big": (220, 330), "mascot_small": (50, 75)}.items():
-    with open(os.path.join(ROOT, "app", "data", name + ".bin"), "wb") as f:
-        f.write(fit(src, w, h).tobytes())
+with open(os.path.join(ROOT, "app", "data", "mascot_big.bin"), "wb") as f:
+    f.write(fit(src, 220, 330).tobytes())
 
-icon = Image.new("RGBA", (256, 256), (0xF3, 0xF7, 0xEC, 255))
-m = fit(src, 220, 236)
-icon.paste(m, (18, 10), m)
-# JPEG lo mas estandar posible: es el formato que espera el menu de la consola
-icon.convert("RGB").save(os.path.join(ROOT, "app", "icon.jpg"), quality=90, subsampling=2,
-                         progressive=False, optimize=False)
+# insignia de la cabecera: el logo "G"
+logo = Image.open(os.path.join(ROOT, "assets", "logo-g.png")).convert("RGBA")
+logo = logo.crop(logo.getbbox())
+with open(os.path.join(ROOT, "app", "data", "mascot_small.bin"), "wb") as f:
+    f.write(fit(logo, 66, 66).tobytes())
+
+# icono de la app. JPEG lo mas estandar posible: es el formato que espera el menu de la consola
+icon = Image.open(os.path.join(ROOT, "assets", "app-icon.png")).convert("RGB").resize((256, 256), Image.LANCZOS)
+icon.save(os.path.join(ROOT, "app", "icon.jpg"), quality=92, subsampling=2, progressive=False, optimize=False)
+
+# imagenes de la web
+web = os.path.join(ROOT, "web", "img")
+fit(logo, 192, 192).save(os.path.join(web, "icon.png"), optimize=True)
+for name in ("usuario", "salir", "menu"):
+    im = Image.open(os.path.join(ROOT, "assets", "icons", name + ".png")).convert("RGBA")
+    fit(im.crop(im.getbbox()), 56, 56).save(os.path.join(web, name + ".png"), optimize=True)
 
 # ---------- sonidos ----------
 import wave
@@ -87,7 +97,8 @@ SND = os.path.join(ROOT, "assets", "sounds")
 os.makedirs(os.path.join(ROOT, "data"), exist_ok=True)
 jobs = [("cargado", "data/snd_cargado.bin", 32000), ("logro", "data/snd_logro.bin", 32000),
         ("navegar", "app/data/sfx_navegar.bin", 48000), ("regresar", "app/data/sfx_regresar.bin", 48000),
-        ("aceptar", "app/data/sfx_aceptar.bin", 48000)]
+        ("aceptar_1", "app/data/sfx_aceptar_1.bin", 48000), ("aceptar_2", "app/data/sfx_aceptar_2.bin", 48000),
+        ("abrir_menu", "app/data/sfx_abrir_menu.bin", 48000)]
 for name, out, rate in jobs:
     x, src_rate = load_mono(os.path.join(SND, name + ".wav"))
     n = write_pcm(resample(x, src_rate, rate), os.path.join(ROOT, out))

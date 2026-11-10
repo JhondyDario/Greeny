@@ -114,7 +114,8 @@ static void test_parse(void) {
     CHECK(bad("[a]\nwhen=stack+0 u8 == 1\n", "main+ o heap+"));
     CHECK(bad("[a]\nwhen=main0 u8 == 1\n", "falta el +"));
     CHECK(bad("[a]\nwhen=main+zz u8 == 1\n", "offset invalido"));
-    CHECK(bad("[a]\nwhen=main+0->1->2->3->4->5 u8 == 1\n", "demasiados niveles"));
+    CHECK(bad("[a]\nwhen=main+0->1->2->3->4->5->6->7->8->9 u8 == 1\n", "demasiados niveles"));
+    CHECK(parse(&g, "[a]\nwhen=main+0->1->2->3->4->5->6->7->8 u8 == 1\n", err, sizeof(err)) == 0 && g.ach[0].cond[0].nderef == 8);
     CHECK(bad("[a]\nwhen=main+0->x u8 == 1\n", "offset de puntero"));
     CHECK(bad("[a]\nwhen=main+0 u8 ==\n", "formato"));
     CHECK(bad("[a]\nwhen=main+0 u8 == 1 2\n", "formato"));

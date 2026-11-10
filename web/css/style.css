@@ -147,3 +147,12 @@ input.code { font-size: 1.6rem; letter-spacing: .3em; text-transform: uppercase;
 @media (prefers-reduced-motion: no-preference) {
   a.card, .btn { transition: box-shadow .12s, background-color .12s; }
 }
+
+/* contraseña con boton para verla */
+.pw { display: flex; gap: 8px; }
+.pw input { flex: 1; min-width: 0; }
+.peek { font: inherit; font-weight: 600; padding: 0 14px; border-radius: 10px; border: 2px solid var(--line); background: var(--card); color: var(--ink); cursor: pointer; min-width: 84px; }
+.peek:hover { border-color: var(--green); }
+.nav a, .nav button { display: inline-flex; align-items: center; gap: 6px; }
+.nav img { width: 22px; height: 22px; }
+.brand-badge img { width: 40px; height: 40px; }
