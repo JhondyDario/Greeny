@@ -12,7 +12,6 @@ tipografías ni personajes de Nintendo.
 |---|---|---|---|
 | Mascota de cuerpo entero | PNG transparente, 1024×1536 | Cabecera de la app, icono y web | Listo (`assets/mascot.png`) |
 | Mascota en poses: celebrando, triste, durmiendo, saludando | PNG transparente, 1024×1536 cada una | Logro desbloqueado, lista vacía, errores, bienvenida | Falta |
-| Cara de la mascota | PNG transparente, 512×512 | Aviso en el juego, avatar por defecto, favicon | Falta |
 | Logo "G" | PNG transparente, 400×400 | Insignia de la cabecera en la app y la web, favicon | Listo (`assets/logo-g.png`) |
 | Logo con el nombre "Greeny" completo | PNG transparente, ~1200×400 | Portada de la web y banner | Falta |
 | Icono de la app | 256×256, sin transparencia | Menú de homebrew | Listo (`assets/app-icon.png`) |
@@ -22,7 +21,8 @@ tipografías ni personajes de Nintendo.
 | Fondo o patrón para la app | PNG 1280×720, muy suave | Fondo de las pantallas | Opcional |
 | Banner del repositorio | PNG 1280×640 | README y vista previa al compartir | Falta |
 | Iconos de menú: perfil, salir, menú | PNG transparente | Web (perfil y salir ya se usan) | Listo (`assets/icons/`) |
-| Iconos de botones (A, B, X, Y, +, −, casa) y sincronizar, y la cara de la mascota | PNG transparente | Pistas de botones en la app | Recibidos como imagen, falta el archivo |
+| Iconos de botones (A, B, X, Y, +, −, casa) y sincronizar | PNG transparente | Pistas de botones en la app (casa y sincronizar aún sin usar) | Listo (`assets/icons/`) |
+| Cara de la mascota | PNG transparente, 512×512 | Introducción y Acerca de en la app, portada de la web | Listo (`assets/cara.png`) |
 | Fotogramas de animación de la mascota (saltando, 8 a 12 cuadros) | PNG transparente, mismo tamaño todos | Animación en inicio y al desbloquear | Opcional, para cuando haya animaciones |
 
 ### Iconos de los 12 logros de Mario 3D World

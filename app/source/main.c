@@ -22,6 +22,7 @@
 #define STBI_NO_STDIO
 #include "third_party/stb_image.h"
 
+#include "buttons_bin.h"
 #include "mascot_big_bin.h"
 #include "mascot_small_bin.h"
 
@@ -33,8 +34,8 @@
 #define TRACE_DONE  "salida normal"
 
 /* tamaños con los que se generaron los .bin (scripts/assets.py) */
-#define BIG_W 220
-#define BIG_H 330
+#define BIG_W 240
+#define BIG_H 240
 #define SMALL_W 66
 #define SMALL_H 66
 
@@ -271,6 +272,7 @@ int main(int argc, char *argv[]) {
     g_assets.mascot_big = mascot_big_bin;
     g_assets.big_w = BIG_W;
     g_assets.big_h = BIG_H;
+    g_assets.buttons = buttons_bin_size >= UI_BTN_COUNT * UI_BTN_SIZE * UI_BTN_SIZE * 4 ? buttons_bin : NULL;
     g_assets.mascot_small = mascot_small_bin;
     g_assets.small_w = SMALL_W;
     g_assets.small_h = SMALL_H;

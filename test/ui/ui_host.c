@@ -63,7 +63,8 @@ int main(int argc, char **argv) {
     snprintf(root, sizeof(root), "%s/config/greeny", sd);
 
     static ui_assets a;
-    a.mascot_big = slurp(argv[4], "mascot_big.bin", 220 * 330 * 4);   a.big_w = 220;  a.big_h = 330;
+    a.mascot_big = slurp(argv[4], "mascot_big.bin", 240 * 240 * 4);   a.big_w = 240;  a.big_h = 240;
+    a.buttons = slurp(argv[4], "buttons.bin", UI_BTN_COUNT * UI_BTN_SIZE * UI_BTN_SIZE * 4);
     a.mascot_small = slurp(argv[4], "mascot_small.bin", 66 * 66 * 4); a.small_w = 66; a.small_h = 66;
     gfx_canvas c = { malloc(UI_W * UI_H * 4), UI_W, UI_H, UI_W };
 

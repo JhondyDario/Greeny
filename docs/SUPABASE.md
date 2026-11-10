@@ -67,8 +67,19 @@ Dos formas, las dos en la app:
    sirve para quien entra con Discord, porque la Switch no tiene navegador para
    hacer el inicio de sesión de Discord.
 
+### Sin conexión
+
+La conexión es opcional. Los logros se desbloquean, se guardan y se ven en la
+app sin internet y sin cuenta, igual que hasta ahora. Cuando hay red y la
+consola está vinculada, la app sube lo que falte; si no hay red, no pasa nada y
+se sube la próxima vez. La app nunca se queda esperando a la red para abrir.
+
 ### Qué no hace
 
+- **No pone "Jugando Greeny" en tu Discord.** Discord solo muestra actividad que
+  le manda el programa de Discord de una PC, o las consolas con las que tiene
+  acuerdo. Una Switch no puede. Lo que sí se puede más adelante es que un bot
+  publique en un canal de un servidor cuando alguien desbloquea un logro.
 - **No evita trampas.** Evita que alguien copie el archivo de progreso de otro,
   pero un cheat desbloquea logros igual. Las cuentas son para perfil y comunidad.
 - **No se vincula con la cuenta Nintendo.** Nintendo no ofrece inicio de sesión

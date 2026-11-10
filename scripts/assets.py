@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Genera los recursos binarios a partir de assets/.
 
-  app/data/mascot_big.bin    RGBA crudo 220x330 (introduccion y Acerca de)
+  app/data/mascot_big.bin    RGBA crudo 240x240: la cara de la mascota (introduccion y Acerca de)
+  app/data/buttons.bin       6 iconos de botones RGBA 38x38 seguidos (pistas de abajo)
   app/data/mascot_small.bin  RGBA crudo 66x66 (insignia de la cabecera: el logo G)
   app/icon.jpg               icono 256x256 para el menu de homebrew (de assets/app-icon.png)
   web/img/*.png              logo e iconos de la web
@@ -31,8 +32,18 @@ def fit(img, w, h):
 
 
 os.makedirs(os.path.join(ROOT, "app", "data"), exist_ok=True)
+# la cara de la mascota, para la introduccion y Acerca de
+face = Image.open(os.path.join(ROOT, "assets", "cara.png")).convert("RGBA")
+face = face.crop(face.getbbox())
 with open(os.path.join(ROOT, "app", "data", "mascot_big.bin"), "wb") as f:
-    f.write(fit(src, 220, 330).tobytes())
+    f.write(fit(face, 240, 240).tobytes())
+
+# iconos de botones para las pistas de abajo, todos seguidos en un archivo.
+# El orden es el de UI_BTN_* en app/source/ui.h.
+with open(os.path.join(ROOT, "app", "data", "buttons.bin"), "wb") as f:
+    for name in ("boton_a", "boton_b", "boton_x", "boton_y", "boton_mas", "boton_menos"):
+        im = Image.open(os.path.join(ROOT, "assets", "icons", name + ".png")).convert("RGBA")
+        f.write(fit(im.crop(im.getbbox()), 38, 38).tobytes())
 
 # insignia de la cabecera: el logo "G"
 logo = Image.open(os.path.join(ROOT, "assets", "logo-g.png")).convert("RGBA")
@@ -47,6 +58,7 @@ icon.save(os.path.join(ROOT, "app", "icon.jpg"), quality=92, subsampling=2, prog
 # imagenes de la web
 web = os.path.join(ROOT, "web", "img")
 fit(logo, 192, 192).save(os.path.join(web, "icon.png"), optimize=True)
+fit(face, 420, 420).save(os.path.join(web, "mascot.png"), optimize=True)
 for name in ("usuario", "salir", "menu"):
     im = Image.open(os.path.join(ROOT, "assets", "icons", name + ".png")).convert("RGBA")
     fit(im.crop(im.getbbox()), 56, 56).save(os.path.join(web, name + ".png"), optimize=True)

@@ -22,9 +22,14 @@ enum {
 int ui_tab_count(int tab);            /* cuantas opciones tiene la pestaña */
 int ui_tab_option(int tab, int row);  /* cual UI_OPT_* esta en esa fila */
 
+/* iconos de botones, en el orden en que estan guardados en buttons.bin */
+enum { UI_BTN_A, UI_BTN_B, UI_BTN_X, UI_BTN_Y, UI_BTN_PLUS, UI_BTN_MINUS, UI_BTN_COUNT };
+#define UI_BTN_SIZE 38
+
 typedef struct {
     const uint8_t *mascot_big;   int big_w, big_h;     /* RGBA; introduccion y Acerca de */
     const uint8_t *mascot_small; int small_w, small_h; /* RGBA */
+    const uint8_t *buttons;      /* UI_BTN_COUNT iconos RGBA de UI_BTN_SIZE, seguidos; NULL = dibujar circulos */
     /* caratulas RGBA en el mismo orden que model->games; NULL = no hay */
     const uint8_t *covers[GR_MAX_GAMES];      /* UI_COVER x UI_COVER */
     const uint8_t *covers_big[GR_MAX_GAMES];  /* UI_COVER_BIG x UI_COVER_BIG */

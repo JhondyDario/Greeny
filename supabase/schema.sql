@@ -27,6 +27,12 @@ create table if not exists public.profiles (
     constraint profiles_caption_len check (caption is null or char_length(caption) <= 60)
 );
 
+-- nombres reservados, para que nadie se haga pasar por el proyecto
+alter table public.profiles drop constraint if exists profiles_username_reserved;
+alter table public.profiles add constraint profiles_username_reserved check (lower(username) not in (
+    'greeny', 'admin', 'administrador', 'administrator', 'soporte', 'support',
+    'moderador', 'moderator', 'oficial', 'official', 'staff', 'nintendo'));
+
 -- el nombre de usuario es unico sin importar mayusculas
 create unique index if not exists profiles_username_lower_idx on public.profiles (lower(username));
 
@@ -329,7 +335,8 @@ declare
     base text := left(regexp_replace(coalesce(wanted, ''), '[^A-Za-z0-9_]', '', 'g'), 20);
     candidate text;
 begin
-    if char_length(base) < 3 then
+    if char_length(base) < 3 or lower(base) in ('greeny', 'admin', 'administrador', 'administrator', 'soporte', 'support',
+                                                'moderador', 'moderator', 'oficial', 'official', 'staff', 'nintendo') then
         base := 'jugador';
     end if;
     candidate := base;

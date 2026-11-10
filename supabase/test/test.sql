@@ -8,6 +8,15 @@ insert into auth.users (id, email, raw_user_meta_data, raw_app_meta_data) values
  ('00000000-0000-0000-0000-00000000000c', 'x@example.com',    '{"user_name":"El Ñandú!!","full_name":"El Ñandú"}', '{"provider":"discord"}'),
  ('00000000-0000-0000-0000-00000000000d', 'jefe@example.com', '{}', '{"provider":"email"}');
 insert into public.admins values ('00000000-0000-0000-0000-00000000000d');
+insert into auth.users (id, email, raw_user_meta_data, raw_app_meta_data) values
+ ('00000000-0000-0000-0000-00000000000e', 'falso@example.com', '{"username":"Admin"}', '{"provider":"email"}');
+do $$
+declare u text;
+begin
+    select username into u from public.profiles where id = '00000000-0000-0000-0000-00000000000e';
+    assert u = 'jugador', 'quien pide un nombre reservado recibe uno generico: ' || u;
+    delete from auth.users where id = '00000000-0000-0000-0000-00000000000e';
+end $$;
 
 do $$
 declare n int; u text;
@@ -131,6 +140,11 @@ begin
     begin update public.profiles set caption = repeat('x', 61) where id = auth.uid();
     exception when check_violation then ok := true; end;
     assert ok, 'caption de mas de 60 caracteres se rechaza';
+
+    ok := false;
+    begin update public.profiles set username = 'Greeny' where id = auth.uid();
+    exception when check_violation then ok := true; end;
+    assert ok, 'no puede tomar un nombre reservado';
 
     ok := false;
     begin update public.profiles set username = 'JEFE' where id = auth.uid();

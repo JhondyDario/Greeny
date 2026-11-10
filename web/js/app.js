@@ -49,6 +49,8 @@
       [/profiles_username_format/i, "El usuario solo puede tener letras, números y _ (de 3 a 20)."],
       [/profiles_caption_len/i, "La frase puede tener hasta 60 caracteres."],
       [/new password should be different/i, "La contraseña nueva tiene que ser distinta a la anterior."],
+      [/manual linking is disabled/i, "Vincular Discord a una cuenta existente todavía no está activado en el servidor."],
+      [/identity is already linked/i, "Esa cuenta de Discord ya está vinculada a otra cuenta de Greeny."],
       [/rate limit|too many/i, "Demasiados intentos. Espera un momento y prueba de nuevo."],
       [/failed to fetch|networkerror/i, "No se pudo conectar. Revisa tu conexión."],
       // mensajes de nuestras funciones de la base de datos (van sin acentos)
@@ -58,6 +60,19 @@
     ];
     for (const [re, text] of known) if (re.test(m)) return text;
     return m; // los de nuestras funciones ya vienen en español
+  }
+
+  // patron para ilike que solo ignora mayusculas (sin comodines)
+  const exactPattern = (text) => String(text).replace(/[\\%_]/g, "\\$&");
+
+  // nombres que nadie puede usar, para que no se hagan pasar por el proyecto
+  const RESERVED = ["greeny", "admin", "administrador", "administrator", "soporte", "support", "moderador", "moderator", "oficial", "official", "staff", "nintendo"];
+
+  // Lanza un error si el nombre de usuario no se puede usar. `myId` es para no chocar con uno mismo.
+  async function checkUsername(username, myId) {
+    if (RESERVED.includes(username.toLowerCase())) throw new Error("Ese nombre de usuario está reservado. Elige otro.");
+    const row = must(await sb.from("profiles").select("id").ilike("username", exactPattern(username)).maybeSingle());
+    if (row && row.id !== myId) throw new Error("Ese nombre de usuario ya está ocupado. Elige otro.");
   }
 
   function must(res) {
@@ -296,8 +311,7 @@
   // ---------- perfil ----------
 
   async function viewProfile(username) {
-    const exact = username.replace(/[\\%_]/g, "\\$&"); // ilike sin comodines: solo ignora mayusculas
-    const profile = must(await sb.from("profiles").select("*").ilike("username", exact).maybeSingle());
+    const profile = must(await sb.from("profiles").select("*").ilike("username", exactPattern(username)).maybeSingle());
     if (!profile) return notFound("No existe ningún jugador con ese nombre.");
 
     const [statRes, unlockRes] = await Promise.all([
@@ -395,6 +409,7 @@
         h("label", {}, "Correo", h("input", { name: "email", type: "email", autocomplete: "email", required: true })),
         passwordField("Contraseña", "password", "new-password", "Mínimo 8 caracteres."),
       ], "Crear cuenta", async (fd, el) => {
+        await checkUsername(fd.get("username"), null); // no se crea la cuenta si el nombre ya existe
         const data = must(await sb.auth.signUp({
           email: fd.get("email"), password: fd.get("password"),
           options: { data: { username: fd.get("username") }, emailRedirectTo: here },
@@ -446,10 +461,15 @@
     if (!session) { location.hash = "#/entrar"; return []; }
     if (!me) return [h("h1", {}, "Cuenta"), h("p", { class: "msg err" }, "No se encontró tu perfil. Cierra sesión y vuelve a entrar.")];
 
-    const [presetRes, deviceRes] = await Promise.all([
+    const [presetRes, deviceRes, identRes] = await Promise.all([
       sb.from("caption_presets").select("text_es").order("sort"),
       sb.from("devices").select("id,name,created_at,last_seen_at").order("created_at"),
+      sb.auth.getUserIdentities(),
     ]);
+    const identities = (identRes.data && identRes.data.identities) || session.user.identities || [];
+    const discord = identities.find((i) => i.provider === "discord");
+    const discordName = discord && discord.identity_data &&
+      (discord.identity_data.full_name || discord.identity_data.name || (discord.identity_data.custom_claims || {}).global_name);
     const presets = (presetRes.data || []).map((p) => p.text_es);
     const CUSTOM = "__custom__";
     const isPreset = !me.caption || presets.includes(me.caption);
@@ -471,6 +491,7 @@
     ], "Guardar perfil", async (fd) => {
       const choice = fd.get("caption_choice");
       const caption = (choice === CUSTOM ? String(fd.get("caption_custom")).trim() : choice) || null;
+      await checkUsername(fd.get("username"), me.id);
       must(await sb.from("profiles").update({
         username: fd.get("username"), display_name: String(fd.get("display_name")).trim() || null, caption,
       }).eq("id", me.id));
@@ -501,11 +522,26 @@
           el.reset();
           return "Contraseña cambiada.";
         })),
-      h("h2", {}, "Vincular una consola"),
+      h("h2", {}, "Vinculaciones"),
+      h("h3", {}, "Discord"),
+      discord
+        ? h("div", { class: "card row" },
+            h("div", { class: "grow" }, h("strong", {}, discordName || "Cuenta de Discord"),
+              h("div", { class: "muted small" }, "Puedes entrar a Greeny con Discord.")),
+            h("span", { class: "pill ok" }, "Vinculado"))
+        : h("div", { class: "card row" },
+            h("div", { class: "grow" }, h("strong", {}, "Sin vincular"),
+              h("div", { class: "muted small" }, "Vincúlalo para entrar con Discord a esta misma cuenta.")),
+            h("button", { class: "btn discord", type: "button", onclick: async (ev) => {
+              ev.target.disabled = true;
+              const { error } = await sb.auth.linkIdentity({ provider: "discord", options: { redirectTo: here } });
+              if (error) { alert(explain(error)); ev.target.disabled = false; }
+            } }, "Vincular Discord")),
+      h("h3", { style: "margin-top:22px" }, "Consola"),
       h("div", { class: "card stack" },
         h("p", { class: "muted", style: "margin:0" }, "En tu Switch, abre Greeny y elige vincular cuenta. Te mostrará un código de 6 caracteres que dura 10 minutos."),
         linkForm),
-      h("h2", {}, "Consolas vinculadas"),
+      h("h3", { style: "margin-top:22px" }, "Consolas vinculadas"),
       devices.length
         ? h("div", { class: "stack" }, devices.map((d) =>
             h("div", { class: "card row" },
@@ -554,8 +590,31 @@
       return "Publicado: " + (def.name || tid) + " con " + def.achievements.length + " logros.";
     });
 
+    // Lista de logros del juego elegido: asi se sabe como nombrar cada icono.
+    const achList = h("div", { class: "ach-list", "aria-live": "polite" });
+    async function showAchievements(tid) {
+      if (!tid) { achList.replaceChildren(); return; }
+      achList.replaceChildren(h("p", { class: "muted small" }, "Cargando logros…"));
+      const rows = (await sb.from("achievements").select("ach_id,name_es,icon_path").eq("title_id", tid).order("sort")).data || [];
+      const missing = rows.filter((a) => !a.icon_path).length;
+      achList.replaceChildren(
+        h("p", { class: "small", style: "margin:0 0 6px" },
+          h("strong", {}, rows.length + " logros"), missing ? " · faltan " + missing + " iconos" : " · todos tienen icono"),
+        h("table", {},
+          h("thead", {}, h("tr", {}, h("th", {}, ""), h("th", {}, "Nombre del archivo"), h("th", {}, "Logro"), h("th", {}, "Icono"))),
+          h("tbody", {}, rows.map((a) => h("tr", {},
+            h("td", {}, achIcon(a, false)),
+            h("td", {}, h("code", {}, a.ach_id + ".png")),
+            h("td", {}, a.name_es),
+            h("td", {}, a.icon_path ? h("span", { class: "pill ok" }, "Subido") : h("span", { class: "pill no" }, "Falta")))))));
+    }
+    const iconGame = gameSelect();
+    iconGame.addEventListener("change", () => showAchievements(iconGame.value));
+    showAchievements(iconGame.value);
+
     const icons = form([
-      h("label", {}, "Juego", gameSelect()),
+      h("label", {}, "Juego", iconGame),
+      achList,
       h("label", {}, "Iconos de logros", h("span", { class: "hint" }, "PNG cuadrados (128×128). Cada archivo se llama como el id del logro: monedas_5.png"),
         h("input", { name: "files", type: "file", accept: "image/png", multiple: true, required: true })),
     ], "Subir iconos", async (fd) => {
@@ -571,6 +630,7 @@
         done.push(id);
       }
       if (!done.length) throw new Error("Ningún archivo coincide con un id de logro de ese juego: " + skipped.join(", "));
+      showAchievements(tid);
       return done.length + " icono(s) subido(s)." + (skipped.length ? " Sin logro con ese nombre: " + skipped.join(", ") + "." : "");
     });
 

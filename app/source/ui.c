@@ -40,6 +40,7 @@ static const palette *P = &k_light;
 #define MARGIN   40
 #define CONTENT_W (UI_W - 2 * MARGIN)
 
+static const uint8_t *g_buttons; /* iconos de botones de la pantalla que se esta dibujando */
 static bool g_en;
 #define T(es, en) (g_en ? (en) : (es))
 
@@ -84,6 +85,7 @@ void ui_background(gfx_canvas *c, float t) {
 
 /* cabecera: caratula del juego si la hay, si no la mascota */
 static void header(gfx_canvas *c, const ui_assets *a, const uint8_t *cover, const char *title, const char *sub) {
+    g_buttons = a->buttons;
     gfx_rect(c, 0, 0, UI_W, HEADER_H, C_GREEN);
     gfx_rect(c, 0, HEADER_H, UI_W, 5, C_GREEN_DK);
     if (cover) {
@@ -112,13 +114,21 @@ static void header_stats(gfx_canvas *c, int unlocked, int total, int pts, int pt
     if (total > 0 && unlocked > 0) gfx_round_rect(c, UI_W - 300, 76, 10 + 250 * unlocked / total, 10, 5, C_YELLOW);
 }
 
-/* pista de boton: circulo con la letra + texto. Devuelve la x siguiente. */
+/* pista de boton: icono del boton (o circulo con la letra si no hay) + texto. Devuelve la x siguiente. */
 static int hint(gfx_canvas *c, int x, const char *btn, const char *label) {
-    int cy = FOOTER_Y + 30;
-    gfx_circle(c, x + 17, cy, 17, P->ink);
-    gfx_text(c, x + 17 - gfx_text_width(22, btn) / 2, cy - 14, 22, P->footer, btn);
-    gfx_text(c, x + 44, cy - 14, 22, P->ink, label);
-    return x + 44 + gfx_text_width(22, label) + 30;
+    static const char *const order[UI_BTN_COUNT] = { "A", "B", "X", "Y", "+", "−" };
+    int cy = FOOTER_Y + 30, icon = -1;
+    for (int i = 0; i < UI_BTN_COUNT; i++)
+        if (!strcmp(btn, order[i])) icon = i;
+
+    if (g_buttons && icon >= 0) {
+        gfx_image(c, x, cy - UI_BTN_SIZE / 2, g_buttons + (size_t)icon * UI_BTN_SIZE * UI_BTN_SIZE * 4, UI_BTN_SIZE, UI_BTN_SIZE);
+    } else {
+        gfx_circle(c, x + 17, cy, 17, P->ink);
+        gfx_text(c, x + 17 - gfx_text_width(22, btn) / 2, cy - 14, 22, P->footer, btn);
+    }
+    gfx_text(c, x + 46, cy - 14, 22, P->ink, label);
+    return x + 46 + gfx_text_width(22, label) + 28;
 }
 
 static void footer_bar(gfx_canvas *c) {
@@ -595,7 +605,7 @@ void ui_about(gfx_canvas *c, const ui_assets *a) {
                  T("Proyecto de fans. No está afiliado ni avalado por Nintendo.",
                    "Fan project. Not affiliated with or endorsed by Nintendo."), w - 72);
 
-    if (a->mascot_big) gfx_image(c, x + w + (UI_W - MARGIN - x - w - a->big_w) / 2 + 10, 210, a->mascot_big, a->big_w, a->big_h);
+    if (a->mascot_big) gfx_image(c, x + w + (UI_W - MARGIN - x - w - a->big_w) / 2 + 10, 250, a->mascot_big, a->big_w, a->big_h);
 
     footer_bar(c);
     int hx = hint(c, MARGIN, "B", T("Volver", "Back"));
@@ -620,7 +630,7 @@ void ui_intro(gfx_canvas *c, const ui_assets *a, int page, const gr_diag_item *i
     for (int i = 0; i < count; i++) fails += items[i].state == GR_DIAG_FAIL;
 
     if (page == 0) {
-        if (a->mascot_big) gfx_image(c, 110, 180, a->mascot_big, a->big_w, a->big_h);
+        if (a->mascot_big) gfx_image(c, 100, 210, a->mascot_big, a->big_w, a->big_h);
         const int tx = 400;
         gfx_text(c, tx, 190, 46, P->ink, T("¡Bienvenido a Greeny!", "Welcome to Greeny!"));
         gfx_text(c, tx, 262, 25, P->gray, T("Logros para tus juegos de Switch.", "Achievements for your Switch games."));
