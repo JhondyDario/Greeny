@@ -50,7 +50,7 @@
 
 typedef enum {
     SCREEN_HOME, SCREEN_DETAIL, SCREEN_SETTINGS, SCREEN_DIAG, SCREEN_ABOUT, SCREEN_INTRO, SCREEN_LINK, SCREEN_MSG,
-    SCREEN_PROFILE, SCREEN_BADGES, SCREEN_ACH, SCREEN_AVATARS
+    SCREEN_PROFILE, SCREEN_BADGES, SCREEN_ACH, SCREEN_AVATARS, SCREEN_BROWSE, SCREEN_BROWSE_GAME
 } screen_t;
 
 static gr_model g_model;
@@ -594,6 +594,53 @@ static void follow_with_code(void) {
     sync_start(); /* para que el contador de \"siguiendo\" se ponga al dia */
 }
 
+/* ---------- buscador de juegos del catalogo ---------- */
+#define CAT_MAX 300
+static gr_cat_game g_cat[CAT_MAX];
+static bool g_cat_have[CAT_MAX];   /* ese juego ya tiene archivo de logros en esta consola */
+static int g_cat_shown[CAT_MAX], g_cat_n, g_cat_nshown;
+static char g_cat_query[40];
+static ui_browse_state g_cat_state = UI_BROWSE_LOADING;
+static lg_game g_cat_def;          /* logros del juego que se esta mirando */
+static int g_cat_open;             /* indice en g_cat */
+
+static bool contains_nocase(const char *text, const char *word) {
+    size_t n = strlen(word);
+    for (; *text; text++)
+        if (!strncasecmp(text, word, n)) return true;
+    return n == 0;
+}
+
+static void browse_filter(void) {
+    g_cat_nshown = 0;
+    for (int i = 0; i < g_cat_n; i++)
+        if (contains_nocase(g_cat[i].name, g_cat_query) || contains_nocase(g_cat[i].tid, g_cat_query)) g_cat_shown[g_cat_nshown++] = i;
+}
+
+static void browse_load(void) {
+    g_cat_n = 0;
+    if (!net_online() || gr_catalog_list(net_get, g_cat, CAT_MAX, &g_cat_n) != 0) { g_cat_state = UI_BROWSE_OFFLINE; g_cat_nshown = 0; return; }
+    for (int i = 0; i < g_cat_n; i++) {
+        char path[160];
+        struct stat st;
+        snprintf(path, sizeof(path), ROOT "/games/%.16s.txt", g_cat[i].tid);
+        g_cat_have[i] = stat(path, &st) == 0;
+    }
+    g_cat_state = UI_BROWSE_OK;
+    browse_filter();
+}
+
+/* Baja y lee los logros de un juego del catalogo. false si no se pudo. */
+static bool browse_open(int index) {
+    char *text = malloc(64 * 1024);
+    if (!text) return false;
+    char err[128];
+    bool ok = gr_catalog_definition(net_get, g_cat[index].tid, text, 64 * 1024) && lg_parse(&g_cat_def, text, err, sizeof(err)) == 0;
+    free(text);
+    g_cat_open = index;
+    return ok;
+}
+
 /* Si no hay fuente o pantalla grafica, al menos decirlo en modo texto en vez de cerrar sin mas. */
 static int fatal_screen(PadState *pad, const char *what) {
     trace("error fatal: %s", what);
@@ -725,7 +772,7 @@ int main(int argc, char *argv[]) {
     trace("listo: %d juego(s), audio %s, caratulas %s, modo %s", g_model.ngames, sfx_ok ? "si" : "no",
           g_ns_ok ? "si" : "no", g_env.applet_mode ? "applet" : "aplicacion");
 
-    int cursor = 0, top = 0, dcursor = 0, dtop = 0, stab = 0, srow = 0, intro_page = 0, acursor = 0;
+    int cursor = 0, top = 0, dcursor = 0, dtop = 0, stab = 0, srow = 0, intro_page = 0, acursor = 0, bcursor = 0, btop = 0, browse_pending = 0;
     screen_t screen = SCREEN_HOME;
 
     trace("usuario y cuenta");
@@ -824,6 +871,59 @@ int main(int argc, char *argv[]) {
             }
             if (down & HidNpadButton_X) { screen = SCREEN_SETTINGS; stab = srow = 0; accepted_alt = true; }
             if (down & HidNpadButton_R) { screen = SCREEN_PROFILE; accepted_alt = true; }
+            if (down & HidNpadButton_L) {
+                screen = SCREEN_BROWSE;
+                bcursor = btop = 0;
+                g_cat_query[0] = 0;
+                g_cat_state = UI_BROWSE_LOADING;
+                browse_pending = 2; /* primero se pinta "Buscando…", luego se consulta */
+                accepted_alt = true;
+            }
+        } else if (screen == SCREEN_BROWSE) {
+            if (browse_pending && --browse_pending == 0) { browse_load(); dirty = true; }
+            else if (browse_pending) dirty = true;
+            TAP_SELECT(bcursor, g_cat_nshown);
+            if (g_cat_nshown > 0) moved = move_cursor(&bcursor, g_cat_nshown, 1, nav);
+            if (bcursor < btop) btop = bcursor;
+            if (bcursor >= btop + UI_BROWSE_ROWS) btop = bcursor - UI_BROWSE_ROWS + 1;
+            if (down & HidNpadButton_B) { screen = SCREEN_HOME; back = true; }
+            if (down & HidNpadButton_Y) { g_cat_state = UI_BROWSE_LOADING; browse_pending = 2; bcursor = btop = 0; accepted_alt = true; }
+            if ((down & HidNpadButton_X) && g_cat_state == UI_BROWSE_OK) {
+                char q[40];
+                if (ask_text("Nombre del juego / Game name", false, false, q, sizeof(q))) {
+                    snprintf(g_cat_query, sizeof(g_cat_query), "%s", q);
+                    browse_filter();
+                    bcursor = btop = 0;
+                }
+                accepted_alt = true;
+            }
+            if ((down & HidNpadButton_Minus) && g_cat_query[0]) { g_cat_query[0] = 0; browse_filter(); bcursor = btop = 0; accepted_alt = true; }
+            if ((down & HidNpadButton_A) && g_cat_state == UI_BROWSE_OK && g_cat_nshown > 0) {
+                int idx = g_cat_shown[bcursor], local = -1;
+                for (int i = 0; i < g_model.ngames; i++)
+                    if (!strcmp(g_model.games[i].tid, g_cat[idx].tid)) local = i;
+                if (local >= 0) { /* ya esta en la consola: se abre con tu progreso */
+                    cursor = local;
+                    gr_open(&g_model, cursor, ROOT);
+                    load_icons(g_model.games[cursor].tid);
+                    icons_start(g_model.games[cursor].tid);
+                    screen = SCREEN_DETAIL;
+                    dcursor = dtop = 0;
+                } else if (browse_open(idx)) {
+                    screen = SCREEN_BROWSE_GAME;
+                    dcursor = dtop = 0;
+                } else {
+                    show_message(false, "No se pudo abrir", "No se pudieron bajar los logros de ese juego.", "Revisa la conexión e inténtalo de nuevo.");
+                    g_msg_return = SCREEN_BROWSE;
+                    screen = SCREEN_MSG;
+                }
+                accepted = true;
+            }
+        } else if (screen == SCREEN_BROWSE_GAME) {
+            moved = move_cursor(&dcursor, g_cat_def.nach, 1, nav);
+            if (dcursor < dtop) dtop = dcursor;
+            if (dcursor >= dtop + 6) dtop = dcursor - 5;
+            if (down & HidNpadButton_B) { screen = SCREEN_BROWSE; back = true; }
         } else if (screen == SCREEN_DETAIL) {
             ui_layout l = ui_detail_layout(&g_config);
             int n = g_model.games[cursor].broken ? 0 : g_model.cur.nach;
@@ -1050,6 +1150,8 @@ int main(int argc, char *argv[]) {
             else if (screen == SCREEN_PROFILE) ui_profile_screen(&layer, &g_assets, &g_profile);
             else if (screen == SCREEN_BADGES) ui_badges(&layer, &g_assets, &g_profile);
             else if (screen == SCREEN_AVATARS) ui_avatars(&layer, &g_assets, &g_profile, acursor);
+            else if (screen == SCREEN_BROWSE) ui_browse(&layer, &g_assets, g_cat, g_cat_shown, g_cat_nshown, g_cat_n, g_cat_have, g_cat_query, g_cat_state, bcursor, btop);
+            else if (screen == SCREEN_BROWSE_GAME) ui_browse_game(&layer, &g_assets, &g_cat[g_cat_open], &g_cat_def, dcursor, dtop);
             else if (screen == SCREEN_LINK) ui_link(&layer, &g_assets, link_code, link_shown_left < 0 ? LINK_SECONDS : link_shown_left);
             else if (screen == SCREEN_MSG) ui_message(&layer, &g_assets, g_msg_title, g_msg_line1, g_msg_line2[0] ? g_msg_line2 : NULL, g_msg_ok);
             else if (screen == SCREEN_DIAG) ui_diag(&layer, &g_assets, g_diag, g_ndiag);

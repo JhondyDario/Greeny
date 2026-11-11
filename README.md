@@ -137,8 +137,11 @@ make -C test
 | App: filtro de juegos del inicio (activos o jugados; todos, por completar o completados) | Revisado en PC; falta probarlo en consola |
 | Aviso nuevo dentro del juego (tarjeta clara u oscura, medalla por dificultad, puntos) | Revisado en PC; falta probarlo en consola |
 | App: logro al detalle (A sobre un logro) | Revisado en PC; falta probarlo en consola |
-| Foto de perfil en la app (verla y cambiarla desde la SD) | Pendiente |
-| Buscador de juegos del catálogo en la app | Pendiente |
+| Foto de perfil: una de las 18 que trae Greeny, en la app y en la web | Revisado en PC y en navegador; falta probarlo en consola |
+| Buscador de juegos del catálogo en la app (L) | Lista probada contra el servidor real desde PC; falta probarlo en consola |
+| App: carátula del catálogo en vez del icono del juego | Descarga probada contra el servidor real desde PC; falta probarlo en consola |
+| Recursos nuevos en la app y la web (mascotas, medallas, iconos, palancas) | Revisado en PC y en navegador; falta probarlo en consola |
+| Menú dentro del juego (overlay de Tesla), música de fondo, nombres de juegos desde una base pública | Pendiente |
 | Iconos por logro, música y animaciones en la app | Pendiente ([docs/RECURSOS.md](docs/RECURSOS.md)) |
 
 ## Limitaciones que conviene saber

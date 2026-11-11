@@ -232,13 +232,15 @@ static int hint(gfx_canvas *c, int x, const char *btn, const char *label) {
     gfx_text(c, x + 46, cy - 14, 22, P->ink, label);
     int next = x + 46 + gfx_text_width(22, label) + 28;
     if (icon >= 0) zone(x - 8, FOOTER_Y, next - x - 4, UI_H - FOOTER_Y, UI_ZONE_BUTTON, icon);
+    /* "+" es siempre la ultima pista: la version va a la derecha solo si queda sitio */
+    if (icon == UI_BTN_PLUS && next + gfx_text_width(18, UI_APP_NAME " " UI_APP_VERSION) < UI_W - MARGIN)
+        gfx_text_right(c, UI_W - MARGIN, FOOTER_Y + 20, 18, P->gray, UI_APP_NAME " " UI_APP_VERSION);
     return next;
 }
 
 static void footer_bar(gfx_canvas *c) {
     gfx_rect(c, 0, FOOTER_Y, UI_W, UI_H - FOOTER_Y, P->footer);
     gfx_rect(c, 0, FOOTER_Y, UI_W, 2, P->gray_lt);
-    gfx_text_right(c, UI_W - MARGIN, FOOTER_Y + 20, 18, P->gray, UI_APP_NAME " " UI_APP_VERSION);
 }
 
 static void progress(gfx_canvas *c, int x, int y, int w, int done, int total) {
@@ -416,6 +418,7 @@ void ui_home(gfx_canvas *c, const ui_assets *a, const gr_model *m, const gr_conf
     hx = hint(c, hx, "X", T("Opciones", "Options"));
     hx = hint(c, hx, "Y", T("Recargar", "Reload"));
     if (m->ngames > 0) hx = hint(c, hx, "−", cfg->games_view == GR_VIEW_GRID ? T("Lista", "List") : T("Cuadrícula", "Grid"));
+    hx = hint(c, hx, "L", T("Buscar", "Find"));
     hx = hint(c, hx, "R", T("Perfil", "Profile"));
     hint(c, hx, "+", T("Salir", "Exit"));
 }
@@ -680,6 +683,90 @@ void ui_detail(gfx_canvas *c, const ui_assets *a, const gr_model *m, const gr_co
     if (!g->broken && m->cur.nach > 0) hx = hint(c, hx, "A", T("Ver detalle", "View details"));
     hx = hint(c, hx, "B", T("Volver", "Back"));
     if (!g->broken) hx = hint(c, hx, "−", cfg->ach_view == GR_VIEW_GRID ? T("Lista", "List") : T("Cuadrícula", "Grid"));
+    hint(c, hx, "+", T("Salir", "Exit"));
+}
+
+/* ---------- buscador de juegos ---------- */
+
+static int status_img(const char *status) {
+    if (!strcmp(status, "perfecto")) return UI_IMG_st_perfecto;
+    if (!strcmp(status, "jugable")) return UI_IMG_st_jugable;
+    if (!strcmp(status, "prueba")) return UI_IMG_st_prueba;
+    return UI_IMG_st_sin_empezar;
+}
+
+static const char *status_name(const char *status) {
+    if (!strcmp(status, "perfecto")) return T("Perfecto", "Perfect");
+    if (!strcmp(status, "jugable")) return T("Jugable", "Playable");
+    if (!strcmp(status, "prueba")) return T("En prueba", "Testing");
+    return T("Sin empezar", "Not started");
+}
+
+void ui_browse(gfx_canvas *c, const ui_assets *a, const gr_cat_game *games, const int *shown, int nshown, int total,
+               const bool *have, const char *query, ui_browse_state state, int cursor, int top) {
+    begin(c);
+    char sub[128];
+    if (query && query[0]) snprintf(sub, sizeof(sub), T("Buscando “%s”  ·  %d de %d", "Searching “%s”  ·  %d of %d"), query, nshown, total);
+    else snprintf(sub, sizeof(sub), T("%d juegos con logros en el catálogo", "%d games with achievements in the catalogue"), total);
+    header(c, a, NULL, T("Buscar juegos", "Find games"), state == UI_BROWSE_OK ? sub : T("Catálogo de Greeny", "Greeny catalogue"));
+
+    if (state != UI_BROWSE_OK || nshown == 0) {
+        card(c, MARGIN, 180, CONTENT_W, 320, false);
+        int mascot = state == UI_BROWSE_OFFLINE ? UI_IMG_m_triste : UI_IMG_m_buscando;
+        img(c, a, mascot, MARGIN + 30, 210);
+        const char *t1, *t2;
+        if (state == UI_BROWSE_LOADING) { t1 = T("Buscando en el catálogo…", "Searching the catalogue…"); t2 = T("Un momento.", "One moment."); }
+        else if (state == UI_BROWSE_OFFLINE) {
+            t1 = T("No hay conexión", "No connection");
+            t2 = T("Conecta la consola a internet y pulsa Y para intentarlo de nuevo.", "Connect the console to the internet and press Y to try again.");
+        } else if (total == 0) { t1 = T("El catálogo está vacío", "The catalogue is empty"); t2 = T("Todavía no se ha publicado ningún juego.", "No games have been published yet."); }
+        else { t1 = T("No encontré nada", "Nothing found"); t2 = T("Prueba con otra palabra (X) o borra la búsqueda (−).", "Try another word (X) or clear the search (−)."); }
+        gfx_text(c, MARGIN + 320, 290, 36, P->ink, t1);
+        gfx_text_fit(c, MARGIN + 320, 350, 23, P->gray, t2, CONTENT_W - 360);
+    } else {
+        const int x = MARGIN, w = CONTENT_W - 24, h = 78;
+        for (int i = top; i < nshown && i < top + UI_BROWSE_ROWS; i++) {
+            const gr_cat_game *g = &games[shown[i]];
+            int y = 116 + (i - top) * (h + 10);
+            card(c, x, y, w, h, i == cursor);
+            zone(x, y, w, h, UI_ZONE_ITEM, i);
+            img(c, a, status_img(g->status), x + 22, y + h / 2 - 20);
+            gfx_text_fit(c, x + 82, y + 10, 27, P->ink, g->name, w - 82 - 380);
+            char line[96];
+            if (g->version[0]) snprintf(line, sizeof(line), T("%s  ·  versión %s", "%s  ·  version %s"), status_name(g->status), g->version);
+            else snprintf(line, sizeof(line), "%s", status_name(g->status));
+            gfx_text_fit(c, x + 82, y + 45, 19, P->gray, line, w - 82 - 380);
+            if (have[shown[i]]) pill(c, x + w - 22, y + h / 2 - 14, C_GREEN, C_WHITE, T("EN TU CONSOLA", "ON YOUR CONSOLE"));
+        }
+        scrollbar(c, 116, UI_BROWSE_ROWS * (h + 10) - 10, top, UI_BROWSE_ROWS, nshown);
+    }
+
+    footer_bar(c);
+    int hx = MARGIN;
+    if (state == UI_BROWSE_OK && nshown > 0) hx = hint(c, hx, "A", T("Ver logros", "View achievements"));
+    hx = hint(c, hx, "B", T("Volver", "Back"));
+    if (state == UI_BROWSE_OK) hx = hint(c, hx, "X", T("Buscar", "Search"));
+    if (state == UI_BROWSE_OK && query && query[0]) hx = hint(c, hx, "−", T("Borrar búsqueda", "Clear search"));
+    hx = hint(c, hx, "Y", T("Recargar", "Reload"));
+    hint(c, hx, "+", T("Salir", "Exit"));
+}
+
+void ui_browse_game(gfx_canvas *c, const ui_assets *a, const gr_cat_game *game, const lg_game *def, int cursor, int top) {
+    begin(c);
+    int points = 0;
+    for (int i = 0; i < def->nach; i++) points += def->ach[i].points;
+    char sub[160];
+    snprintf(sub, sizeof(sub), T("%s  ·  %d logros  ·  %d pts  ·  no está en tu consola", "%s  ·  %d achievements  ·  %d pts  ·  not on your console"),
+             status_name(game->status), def->nach, points);
+    header(c, a, NULL, game->name, sub);
+    prepare_fill(a);
+    static ui_assets bare; /* sin iconos propios: todos con el de relleno */
+    bare = *a;
+    memset(bare.ach_icons, 0, sizeof(bare.ach_icons));
+    memset(bare.ach_icons_gray, 0, sizeof(bare.ach_icons_gray));
+    detail_list(c, &bare, def, cursor, top, 6);
+    footer_bar(c);
+    int hx = hint(c, MARGIN, "B", T("Volver", "Back"));
     hint(c, hx, "+", T("Salir", "Exit"));
 }
 

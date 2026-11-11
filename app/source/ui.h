@@ -114,6 +114,15 @@ void ui_background(gfx_canvas *c, float t);
  * `top` es la primera fila visible (en filas, no en elementos). */
 void ui_home(gfx_canvas *c, const ui_assets *a, const gr_model *m, const gr_config *cfg, int cursor, int top);
 void ui_detail(gfx_canvas *c, const ui_assets *a, const gr_model *m, const gr_config *cfg, int game, int cursor, int top);
+/* Buscador de juegos del catalogo. `shown` son los indices de `games` que pasan el filtro. */
+#include "catalog.h"
+typedef enum { UI_BROWSE_LOADING, UI_BROWSE_OK, UI_BROWSE_OFFLINE } ui_browse_state;
+#define UI_BROWSE_ROWS 6
+void ui_browse(gfx_canvas *c, const ui_assets *a, const gr_cat_game *games, const int *shown, int nshown, int total,
+               const bool *have, const char *query, ui_browse_state state, int cursor, int top);
+/* Los logros de un juego del catalogo que no esta en la consola (solo para mirar). */
+void ui_browse_game(gfx_canvas *c, const ui_assets *a, const gr_cat_game *game, const lg_game *def, int cursor, int top);
+
 /* Un logro al detalle: imagen grande, puntos, dificultad y fecha. */
 void ui_achievement(gfx_canvas *c, const ui_assets *a, const gr_model *m, int game, int index);
 void ui_settings(gfx_canvas *c, const ui_assets *a, const gr_config *cfg, int tab, int row, bool system_spanish,

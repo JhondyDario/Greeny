@@ -41,7 +41,7 @@
   };
   function statusPill(status) {
     const st = STATUS[status];
-    return st ? h("span", { class: "pill st-" + status, title: st.help }, st.label) : null;
+    return st ? h("span", { class: "pill st-" + status + " with-icon", title: st.help }, h("img", { src: "img/st_" + status + ".png", alt: "", width: 18, height: 18 }), st.label) : null;
   }
 
   const fmtDate = (iso) => new Date(iso).toLocaleDateString("es", { day: "numeric", month: "short", year: "numeric" });
@@ -117,9 +117,13 @@
     } }, "Copiar");
   }
 
+  // La foto de perfil es una de las que trae Greeny, por numero (profiles.avatar).
+  const AVATARS = 18;
+  const avatarSrc = (n) => "img/avatars/" + String(n).padStart(2, "0") + ".png";
   function avatar(p, size) {
     const el = h("span", { class: "avatar " + (size || ""), "aria-hidden": "true" });
-    if (p && p.avatar_url) el.append(h("img", { src: p.avatar_url, alt: "", loading: "lazy", referrerpolicy: "no-referrer" }));
+    const n = p && Number(p.avatar);
+    if (n >= 1 && n <= AVATARS) el.append(h("img", { src: avatarSrc(n), alt: "", loading: "lazy" }));
     else el.textContent = shownName(p).charAt(0).toUpperCase();
     return el;
   }
@@ -129,7 +133,7 @@
     // el borde dice la dificultad: bronce, plata u oro
     const el = h("span", { class: "icon" + (done ? " done" : "") + (ach.points != null ? " tier-" + tierOf(ach) : ""), title: ach.points != null ? TIER_LABEL[tierOf(ach)] : null });
     if (url) el.append(h("img", { src: url, alt: "", loading: "lazy" }));
-    else el.textContent = done ? "✓" : "?";
+    else el.append(h("img", { src: "img/ach_fill.png", alt: "", loading: "lazy" }));
     return el;
   }
 
@@ -137,7 +141,7 @@
     const url = imgUrl("covers", game.cover_path);
     const el = h("div", { class: "cover" + (small ? " small" : ""), "aria-hidden": "true" });
     if (url) el.append(h("img", { src: url, alt: "", loading: "lazy" }));
-    else el.textContent = (game.name || "?").charAt(0).toUpperCase();
+    else el.append(h("img", { src: "img/cover_fill.png", alt: "", loading: "lazy" }));
     return el;
   }
 
@@ -242,12 +246,13 @@
     const [players, unlocks, games, recent] = await Promise.all([
       count("profiles"), count("unlocks"), count("games"),
       sb.from("unlocks")
-        .select("unlocked_at,title_id,ach_id,profiles(username,display_name,avatar_url),achievements(*,games(name))")
+        .select("unlocked_at,title_id,ach_id,profiles(username,display_name,avatar),achievements(*,games(name))")
         .order("unlocked_at", { ascending: false }).limit(10),
     ]);
 
     const hero = h("section", { class: "hero" },
       h("div", {},
+        h("img", { class: "hero-logo", src: "img/logo.png", alt: "Greeny", width: 300, height: 152 }),
         h("h1", {}, "Logros para tu Switch"),
         h("p", { class: "lead" }, "Greeny corre en segundo plano mientras juegas, te avisa cuando desbloqueas un logro y guarda tu progreso. Aquí lo ves, lo compartes y lo comparas."),
         h("div", { class: "actions" },
@@ -255,7 +260,7 @@
                   : h("a", { class: "btn", href: "#/registro" }, "Crear cuenta"),
           h("a", { class: "btn alt", href: "#/juegos" }, "Ver juegos"),
           h("a", { class: "btn alt", href: cfg.repoUrl, rel: "noopener" }, "Descargar en GitHub"))),
-      h("img", { src: "img/mascot.png", alt: "Greeny, la mascota: una plantita verde saltando", width: 240, height: 320 }));
+      h("img", { class: "hero-mascot", src: "img/m_saludando.png", alt: "Greeny, la mascota: una plantita verde saludando", width: 260, height: 260 }));
 
     const stats = h("section", { class: "stats", "aria-label": "Números de Greeny" },
       h("div", { class: "card stat" }, h("b", {}, fmtNum(players.count)), h("span", {}, "jugadores")),
@@ -431,16 +436,16 @@
             h("i", { style: "width:" + Math.round((lvl.into / lvl.span) * 100) + "%" }))),
           h("span", { class: "muted small nowrap" }, lvl.into + " / " + lvl.span + " pts para el nivel " + (lvl.level + 1)))),
       h("section", { class: "stats", style: "margin-top:14px" },
-        h("div", { class: "card stat" }, h("b", {}, fmtNum(stats.points)), h("span", {}, "puntos")),
-        h("div", { class: "card stat" }, h("b", {}, fmtNum(stats.achievements)), h("span", {}, "logros")),
-        h("div", { class: "card stat" }, h("b", {}, fmtNum(stats.games)), h("span", {}, "juegos jugados")),
-        h("div", { class: "card stat" }, h("b", {}, fmtNum(stats.platinums)), h("span", {}, "juegos platinados")),
-        h("div", { class: "card stat" }, h("b", {}, fmtNum(stats.followers)), h("span", {}, "seguidores")),
-        h("div", { class: "card stat" }, h("b", {}, fmtNum(stats.following)), h("span", {}, "siguiendo"))),
+        h("div", { class: "card stat with-icon" }, h("img", { src: "img/stat_puntos.png", alt: "", width: 44, height: 44 }), h("div", {}, h("b", {}, fmtNum(stats.points)), h("span", {}, "puntos"))),
+        h("div", { class: "card stat with-icon" }, h("img", { src: "img/stat_logros.png", alt: "", width: 44, height: 44 }), h("div", {}, h("b", {}, fmtNum(stats.achievements)), h("span", {}, "logros"))),
+        h("div", { class: "card stat with-icon" }, h("img", { src: "img/stat_juegos.png", alt: "", width: 44, height: 44 }), h("div", {}, h("b", {}, fmtNum(stats.games)), h("span", {}, "juegos jugados"))),
+        h("div", { class: "card stat with-icon" }, h("img", { src: "img/stat_completados.png", alt: "", width: 44, height: 44 }), h("div", {}, h("b", {}, fmtNum(stats.platinums)), h("span", {}, "juegos platinados"))),
+        h("div", { class: "card stat with-icon" }, h("img", { src: "img/stat_seguidores.png", alt: "", width: 44, height: 44 }), h("div", {}, h("b", {}, fmtNum(stats.followers)), h("span", {}, "seguidores"))),
+        h("div", { class: "card stat with-icon" }, h("img", { src: "img/stat_seguidores.png", alt: "", width: 44, height: 44 }), h("div", {}, h("b", {}, fmtNum(stats.following)), h("span", {}, "siguiendo")))),
       h("h2", {}, "Medallas ", h("span", { class: "muted small" }, earned + " de " + badgeList.length)),
       h("div", { class: "badges" }, badgeList.map((b) =>
         h("div", { class: "card badge" + (b.earned ? " earned" : "") },
-          h("span", { class: "medal " + b.kind, "aria-hidden": "true" }, b.earned ? "★" : ""),
+          h("img", { class: "medal-img", src: "img/badges/" + (b.earned ? b.id : "bloqueada") + ".png", alt: "", width: 64, height: 64, loading: "lazy" }),
           h("div", {},
             h("strong", {}, b.name),
             h("div", { class: "muted small" }, b.how),
@@ -570,48 +575,27 @@
     const identities = (identRes.data && identRes.data.identities) || session.user.identities || [];
     const discord = identities.find((i) => i.provider === "discord");
 
-    // Si vinculaste Discord y todavia no tienes foto, se usa la de Discord.
-    const discordAvatar = discord && discord.identity_data && (discord.identity_data.avatar_url || discord.identity_data.picture);
-    if (!me.avatar_url && discordAvatar) {
-      const res = await sb.from("profiles").update({ avatar_url: discordAvatar }).eq("id", me.id);
-      if (!res.error) me.avatar_url = discordAvatar;
+    // Foto de perfil: se elige una de la lista.
+    const picker = h("div", { class: "avatar-picker", role: "radiogroup", "aria-label": "Foto de perfil" });
+    function drawPicker() {
+      picker.replaceChildren(...Array.from({ length: AVATARS }, (_, i) => {
+        const n = i + 1;
+        return h("button", { type: "button", role: "radio", "aria-checked": String(me.avatar === n), "aria-label": "Foto " + n,
+          class: "avatar-option" + (me.avatar === n ? " on" : ""), onclick: async (ev) => {
+            const b = ev.currentTarget;
+            b.disabled = true;
+            const res = await sb.from("profiles").update({ avatar: n }).eq("id", me.id);
+            b.disabled = false;
+            if (res.error) { alert(explain(res.error)); return; }
+            me.avatar = n;
+            drawPicker();
+          } }, h("img", { src: avatarSrc(n), alt: "", loading: "lazy", width: 72, height: 72 }));
+      }));
     }
-
-    // Foto de perfil: se sube a la carpeta propia del usuario, ya recortada y reducida.
-    const ownPrefix = sb.storage.from("avatars").getPublicUrl(me.id + "/").data.publicUrl;
-    const oldOwnPath = () => (me.avatar_url && me.avatar_url.startsWith(ownPrefix) ? me.id + "/" + me.avatar_url.slice(ownPrefix.length) : null);
-    const photoInput = h("input", { type: "file", accept: "image/*", hidden: true, "aria-label": "Foto de perfil" });
-    const photoMsg = h("span", { class: "muted small", role: "status", "aria-live": "polite" });
-    const photoBtn = h("button", { type: "button", class: "btn alt", onclick: () => photoInput.click() }, me.avatar_url ? "Cambiar foto" : "Subir foto");
-    async function setAvatar(url, removePath) {
-      must(await sb.from("profiles").update({ avatar_url: url }).eq("id", me.id));
-      if (removePath) await sb.storage.from("avatars").remove([removePath]);
-      await loadMe();
-      render();
-    }
-    photoInput.addEventListener("change", async () => {
-      if (!photoInput.files.length) return;
-      photoBtn.disabled = true;
-      photoMsg.textContent = "Subiendo…";
-      try {
-        const jpg = await squareImage(photoInput.files[0], 256, "image/jpeg");
-        const path = me.id + "/" + Date.now().toString(36) + ".jpg";
-        must(await sb.storage.from("avatars").upload(path, jpg, { contentType: "image/jpeg", cacheControl: "31536000" }));
-        await setAvatar(sb.storage.from("avatars").getPublicUrl(path).data.publicUrl, oldOwnPath());
-      } catch (err) {
-        photoMsg.textContent = explain(err);
-        photoBtn.disabled = false;
-      }
-    });
-    const photoRow = h("div", { class: "row", style: "margin-bottom:16px" }, avatar(me, "big"),
-      h("div", { class: "stack" },
-        h("div", { class: "row", style: "flex-wrap:wrap" }, photoBtn, photoInput,
-          discordAvatar && me.avatar_url !== discordAvatar
-            ? h("button", { type: "button", class: "btn alt", onclick: () => setAvatar(discordAvatar, oldOwnPath()).catch((e) => alert(explain(e))) }, "Usar la de Discord") : null,
-          me.avatar_url
-            ? h("button", { type: "button", class: "btn danger", onclick: () => setAvatar(null, oldOwnPath()).catch((e) => alert(explain(e))) }, "Quitar") : null),
-        photoMsg,
-        h("span", { class: "muted small" }, "Cualquier imagen; se recorta cuadrada. Si vinculas Discord y no tienes foto, se pone la de Discord.")));
+    drawPicker();
+    const photoRow = h("div", { class: "stack", style: "margin-bottom:18px" },
+      h("div", {}, h("strong", {}, "Foto de perfil"), h("div", { class: "muted small" }, "Elige una. Es la misma en la app y en la web.")),
+      picker);
     const discordName = discord && discord.identity_data &&
       (discord.identity_data.full_name || discord.identity_data.name || (discord.identity_data.custom_claims || {}).global_name);
     const presets = (presetRes.data || []).map((p) => p.text_es);
@@ -942,21 +926,40 @@
       return "Frase añadida.";
     });
 
+    // Pestañas: cada tarea en la suya, para no tener todo en una sola columna larga.
+    const tabs = [
+      { id: "nuevo", label: "Publicar juego", body: [
+        h("p", { class: "muted" }, "Sube el archivo de logros de un juego nuevo, o vuelve a subirlo para actualizarlo."),
+        h("div", { class: "card" }, publish)] },
+      { id: "juegos", label: "Editar juegos", body: games.length ? [
+        h("h2", {}, "Datos del juego"), h("div", { class: "card" }, infoForm),
+        h("h2", {}, "Logros: dificultad e iconos"), h("div", { class: "card" }, icons),
+        h("h2", {}, "Carátula"), h("div", { class: "card" }, coverForm)]
+        : [h("p", { class: "card muted" }, "Primero publica un juego.")] },
+      { id: "frases", label: "Frases de perfil", body: [
+        h("p", { class: "muted" }, "Son las que salen en el desplegable de Cuenta. Tu propia frase la cambias en Cuenta → Perfil."),
+        h("div", { class: "card stack" }, presetList, presetForm)] },
+    ];
+    let current = "nuevo";
+    try { current = sessionStorage.getItem("greeny-dev-tab") || current; } catch (e) { /* sin almacenamiento: empieza en la primera */ }
+    if (!tabs.some((t) => t.id === current)) current = "nuevo";
+    const panels = tabs.map((t) => h("section", { class: "dev-panel", id: "dev-" + t.id, role: "tabpanel", hidden: t.id !== current }, t.body));
+    const buttons = tabs.map((t, i) => h("button", { type: "button", role: "tab", class: "tab" + (t.id === current ? " on" : ""),
+      "aria-selected": String(t.id === current), "aria-controls": "dev-" + t.id, onclick: () => {
+        buttons.forEach((b, k) => { b.classList.toggle("on", k === i); b.setAttribute("aria-selected", String(k === i)); });
+        panels.forEach((pn, k) => { pn.hidden = k !== i; });
+        try { sessionStorage.setItem("greeny-dev-tab", t.id); } catch (e) { /* da igual */ }
+      } }, t.label));
     return [
       h("h1", {}, "Desarrollador"),
       h("p", { class: "muted" }, "Publicar de nuevo un juego actualiza sus textos y puntos. No borra logros que ya no estén en el archivo, porque eso borraría el progreso de la gente."),
-      h("h2", {}, "1. Juego y logros"), h("div", { class: "card" }, publish),
-      h("h2", {}, "2. Datos del juego"), h("div", { class: "card" }, games.length ? infoForm : h("p", { class: "muted", style: "margin:0" }, "Primero publica un juego.")),
-      h("h2", {}, "3. Logros: dificultad e iconos"), h("div", { class: "card" }, icons),
-      h("h2", {}, "4. Carátula"), h("div", { class: "card" }, coverForm),
-      h("h2", {}, "Frases sugeridas del perfil"),
-      h("p", { class: "muted" }, "Son las que salen en el desplegable de Cuenta. Tu propia frase la cambias en Cuenta → Perfil."),
-      h("div", { class: "card stack" }, presetList, presetForm),
+      h("div", { class: "tabs", role: "tablist", "aria-label": "Secciones" }, buttons),
+      h("div", { class: "dev" }, panels),
     ];
   }
 
   function notFound(text) {
-    return [h("h1", {}, "No encontrado"), h("p", { class: "card" }, text || "Esa página no existe."), h("p", {}, h("a", { href: "#/" }, "Volver al inicio"))];
+    return [h("h1", {}, "No encontrado"), h("div", { class: "card row" }, h("img", { src: "img/m_buscando.png", alt: "", width: 110, height: 110 }), h("p", { style: "margin:0" }, text || "Esa página no existe.")), h("p", {}, h("a", { href: "#/" }, "Volver al inicio"))];
   }
 
   // ---------- rutas ----------

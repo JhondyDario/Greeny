@@ -81,6 +81,16 @@ int main(int argc, char **argv) {
     printf("marca vieja: bajados=%d\n", n);
     if (n != 1) { printf("FALLO: debia actualizar\n"); fail++; }
 
+    /* el buscador: la lista completa y el archivo de un juego sin guardarlo */
+    static gr_cat_game cat[32];
+    static char def[64 * 1024];
+    int ncat = 0;
+    rc = gr_catalog_list(get_curl, cat, 32, &ncat);
+    printf("buscador: rc=%d, %d juego(s)%s%s\n", rc, ncat, ncat ? ", primero: " : "", ncat ? cat[0].name : "");
+    if (rc != 0 || ncat < 1) { printf("FALLO: la lista del catalogo\n"); fail++; }
+    else if (!gr_catalog_definition(get_curl, cat[0].tid, def, sizeof(def)) || !strstr(def, "game")) { printf("FALLO: el archivo del juego\n"); fail++; }
+    else printf("buscador: archivo de %s, %zu bytes, estado %s\n", cat[0].tid, strlen(def), cat[0].status);
+
     printf("%s\n", fail ? "HAY FALLOS" : "catalogo: todo bien");
     return fail ? 1 : 0;
 }

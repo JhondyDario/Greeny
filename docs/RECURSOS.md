@@ -26,30 +26,35 @@ tipografías ni personajes de Nintendo.
 | Cara de la mascota | PNG transparente, 512×512 | Introducción y Acerca de en la app, portada de la web | Listo (`assets/cara.png`) |
 | Fotogramas de animación de la mascota (saltando, 8 a 12 cuadros) | PNG transparente, mismo tamaño todos | Animación en inicio y al desbloquear | Opcional, para cuando haya animaciones |
 
-### Lo que más ayudaría ahora (app y web)
+### Recursos de la app y la web
 
-Todo en PNG transparente. Hoy cada cosa de esta lista se dibuja con formas simples o no existe.
+Todo sale de `assets/` con `python3 scripts/assets.py`.
 
-| Recurso | Tamaño | Dónde se usa |
+| Recurso | Dónde está | Dónde se usa |
 |---|---|---|
-| Marco o medalla de bronce, plata y oro (3) | 256×256 | Borde del icono de cada logro, detalle del logro y aviso dentro del juego |
-| Icono genérico de logro bloqueado y desbloqueado (2) | 256×256 | Logros que todavía no tienen icono propio |
-| Trofeo de juego completado | 128×128 | Sobre la carátula del juego al 100 % |
-| Iconos de las estadísticas del perfil: juegos, logros, completados, puntos, seguidores (5) | 96×96 | Perfil en la app y en la web |
-| Iconos de las pestañas de Opciones: General, Vista, En el juego, Cuenta, Ayuda (5) | 64×64 | Opciones de la app |
-| Iconos de estado del juego: sin empezar, prueba, jugable, perfecto (4) | 64×64 | Web y buscador de juegos |
-| Carátula de relleno | 512×512 | Juegos sin carátula |
-| Foto de perfil por defecto | 256×256 | Cuentas sin foto |
+| Medallas de bronce, plata y oro | `assets/medals/` | Logro al detalle (app), web |
+| Logro bloqueado y desbloqueado | `assets/logro_*.png` | Estado de cada logro |
+| Logro y carátula de relleno | `assets/relleno_*.png` | Logros sin icono y juegos sin carátula |
+| Trofeo de juego completado | `assets/trofeo.png` | Sobre la carátula al 100 % |
+| Iconos de estadísticas | `assets/stats/` | Perfil |
+| Iconos de estado del juego | `assets/estado/` | Buscador de la app, web |
+| Mascota en 8 poses | `assets/mascota/` | Pantallas vacías, errores, bienvenida, buscador |
+| Medallas del perfil (11 + bloqueada) | `assets/badges/` | Perfil |
+| Fotos de perfil (18) | `assets/avatars/` | Perfil; se elige una, no se suben fotos propias |
+| Flecha, palancas de encendido y apagado | `assets/icons/` | Logro al detalle, Opciones |
+| Logos con el nombre | `assets/logo-greeny*.png` | Acerca de, portada de la web |
+
+De las 24 fotos de perfil recibidas se dejaron fuera 6 porque dibujan personajes u objetos de
+Nintendo (champiñón, estrella con ojos, fantasma, trifuerza, pokébola y bloque de interrogación).
+Hacen falta 6 dibujos propios para completar las 24.
 
 ### Medallas del perfil
 
-Once medallas, PNG transparente de 256×256, con el id como nombre. Hoy se dibujan
-con un círculo de color y una estrella.
+Once medallas, PNG transparente de 256×256, con el id como nombre, más `bloqueada`.
 
 `primer_logro`, `logros_10`, `logros_50`, `logros_200`, `primer_platino`,
 `platinos_5`, `juegos_3`, `juegos_10`, `puntos_100`, `puntos_500`, `puntos_2000`
 
-Hace falta también una versión "bloqueada" genérica (gris, con candado).
 
 ### Iconos de los 12 logros de Mario 3D World
 

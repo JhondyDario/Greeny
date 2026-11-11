@@ -166,3 +166,55 @@ done:
     free(url);
     return rc;
 }
+
+int gr_catalog_list(gr_get_fn get, gr_cat_game *out, int max, int *count) {
+    *count = 0;
+    const size_t cap = 96 * 1024;
+    char *list = malloc(cap);
+    if (!list) return -1;
+    size_t len = 0;
+    long status = 0;
+    int rc = get(GR_BACKEND_URL "/rest/v1/games?select=title_id,name,version,status&published=eq.true&order=name&limit=300",
+                 list, cap - 1, &len, &status);
+    if (rc != 0) { free(list); return -1; }
+    list[len] = 0;
+    if (status == 200) {
+        for (char *p = strchr(list, '{'); p && *count < max; ) {
+            char *end = strchr(p, '}');
+            if (!end) break;
+            char saved = end[1];
+            end[1] = 0;
+            gr_cat_game *g = &out[*count];
+            memset(g, 0, sizeof(*g));
+            char tid[24];
+            if (gr_json_string(p, "title_id", tid, sizeof(tid)) && valid_tid(tid)) {
+                memcpy(g->tid, tid, 17);
+                if (!gr_json_string(p, "name", g->name, sizeof(g->name)) || !g->name[0]) memcpy(g->name, tid, 17);
+                gr_json_string(p, "version", g->version, sizeof(g->version));
+                gr_json_string(p, "status", g->status, sizeof(g->status));
+                (*count)++;
+            }
+            end[1] = saved;
+            p = strchr(end + 1, '{');
+        }
+    }
+    free(list);
+    return 0;
+}
+
+bool gr_catalog_definition(gr_get_fn get, const char *tid, char *text, size_t cap) {
+    char url[256];
+    if (!valid_tid(tid) || cap < DEF_MAX) return false;
+    char *json = malloc(DEF_JSON_MAX);
+    if (!json) return false;
+    size_t len = 0;
+    long status = 0;
+    snprintf(url, sizeof(url), GR_BACKEND_URL "/rest/v1/games?select=definition&published=eq.true&title_id=eq.%s", tid);
+    bool ok = get(url, json, DEF_JSON_MAX - 1, &len, &status) == 0 && status == 200;
+    if (ok) {
+        json[len] = 0;
+        ok = gr_json_string(json, "definition", text, DEF_MAX) && text[0];
+    }
+    free(json);
+    return ok;
+}

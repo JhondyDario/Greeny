@@ -245,6 +245,26 @@ int main(int argc, char **argv) {
         save(&c, out, "home_empty", sfx);
         ui_avatars(&c, &a, &chip, 7);
         save(&c, out, "avatars", sfx);
+        {
+            static gr_cat_game cat[5] = {
+                { "010028600EBDA000", "Super Mario 3D World + Bowser's Fury", "1.1.0", "jugable" },
+                { "0100AAAAAAAAA000", "Otro juego de plataformas", "2.0.1", "perfecto" },
+                { "0100BBBBBBBBB000", "Carreras locas", "", "prueba" },
+                { "0100CCCCCCCCC000", "Aventura sin terminar", "1.0.0", "sin_empezar" },
+                { "0100DDDDDDDDD000", "Un juego con un nombre larguisimo que no cabe en la fila", "1.2.3", "jugable" },
+            };
+            static const bool have[5] = { true, false, false, false, false };
+            static const int all[5] = { 0, 1, 2, 3, 4 };
+            ui_browse(&c, &a, cat, all, 5, 5, have, "", UI_BROWSE_OK, 1, 0);
+            save(&c, out, "browse", sfx);
+            ui_browse(&c, &a, cat, all, 0, 5, have, "zelda", UI_BROWSE_OK, 0, 0);
+            save(&c, out, "browse_nada", sfx);
+            ui_browse(&c, &a, cat, all, 0, 0, have, "", UI_BROWSE_OFFLINE, 0, 0);
+            save(&c, out, "browse_sin_red", sfx);
+            gr_open(&m, m.ngames - 1, root);
+            ui_browse_game(&c, &a, &cat[0], &m.cur, 1, 0);
+            save(&c, out, "browse_juego", sfx);
+        }
         empty.hidden = 3; /* hay juegos, pero el filtro los deja fuera */
         ui_home(&c, &bare, &empty, &cfg, 0, 0);
         save(&c, out, "home_filtro", sfx);

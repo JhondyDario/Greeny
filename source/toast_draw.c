@@ -165,7 +165,7 @@ void toast_draw(const toast_view *v, toast_put_fn put) {
         npts = to_latin1(tmp, pts, sizeof(pts));
         pill_w = text_width(&tf_small, pts, npts) + 20;
     }
-    const float pill_x = TOAST_W - 16 - pill_w, pill_y = 14, pill_h = 24;
+    const float pill_x = TOAST_W - 16 - pill_w, pill_y = 14, pill_h = 24; /* la etiqueta se queda arriba */
 
     const float bcx = 62, bcy = 64, br = 38;
     for (int y = 0; y < TOAST_H; y++) {
@@ -199,7 +199,11 @@ void toast_draw(const toast_view *v, toast_put_fn put) {
 
     const int tx = 116, tw = TOAST_W - tx - 18;
     if (pill_w) draw_text(put, &tf_small, (int)pill_x + 10, (int)pill_y + 3, pts, npts, on_yellow, yellow);
-    draw_wrapped(put, &tf_small, tx, 17, tw - (pill_w ? pill_w + 8 : 0), 18, 1, v->title, head, card);
-    draw_wrapped(put, &tf_big, tx, 37, tw, 24, 1, v->name, ink, card);
-    draw_wrapped(put, &tf_small, tx, 68, tw, 19, 2, v->desc, soft, card);
+    /* si la descripcion cabe en una linea (o no hay), el texto baja para quedar centrado en la tarjeta */
+    uint8_t probe[160];
+    int nprobe = to_latin1(v->desc, probe, sizeof(probe));
+    int dy = nprobe == 0 ? 18 : text_width(&tf_small, probe, nprobe) <= tw ? 9 : 0;
+    draw_wrapped(put, &tf_small, tx, 17 + dy, tw - (pill_w ? pill_w + 8 : 0), 18, 1, v->title, head, card);
+    draw_wrapped(put, &tf_big, tx, 37 + dy, tw, 24, 1, v->name, ink, card);
+    draw_wrapped(put, &tf_small, tx, 68 + dy, tw, 19, 2, v->desc, soft, card);
 }
