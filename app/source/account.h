@@ -35,6 +35,7 @@ typedef struct {
     int  followers, following;
     char friend_code[24];  /* GR-123456; "" si aun no se sabe */
     int  avatar;           /* foto de perfil elegida (1..); 0 = aun no se sabe */
+    bool admin;            /* la cuenta es de un administrador: ve las herramientas para crear logros */
 } gr_account;
 
 void gr_account_load(gr_account *a, const char *path);

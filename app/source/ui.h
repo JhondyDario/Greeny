@@ -13,7 +13,7 @@
 #define UI_COVER_BIG  150  /* caratula en la cuadricula */
 
 #define UI_APP_NAME    "Greeny"
-#define UI_APP_VERSION "0.0.15"
+#define UI_APP_VERSION "0.0.16"
 
 /* opciones, agrupadas en pestañas que se cambian con L y R */
 enum {
@@ -89,6 +89,8 @@ typedef struct {
 /* `busy` = fila que se esta descargando ahora, o -1. Se guarda el puntero: debe seguir vivo. */
 void ui_set_music(const ui_song *songs, int count, int busy);
 
+/* true = la cuenta vinculada es de un administrador: Opciones muestra el buscador de valores. */
+void ui_set_admin(bool admin);
 /* ¿Estan encendidos los logros dentro de los juegos (existe boot2.flag)? Lo muestra Opciones. */
 void ui_set_ingame(bool on);
 void ui_set_english(bool english);

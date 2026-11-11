@@ -14,6 +14,8 @@
 #define STB_VORBIS_HEADER_ONLY
 #include "third_party/stb_vorbis.c"
 
+int gr_ogg_read_mono(stb_vorbis *f, short *out, int frames); /* vorbis_impl.c */
+
 #define RATE 48000 /* PCM 16 bit mono, generado por scripts/assets.py */
 
 /* musica: una voz mas, alimentada con trozos de un cuarto de segundo */
@@ -111,8 +113,7 @@ void sfx_play(sfx_id id) {
 /* Llena un trozo con lo que sigue de la cancion. Al llegar al final no pone nada mas. */
 static void music_fill(int i) {
     s16 *buf = (s16 *)((u8 *)g_music_pool + (size_t)i * MUSIC_BUF_BYTES);
-    int want = MUSIC_BUF_BYTES / 2; /* samples, contando los dos canales */
-    int frames = stb_vorbis_get_samples_short_interleaved(g_ogg, g_ogg_channels, buf, want);
+    int frames = gr_ogg_read_mono(g_ogg, buf, MUSIC_BUF_BYTES / 2);
     if (frames == 0) { g_music_eof = true; return; }
     armDCacheFlush(buf, MUSIC_BUF_BYTES);
     memset(&g_music_wave[i], 0, sizeof(g_music_wave[i]));

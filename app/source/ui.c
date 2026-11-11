@@ -46,6 +46,8 @@ static const uint8_t *g_buttons; /* iconos de botones de la pantalla que se esta
 static const ui_assets *g_a;     /* recursos de la pantalla que se esta dibujando */
 static bool g_ingame = true;
 void ui_set_ingame(bool on) { g_ingame = on; }
+static bool g_admin;
+void ui_set_admin(bool admin) { g_admin = admin; }
 
 static const ui_song *g_songs;
 static int g_nsongs, g_song_busy = -1;
@@ -713,14 +715,10 @@ void ui_browse(gfx_canvas *c, const ui_assets *a, const gr_cat_game *games, cons
                const bool *have, const char *query, ui_browse_state state, int cursor, int top) {
     (void)query;
     begin(c);
-    g_buttons = a->buttons; /* sin barra arriba, igual que el perfil */
-    g_a = a;
-
-    gfx_text(c, MARGIN, 26, 42, P->ink, T("Buscar juegos", "Find games"));
     char sub[96];
     if (state == UI_BROWSE_OK) snprintf(sub, sizeof(sub), T("%d juegos con logros, de la A a la Z", "%d games with achievements, A to Z"), total);
     else snprintf(sub, sizeof(sub), "%s", T("Catálogo de Greeny", "Greeny catalogue"));
-    gfx_text(c, MARGIN + 2, 78, 20, P->gray, sub);
+    header(c, a, NULL, T("Buscar juegos", "Find games"), sub);
 
     if (state != UI_BROWSE_OK || nshown == 0) {
         card(c, MARGIN, 180, CONTENT_W, 320, false);
@@ -735,17 +733,10 @@ void ui_browse(gfx_canvas *c, const ui_assets *a, const gr_cat_game *games, cons
         gfx_text(c, MARGIN + 320, 290, 36, P->ink, t1);
         gfx_text_fit(c, MARGIN + 320, 350, 23, P->gray, t2, CONTENT_W - 360);
     } else {
-        /* a la derecha del titulo, la letra por la que va la lista */
-        char letter[5];
-        first_letter(games[shown[cursor]].name, letter);
-        if (letter[0] >= 'a' && letter[0] <= 'z') letter[0] = (char)(letter[0] - 32);
-        gfx_circle(c, UI_W - MARGIN - 34, 60, 34, C_GREEN);
-        gfx_text(c, UI_W - MARGIN - 34 - gfx_text_width(38, letter) / 2, 37, 38, C_WHITE, letter);
-
-        const int x = MARGIN, w = CONTENT_W - 24, h = 78;
+        const int x = MARGIN, w = CONTENT_W - 56, h = 78;
         for (int i = top; i < nshown && i < top + UI_BROWSE_ROWS; i++) {
             const gr_cat_game *g = &games[shown[i]];
-            int y = 122 + (i - top) * (h + 10);
+            int y = 116 + (i - top) * (h + 10);
             card(c, x, y, w, h, i == cursor);
             zone(x, y, w, h, UI_ZONE_ITEM, i);
             img(c, a, status_img(g->status), x + 22, y + h / 2 - 20);
@@ -756,7 +747,24 @@ void ui_browse(gfx_canvas *c, const ui_assets *a, const gr_cat_game *games, cons
             gfx_text_fit(c, x + 82, y + 45, 19, P->gray, line, w - 82 - 380);
             if (have[shown[i]]) pill(c, x + w - 22, y + h / 2 - 14, C_GREEN, C_WHITE, T("EN TU CONSOLA", "ON YOUR CONSOLE"));
         }
-        scrollbar(c, 122, UI_BROWSE_ROWS * (h + 10) - 10, top, UI_BROWSE_ROWS, nshown);
+
+        /* el abecedario, a la derecha: resalta la letra por la que va la lista y apaga las que no tienen juegos */
+        bool used[26] = { false };
+        for (int i = 0; i < nshown; i++) {
+            char ch = games[shown[i]].name[0];
+            if (ch >= 'a' && ch <= 'z') ch = (char)(ch - 32);
+            if (ch >= 'A' && ch <= 'Z') used[ch - 'A'] = true;
+        }
+        char now = games[shown[cursor]].name[0];
+        if (now >= 'a' && now <= 'z') now = (char)(now - 32);
+        const int ax = UI_W - MARGIN - 12;
+        for (int i = 0; i < 26; i++) {
+            char letter[2] = { (char)('A' + i), 0 };
+            int ay = 116 + i * 20;
+            bool cur = now == 'A' + i;
+            if (cur) gfx_circle(c, ax, ay + 10, 12, C_GREEN);
+            gfx_text(c, ax - gfx_text_width(15, letter) / 2, ay + 1, 15, cur ? C_WHITE : used[i] ? P->ink : P->gray_lt, letter);
+        }
     }
 
     footer_bar(c);
@@ -856,11 +864,12 @@ static const struct { const char *es, *en; int n; int opt[4]; } k_tabs[UI_TABS] 
     { "En el juego", "In-game",  3, { UI_OPT_INGAME, UI_OPT_SOUND, UI_OPT_POPUP } },
     { "Música",      "Music",    0, { 0 } },  /* una fila para encender y una por cancion */
     { "Cuenta",      "Account",  0, { 0 } },  /* sus filas dependen de si la consola esta vinculada */
-    { "Ayuda",       "Help",     3, { UI_OPT_DIAG, UI_OPT_SEARCH, UI_OPT_ABOUT } },
+    { "Ayuda",       "Help",     3, { UI_OPT_DIAG, UI_OPT_ABOUT, UI_OPT_SEARCH } }, /* la ultima solo la ve un administrador */
 };
 
 int ui_tab_count(int tab, bool linked) {
     if (tab == UI_TAB_MUSIC) return 1 + g_nsongs;
+    if (tab == UI_TABS - 1) return g_admin ? 3 : 2;
     if (tab == UI_TAB_ACCOUNT) return linked ? 3 : 2;
     return k_tabs[tab].n;
 }

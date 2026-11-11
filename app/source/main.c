@@ -452,6 +452,7 @@ static void refresh_greeting(void) {
     g_profile.caption = linked ? g_account.caption : "";
     g_profile.friend_code = linked ? g_account.friend_code : "";
     g_profile.avatar = linked ? g_account.avatar : 0;
+    ui_set_admin(linked && g_account.admin);
     g_profile.social_known = g_account.social_known;
     g_profile.followers = g_account.followers;
     g_profile.following = g_account.following;
@@ -1328,6 +1329,7 @@ int main(int argc, char *argv[]) {
             if (down & HidNpadButton_Y) { search_send("ptr %d", fcand); accepted = true; }
             if (down & HidNpadButton_Minus) { search_send("check %u", fvalue); accepted = true; }
             if (down & HidNpadButton_B) { screen = SCREEN_SETTINGS; back = true; }
+            if (!(g_account.linked && g_account.admin)) screen = SCREEN_SETTINGS; /* por si la cuenta dejo de ser admin */
         } else if (screen == SCREEN_DIAG) {
             if (down & HidNpadButton_Y) { rescan(); run_diag(); accepted_alt = true; }
             if (down & HidNpadButton_B) { screen = SCREEN_SETTINGS; back = true; }

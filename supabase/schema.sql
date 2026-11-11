@@ -554,6 +554,7 @@ as $$
     select jsonb_build_object(
                'username', p.username, 'display_name', p.display_name, 'caption', p.caption, 'avatar', p.avatar,
                'friend_code', p.friend_code,
+               'admin', exists (select 1 from public.admins a where a.user_id = p.id),
                'achievements', s.achievements, 'points', s.points, 'games', s.games, 'platinums', s.platinums,
                'followers', s.followers, 'following', s.following)
       from public.devices d
