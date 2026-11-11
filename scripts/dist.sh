@@ -20,9 +20,8 @@ mkdir -p dist/config/greeny/sounds
 cp sd/config/greeny/sounds/*.pcm dist/config/greeny/sounds/
 mkdir -p dist/config/greeny/toast
 cp sd/config/greeny/toast/*.bin dist/config/greeny/toast/
-for f in juegos/*.txt; do
-  [ "$(basename "$f")" = 0100000000000000.txt ] || cp "$f" dist/config/greeny/games/
-done
+# Los archivos de logros de cada juego ya no van en el zip: la app los baja del catalogo.
+# Un archivo copiado a mano en la SD no se actualiza nunca solo, y eso dejaba nombres y logros viejos.
 
 (cd dist && zip -qr ../greeny.zip .)
 echo "listo: dist/ y greeny.zip"

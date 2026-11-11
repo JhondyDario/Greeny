@@ -56,7 +56,7 @@
 
 typedef enum {
     SCREEN_HOME, SCREEN_DETAIL, SCREEN_SETTINGS, SCREEN_DIAG, SCREEN_ABOUT, SCREEN_INTRO, SCREEN_LINK, SCREEN_MSG,
-    SCREEN_PROFILE, SCREEN_BADGES, SCREEN_ACH, SCREEN_AVATARS, SCREEN_BROWSE, SCREEN_BROWSE_GAME, SCREEN_SEARCH
+    SCREEN_PROFILE, SCREEN_BADGES, SCREEN_ACH, SCREEN_AVATARS, SCREEN_BROWSE, SCREEN_BROWSE_GAME, SCREEN_SEARCH, SCREEN_RANKING, SCREEN_USER, SCREEN_COUNTRY
 } screen_t;
 
 static gr_model g_model;
@@ -226,9 +226,13 @@ static void load_background(bool dark) {
     stbi_image_free(img);
 }
 
+static bool g_ui_en; /* la app esta en ingles */
+
 static void apply_config(void) {
     bool dark = g_config.theme == GR_THEME_DARK || (g_config.theme == GR_THEME_AUTO && g_system_dark);
-    ui_set_english(g_config.lang == GR_LANG_EN || (g_config.lang == GR_LANG_AUTO && !g_system_spanish));
+    g_ui_en = g_config.lang == GR_LANG_EN || (g_config.lang == GR_LANG_AUTO && !g_system_spanish);
+    ui_set_english(g_ui_en);
+    sfx_set_enabled(g_config.app_sound);
     ui_set_dark(dark);
     load_background(dark);
 }
@@ -449,7 +453,9 @@ static void refresh_greeting(void) {
     g_profile.linked = linked;
     g_profile.username = linked ? g_account.username : "";
     g_profile.name = linked ? (g_account.display[0] ? g_account.display : g_account.username) : (g_nick[0] ? g_nick : "Jugador");
-    g_profile.caption = linked ? g_account.caption : "";
+    /* la frase sale en el idioma de la app cuando es una de las de la lista (el servidor manda su traduccion) */
+    g_profile.caption = !linked ? "" : (g_ui_en && g_account.caption_en[0]) ? g_account.caption_en : g_account.caption;
+    g_profile.country = linked ? g_account.country : "";
     g_profile.friend_code = linked ? g_account.friend_code : "";
     g_profile.avatar = linked ? g_account.avatar : 0;
     ui_set_admin(linked && g_account.admin);
@@ -643,6 +649,10 @@ static bool search_read(void) {
     if (changed) { memcpy(g_search_lines, fresh, sizeof(fresh)); g_search_nlines = n; }
     return changed;
 }
+
+/* ---------- ranking ---------- */
+static gr_rank_row g_rank[GR_RANK_TOP], g_rank_me, g_rank_view;
+static int g_nrank, g_rank_total;
 
 /* ---------- musica de fondo ---------- */
 #define MUSIC_URL "https://jhondydario.github.io/Greeny/music/"
@@ -900,6 +910,10 @@ int main(int argc, char *argv[]) {
 
     int cursor = 0, top = 0, dcursor = 0, dtop = 0, stab = 0, srow = 0, intro_page = 0, acursor = 0, bcursor = 0, btop = 0, browse_pending = 0, song_pending = 0, song_wait = 0;
     bool song_all = false;
+    int ccursor = 0, rcursor = 0, rank_scope = 0, rank_mode = 0, rank_state = 0, rank_pending = 0;
+    bool lang_changed = false;
+    int ach_filter = UI_ACH_ALL;
+    static int ach_map[LG_MAX_ACH];
     int frow = 0, ftype = 0, fcand = 1; /* fcand: cuanto cambia el numero cada vez */
     unsigned fvalue = 10;
     screen_t screen = SCREEN_HOME;
@@ -1056,9 +1070,17 @@ int main(int argc, char *argv[]) {
             if (down & HidNpadButton_B) { screen = SCREEN_BROWSE; back = true; }
         } else if (screen == SCREEN_DETAIL) {
             ui_layout l = ui_detail_layout(&g_config);
-            int n = g_model.games[cursor].broken ? 0 : g_model.cur.nach;
+            int n = g_model.games[cursor].broken ? 0 : ui_ach_visible(&g_model.cur, ach_filter, ach_map);
+            if (dcursor >= n) dcursor = n ? n - 1 : 0;
             TAP_SELECT(dcursor, n);
             if (n > 0) moved = move_cursor(&dcursor, n, l.cols, nav);
+            if ((down & HidNpadButton_X) && !g_model.games[cursor].broken && g_model.cur.nach > 0) {
+                /* filtro rapido: todos -> obtenidos -> por obtener */
+                ach_filter = (ach_filter + 1) % UI_ACH_FILTERS;
+                ui_set_ach_filter(ach_filter);
+                dcursor = dtop = 0;
+                accepted_alt = true;
+            }
             if ((down & HidNpadButton_Minus) && n > 0) {
                 g_config.ach_view = (g_config.ach_view + 1) % GR_VIEW_COUNT;
                 save_config();
@@ -1070,7 +1092,9 @@ int main(int argc, char *argv[]) {
             if ((down & HidNpadButton_A) && n > 0) { screen = SCREEN_ACH; opened = true; }
             if (down & HidNpadButton_B) { screen = SCREEN_HOME; back = true; }
         } else if (screen == SCREEN_ACH) {
-            int n = g_model.cur.nach, step = 0;
+            int n = ui_ach_visible(&g_model.cur, ach_filter, ach_map), step = 0; /* L y R recorren lo que deja ver el filtro */
+            if (dcursor >= n) dcursor = n ? n - 1 : 0;
+            if (n == 0) screen = SCREEN_DETAIL;
             if (down & (HidNpadButton_R | HidNpadButton_AnyRight)) step = 1;
             if (down & (HidNpadButton_L | HidNpadButton_AnyLeft)) step = -1;
             if (step && dcursor + step >= 0 && dcursor + step < n) { dcursor += step; moved = true; }
@@ -1145,7 +1169,8 @@ int main(int argc, char *argv[]) {
             if (down & HidNpadButton_A) {
                 int opt = ui_tab_option(stab, srow, linked);
                 switch (opt) {
-                    case UI_OPT_LANG:       g_config.lang = (g_config.lang + 1) % GR_LANG_COUNT; break;
+                    case UI_OPT_LANG:       g_config.lang = (g_config.lang + 1) % GR_LANG_COUNT; lang_changed = true; break;
+                    case UI_OPT_APPSOUND:   g_config.app_sound = !g_config.app_sound; sfx_set_enabled(true); break; /* que se oiga el clic al encender */
                     case UI_OPT_THEME:      g_config.theme = (g_config.theme + 1) % GR_THEME_COUNT; break;
                     case UI_OPT_ANIM:       g_config.animated_bg = !g_config.animated_bg; break;
                     case UI_OPT_GAMES_VIEW: g_config.games_view = (g_config.games_view + 1) % GR_VIEW_COUNT; break;
@@ -1211,6 +1236,15 @@ int main(int argc, char *argv[]) {
                     case UI_OPT_ACC_SYNC:
                         sync_start();
                         break;
+                    case UI_OPT_ACC_PHOTO:
+                        acursor = g_account.avatar > 0 && g_account.avatar <= UI_AVATAR_COUNT ? g_account.avatar - 1 : 0;
+                        screen = SCREEN_AVATARS;
+                        break;
+                    case UI_OPT_ACC_COUNTRY:
+                        ccursor = ui_country_index(g_account.country);
+                        if (ccursor < 0) ccursor = 0;
+                        screen = SCREEN_COUNTRY;
+                        break;
                     case UI_OPT_ACC_UNLINK:
                         memset(&g_account, 0, sizeof(g_account));
                         gr_account_save(&g_account, ACCOUNT_PATH);
@@ -1226,6 +1260,7 @@ int main(int argc, char *argv[]) {
                 if (opt < UI_OPT_DIAG) {
                     accepted = true;
                     save_config();
+                    if (lang_changed) { refresh_greeting(); lang_changed = false; } /* la frase del perfil cambia de idioma */
                     top = 0; /* la vista pudo cambiar de forma */
                     follow(cursor, &top, ui_home_layout(&g_config));
                 } else if (opt == UI_OPT_ACC_SYNC) {
@@ -1266,8 +1301,10 @@ int main(int argc, char *argv[]) {
             if (down & (HidNpadButton_L | HidNpadButton_B)) { screen = SCREEN_HOME; back = true; }
             if (down & HidNpadButton_X) { screen = SCREEN_BADGES; opened = true; }
             if ((down & HidNpadButton_A) && g_account.linked) {
-                acursor = g_account.avatar > 0 && g_account.avatar <= UI_AVATAR_COUNT ? g_account.avatar - 1 : 0;
-                screen = SCREEN_AVATARS;
+                screen = SCREEN_RANKING;
+                rcursor = 0;
+                rank_state = 0;
+                rank_pending = 2;
                 accepted = true;
             }
             if ((down & HidNpadButton_Y) && g_account.linked) {
@@ -1279,7 +1316,7 @@ int main(int argc, char *argv[]) {
         } else if (screen == SCREEN_AVATARS) {
             TAP_SELECT(acursor, UI_AVATAR_COUNT);
             moved = move_cursor(&acursor, UI_AVATAR_COUNT, UI_AVATAR_COLS, nav);
-            if (down & HidNpadButton_B) { screen = SCREEN_PROFILE; back = true; }
+            if (down & HidNpadButton_B) { screen = SCREEN_SETTINGS; stab = UI_TAB_ACCOUNT; back = true; }
             if (down & HidNpadButton_A) {
                 char err[160] = "";
                 if (!net_online()) {
@@ -1292,10 +1329,71 @@ int main(int argc, char *argv[]) {
                     trace("cambiar foto: %s %s", err, net_last_error());
                     show_message(false, "No se pudo cambiar la foto", err[0] ? err : "Inténtalo de nuevo en un momento.", NULL);
                 }
-                g_msg_return = SCREEN_PROFILE;
+                g_msg_return = SCREEN_SETTINGS;
+                g_msg_tab = UI_TAB_ACCOUNT;
                 screen = SCREEN_MSG;
                 accepted = true;
             }
+        } else if (screen == SCREEN_COUNTRY) {
+            TAP_SELECT(ccursor, UI_COUNTRY_COUNT);
+            moved = move_cursor(&ccursor, UI_COUNTRY_COUNT, UI_COUNTRY_COLS, nav);
+            if (down & HidNpadButton_B) { screen = SCREEN_SETTINGS; stab = UI_TAB_ACCOUNT; back = true; }
+            if (down & (HidNpadButton_A | HidNpadButton_X)) {
+                char err[160] = "";
+                const char *code = (down & HidNpadButton_X) ? "" : ui_country_code(ccursor);
+                if (!net_online()) show_message(false, "Sin conexión", "Conecta la consola a internet para cambiar el país.", NULL);
+                else if (gr_set_country(net_http, &g_account, code, err, sizeof(err)) == GR_NET_OK) {
+                    gr_account_save(&g_account, ACCOUNT_PATH);
+                    refresh_greeting();
+                    show_message(true, code[0] ? "País guardado" : "País quitado", "Se ve en tu perfil y en el ranking.", NULL);
+                } else {
+                    trace("cambiar pais: %s %s", err, net_last_error());
+                    show_message(false, "No se pudo cambiar el país", err[0] ? err : "Inténtalo de nuevo en un momento.", NULL);
+                }
+                g_msg_return = SCREEN_SETTINGS;
+                g_msg_tab = UI_TAB_ACCOUNT;
+                screen = SCREEN_MSG;
+                accepted = true;
+            }
+        } else if (screen == SCREEN_RANKING) {
+            /* juegos por los que se puede clasificar: los que ya tienen algun logro tuyo */
+            int ngames = 0, gidx[GR_MAX_GAMES];
+            for (int i = 0; i < g_model.ngames; i++)
+                if (g_model.games[i].unlocked > 0) gidx[ngames++] = i;
+            if (rank_mode > ngames) rank_mode = 0;
+            if (rank_pending) {
+                dirty = true;
+                if (--rank_pending == 0) {
+                    static const char *scopes[3] = { "global", "country", "friends" };
+                    if (rank_scope == 1 && !g_account.country[0]) rank_state = 3;
+                    else if (!net_online()) rank_state = 2;
+                    else {
+                        gr_net_result r = gr_ranking(net_http, &g_account, scopes[rank_scope], rank_scope == 1 ? g_account.country : "",
+                                                     rank_mode > 0 ? g_model.games[gidx[rank_mode - 1]].tid : "", g_rank, &g_nrank, &g_rank_me, &g_rank_total);
+                        rank_state = r == GR_NET_OK ? 1 : 2;
+                        if (r != GR_NET_OK) trace("ranking: fallo %d %s", (int)r, net_last_error());
+                    }
+                    if (rcursor >= g_nrank) rcursor = 0;
+                }
+            }
+            if (rank_state == 1) { TAP_SELECT(rcursor, g_nrank); if (g_nrank > 0) moved = move_cursor(&rcursor, g_nrank, 1, nav); }
+            if (down & HidNpadButton_X) { rank_scope = (rank_scope + 1) % 3; rank_state = 0; rank_pending = 2; rcursor = 0; accepted_alt = true; }
+            if (down & HidNpadButton_Y) { rank_mode = (rank_mode + 1) % (ngames + 1); rank_state = 0; rank_pending = 2; rcursor = 0; accepted_alt = true; }
+            if ((down & HidNpadButton_A) && rank_state == 1 && g_nrank > 0) { g_rank_view = g_rank[rcursor]; screen = SCREEN_USER; accepted = true; }
+            if (down & HidNpadButton_B) { screen = SCREEN_PROFILE; back = true; }
+        } else if (screen == SCREEN_USER) {
+            bool other = strcasecmp(g_rank_view.username, g_account.username) != 0;
+            if ((down & HidNpadButton_A) && other) {
+                char err[160] = "", line[96];
+                gr_net_result r = net_online() ? gr_follow_user(net_http, &g_account, g_rank_view.username, err, sizeof(err)) : GR_NET_OFFLINE;
+                snprintf(line, sizeof(line), "Ahora sigues a @%s.", g_rank_view.username);
+                if (r == GR_NET_OK) { show_message(true, "¡Listo!", line, NULL); sync_start(); }
+                else show_message(false, "No se pudo seguir", r == GR_NET_OFFLINE ? "No hay conexión a internet." : err, NULL);
+                g_msg_return = SCREEN_RANKING;
+                screen = SCREEN_MSG;
+                accepted = true;
+            }
+            if (down & HidNpadButton_B) { screen = SCREEN_RANKING; back = true; }
         } else if (screen == SCREEN_BADGES) {
             if (down & HidNpadButton_B) { screen = SCREEN_PROFILE; back = true; }
         } else if (screen == SCREEN_MSG) {
@@ -1386,14 +1484,27 @@ int main(int argc, char *argv[]) {
         bool redraw = dirty;
         if (dirty) {
             if (screen == SCREEN_DETAIL) ui_detail(&layer, &g_assets, &g_model, &g_config, cursor, dcursor, dtop);
-            else if (screen == SCREEN_ACH) ui_achievement(&layer, &g_assets, &g_model, cursor, dcursor);
+            else if (screen == SCREEN_ACH) {
+                int n = ui_ach_visible(&g_model.cur, ach_filter, ach_map);
+                ui_achievement(&layer, &g_assets, &g_model, cursor, ach_map[dcursor < n ? dcursor : 0]);
+            }
             else if (screen == SCREEN_SETTINGS) {
-                ui_account acc = { .linked = g_account.linked, .username = g_account.username, .caption = g_account.caption };
+                ui_account acc = { .linked = g_account.linked, .username = g_account.username, .caption = (g_ui_en && g_account.caption_en[0]) ? g_account.caption_en : g_account.caption };
                 sync_text(&acc.sync_es, &acc.sync_en);
                 ui_settings(&layer, &g_assets, &g_config, stab, srow, g_system_spanish, g_system_dark, &acc);
             }
             else if (screen == SCREEN_PROFILE) ui_profile_screen(&layer, &g_assets, &g_profile);
             else if (screen == SCREEN_BADGES) ui_badges(&layer, &g_assets, &g_profile);
+            else if (screen == SCREEN_COUNTRY) ui_countries(&layer, &g_assets, ccursor, g_account.country);
+            else if (screen == SCREEN_RANKING) {
+                static const char *sc_es[3] = { "Global", "Mi país", "Amigos" }, *sc_en[3] = { "Global", "My country", "Friends" };
+                int ngames = 0, gidx[GR_MAX_GAMES];
+                for (int i = 0; i < g_model.ngames; i++)
+                    if (g_model.games[i].unlocked > 0) gidx[ngames++] = i;
+                const char *mode = rank_mode > 0 && rank_mode <= ngames ? g_model.games[gidx[rank_mode - 1]].name : (g_ui_en ? "Total points" : "Puntos totales");
+                ui_ranking(&layer, &g_assets, g_rank, g_nrank, &g_rank_me, g_rank_total, sc_es[rank_scope], sc_en[rank_scope], mode, rcursor, rank_state);
+            }
+            else if (screen == SCREEN_USER) ui_user(&layer, &g_assets, &g_rank_view, strcasecmp(g_rank_view.username, g_account.username) != 0);
             else if (screen == SCREEN_AVATARS) ui_avatars(&layer, &g_assets, &g_profile, acursor);
             else if (screen == SCREEN_BROWSE) ui_browse(&layer, &g_assets, g_cat, g_cat_shown, g_cat_nshown, g_cat_n, g_cat_have, g_cat_query, g_cat_state, bcursor, btop);
             else if (screen == SCREEN_SEARCH) {

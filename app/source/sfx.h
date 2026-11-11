@@ -7,6 +7,7 @@ typedef enum { SFX_NAV, SFX_ACCEPT, SFX_ACCEPT_ALT, SFX_OPEN, SFX_BACK, SFX_COUN
 
 bool sfx_init(void);
 void sfx_play(sfx_id id);
+void sfx_set_enabled(bool on); /* apagar o encender los sonidos de los botones (la musica va aparte) */
 void sfx_update(void); /* una vez por cuadro */
 void sfx_exit(void);
 

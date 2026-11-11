@@ -102,8 +102,11 @@ fail_pool:
     return false;
 }
 
+static bool g_sfx_on = true;
+void sfx_set_enabled(bool on) { g_sfx_on = on; }
+
 void sfx_play(sfx_id id) {
-    if (!g_ok || id < 0 || id >= SFX_COUNT) return;
+    if (!g_ok || !g_sfx_on || id < 0 || id >= SFX_COUNT) return;
     /* reiniciar la voz: si el mismo sonido seguia sonando, empieza de nuevo */
     audrvVoiceStop(&g_drv, id);
     audrvVoiceAddWaveBuf(&g_drv, id, &g_wave[id]);

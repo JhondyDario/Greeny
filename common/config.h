@@ -21,6 +21,7 @@ typedef struct {
     int  start_page;  /* gr_start: que pantalla abre la app */
     int  games_scope; /* gr_scope: solo los juegos instalados, o tambien los ya jugados */
     int  games_show;  /* gr_show: todos, por completar o completados */
+    bool app_sound;   /* sonidos de los botones dentro de la app */
     bool music;       /* musica de fondo en la app */
     char music_track[32]; /* cancion elegida (su id); "" = ninguna */
 } gr_config;

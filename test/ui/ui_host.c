@@ -120,7 +120,7 @@ int main(int argc, char **argv) {
         bool dark = v & 1, en = v & 2;
         char sfx[32];
         snprintf(sfx, sizeof(sfx), "%s%s", dark ? "_dark" : "", en ? "_en" : "");
-        static ui_profile chip = { .name = "Jhondy", .username = "megaJHONDY", .caption = "", .linked = true, .avatar = 4, .stats = { 1, 7, 0, 180 } };
+        static ui_profile chip = { .name = "Jhondy", .username = "megaJHONDY", .caption = "", .linked = true, .avatar = 4, .country = "DO", .stats = { 1, 7, 0, 180 } };
         ui_set_profile(&chip);
         ui_set_dark(dark);
         ui_set_background(bg[dark]);
@@ -261,6 +261,23 @@ int main(int argc, char **argv) {
                                                 "#1  heap+0x1A2B3D10", "#2  main+0x19F0124", "Ya son pocas: elige una y busca sus punteros." };
             ui_search(&c, &a, 10, 32, 1, 0, lines, 6, true);
             save(&c, out, "buscador_valores", sfx);
+        }
+        {
+            static const gr_rank_row rows[10] = {
+                { 1, "megaJHONDY", "Jhondy", 4, "DO", 520, 900, 41 }, { 2, "ana_99", "", 9, "MX", 480, 480, 30 }, { 3, "luis", "Luis M", 15, "ES", 310, 310, 22 },
+                { 4, "player4", "", 20, "US", 250, 400, 18 }, { 5, "kira", "Kira", 28, "JP", 240, 240, 17 }, { 6, "sol", "Sol", 31, "AR", 200, 200, 15 },
+                { 7, "nacho", "", 2, "", 180, 180, 12 }, { 8, "bea", "Bea", 12, "CO", 150, 150, 11 }, { 9, "tom", "Tom", 17, "GB", 120, 120, 9 }, { 10, "zed", "", 33, "BR", 100, 100, 8 } };
+            static const gr_rank_row yo = { 14, "Jhondy", "Jhondy", 4, "DO", 70, 70, 7 };
+            ui_ranking(&c, &a, rows, 10, &yo, 37, "Global", "Global", "Puntos totales", 2, 1);
+            save(&c, out, "ranking", sfx);
+            ui_ranking(&c, &a, rows, 3, &yo, 14, "Mi país", "My country", "Super Mario 3D World", 0, 1);
+            save(&c, out, "ranking_pais", sfx);
+            ui_ranking(&c, &a, rows, 0, &yo, 0, "Mi país", "My country", "Puntos totales", 0, 3);
+            save(&c, out, "ranking_sin_pais", sfx);
+            ui_user(&c, &a, &rows[2], true);
+            save(&c, out, "usuario", sfx);
+            ui_countries(&c, &a, 0, "DO");
+            save(&c, out, "paises", sfx);
         }
         ui_avatars(&c, &a, &chip, 7);
         save(&c, out, "avatars", sfx);

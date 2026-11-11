@@ -157,6 +157,8 @@ void gr_account_load(gr_account *a, const char *path) {
         else if (!strcmp(line, "friend_code")) snprintf(a->friend_code, sizeof(a->friend_code), "%s", v);
         else if (!strcmp(line, "avatar")) a->avatar = atoi(v);
         else if (!strcmp(line, "admin")) a->admin = v[0] == '1';
+        else if (!strcmp(line, "country")) snprintf(a->country, sizeof(a->country), "%.2s", v);
+        else if (!strcmp(line, "caption_en")) snprintf(a->caption_en, sizeof(a->caption_en), "%s", v);
     }
     fclose(f);
     if (!a->token[0]) a->linked = false;
@@ -172,6 +174,8 @@ int gr_account_save(const gr_account *a, const char *path) {
     if (ok && a->friend_code[0]) ok = fprintf(f, "friend_code=%s\n", a->friend_code) > 0;
     if (ok && a->avatar > 0) ok = fprintf(f, "avatar=%d\n", a->avatar) > 0;
     if (ok && a->admin) ok = fprintf(f, "admin=1\n") > 0;
+    if (ok && a->country[0]) ok = fprintf(f, "country=%s\n", a->country) > 0;
+    if (ok && a->caption_en[0]) ok = fprintf(f, "caption_en=%s\n", a->caption_en) > 0;
     if (fclose(f) != 0) ok = 0;
     return ok ? 0 : -1;
 }
@@ -234,7 +238,87 @@ gr_net_result gr_fetch_social(gr_http_fn http, gr_account *a) {
     if (gr_json_int(resp, "avatar", &avatar) && avatar > 0) a->avatar = avatar;
     bool admin;
     if (gr_json_bool(resp, "admin", &admin)) a->admin = admin;
+    char country[8] = "";
+    gr_json_string(resp, "country", country, sizeof(country)); /* null = sin pais */
+    snprintf(a->country, sizeof(a->country), "%.2s", country);
+    a->caption_en[0] = 0;
+    gr_json_string(resp, "caption_en", a->caption_en, sizeof(a->caption_en));
     return GR_NET_OK;
+}
+
+gr_net_result gr_set_country(gr_http_fn http, gr_account *a, const char *code, char *err, size_t errlen) {
+    char body[160], resp[RESP_MAX];
+    if (!a->token[0] || !a->linked) { snprintf(err, errlen, "Esta consola no está vinculada."); return GR_NET_REJECTED; }
+    if (strlen(code) != 2 && code[0]) { snprintf(err, errlen, "País inválido."); return GR_NET_REJECTED; }
+    snprintf(body, sizeof(body), "{\"device_token\":\"%s\",\"code\":\"%.2s\"}", a->token, code);
+    gr_net_result r = call(http, "/rest/v1/rpc/device_set_country", NULL, body, resp, sizeof(resp), err, errlen);
+    if (r == GR_NET_OK) snprintf(a->country, sizeof(a->country), "%.2s", code);
+    return r;
+}
+
+static void rank_row(const char *obj, gr_rank_row *r) {
+    memset(r, 0, sizeof(*r));
+    gr_json_int(obj, "position", &r->position);
+    gr_json_string(obj, "username", r->username, sizeof(r->username));
+    gr_json_string(obj, "display_name", r->display, sizeof(r->display));
+    gr_json_int(obj, "avatar", &r->avatar);
+    char c[8] = "";
+    gr_json_string(obj, "country", c, sizeof(c));
+    snprintf(r->country, sizeof(r->country), "%.2s", c);
+    gr_json_int(obj, "points", &r->points);
+    gr_json_int(obj, "total_points", &r->total_points);
+    gr_json_int(obj, "achievements", &r->achievements);
+}
+
+gr_net_result gr_ranking(gr_http_fn http, const gr_account *a, const char *scope, const char *country, const char *title,
+                         gr_rank_row *top, int *ntop, gr_rank_row *me, int *total) {
+    *ntop = 0;
+    *total = 0;
+    memset(me, 0, sizeof(*me));
+    char body[320], q1[8], q2[40];
+    char *resp = malloc(16 * 1024);
+    if (!resp) return GR_NET_BAD;
+    snprintf(q1, sizeof(q1), "%.2s", country ? country : "");
+    snprintf(q2, sizeof(q2), "%.16s", title ? title : "");
+    int n = snprintf(body, sizeof(body), "{\"device_token\":\"%s\",\"scope\":\"%s\"", a->token,
+                     !strcmp(scope, "country") ? "country" : !strcmp(scope, "friends") ? "friends" : "global");
+    if (q1[0]) n += snprintf(body + n, sizeof(body) - (size_t)n, ",\"country\":\"%s\"", q1);
+    if (q2[0]) n += snprintf(body + n, sizeof(body) - (size_t)n, ",\"title\":\"%s\"", q2);
+    snprintf(body + n, sizeof(body) - (size_t)n, "}");
+    gr_net_result r = call(http, "/rest/v1/rpc/device_ranking", NULL, body, resp, 16 * 1024, NULL, 0);
+    if (r == GR_NET_OK) {
+        gr_json_int(resp, "total", total);
+        /* "me" es un objeto o null */
+        char *m = strstr(resp, "\"me\":");
+        if (m && (m = strchr(m, ':'))) {
+            m++;
+            while (*m == ' ') m++; /* Postgres deja un espacio despues de los dos puntos */
+            char *end = *m == '{' ? strchr(m, '}') : NULL;
+            if (end) { char saved = end[1]; end[1] = 0; rank_row(m, me); end[1] = saved; }
+        }
+        char *t = strstr(resp, "\"top\":");
+        char *stop = t ? strchr(t, ']') : NULL;
+        for (char *p = t ? strchr(t, '{') : NULL; p && stop && p < stop && *ntop < GR_RANK_TOP; ) {
+            char *end = strchr(p, '}');
+            if (!end) break;
+            char saved = end[1];
+            end[1] = 0;
+            rank_row(p, &top[*ntop]);
+            if (top[*ntop].username[0]) (*ntop)++;
+            end[1] = saved;
+            p = strchr(end + 1, '{');
+        }
+    }
+    free(resp);
+    return r;
+}
+
+gr_net_result gr_follow_user(gr_http_fn http, const gr_account *a, const char *username, char *err, size_t errlen) {
+    char u[64], body[256], resp[RESP_MAX];
+    if (!a->token[0] || !a->linked) { snprintf(err, errlen, "Esta consola no está vinculada."); return GR_NET_REJECTED; }
+    gr_json_escape(u, sizeof(u), username);
+    snprintf(body, sizeof(body), "{\"device_token\":\"%s\",\"who\":\"%s\"}", a->token, u);
+    return call(http, "/rest/v1/rpc/device_follow_user", NULL, body, resp, sizeof(resp), err, errlen);
 }
 
 gr_net_result gr_set_avatar(gr_http_fn http, gr_account *a, int picture, char *err, size_t errlen) {

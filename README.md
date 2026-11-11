@@ -148,6 +148,8 @@ make -C test
 | Aviso del juego con las medallas dibujadas (se leen de la SD) | Revisado en PC; falta probarlo en consola |
 | "Última vez jugado" en la lista de juegos | Falta probarlo en consola |
 | Buscador de valores (encuentra direcciones y cadenas de punteros para crear logros) | Probado en PC con memoria simulada; falta probarlo en consola |
+| Ranking (global, por país, amigos; por puntos o por juego) y país en el perfil, en la app y en la web | Revisado en PC y en navegador; falta probarlo en consola y contra el servidor real |
+| App: filtro rápido de logros (X), sonidos de la app configurables | Revisado en PC; falta probarlo en consola |
 | Menú dentro del juego (overlay de Tesla), nombres de juegos desde una base pública | Pendiente |
 | Iconos por logro, música y animaciones en la app | Pendiente ([docs/RECURSOS.md](docs/RECURSOS.md)) |
 
@@ -167,5 +169,6 @@ GPLv2 (ver [LICENSE](LICENSE)). Incluye código derivado de
 [Atmosphère](https://github.com/Atmosphere-NX/Atmosphere) (`dmntcht`) y sigue el
 procedimiento de capa de [libtesla](https://github.com/WerWolv/libtesla), ambos
 GPLv2. Letras del aviso dentro del juego: [Inter](https://github.com/rsms/inter)
-(SIL Open Font License). Carga de imágenes y música: [stb_image y stb_vorbis](https://github.com/nothings/stb)
+(SIL Open Font License). Banderas: [Twemoji](https://github.com/jdecked/twemoji) (CC-BY 4.0).
+Carga de imágenes y música: [stb_image y stb_vorbis](https://github.com/nothings/stb)
 (dominio público). La mascota y el nombre Greeny son de Jhondy.

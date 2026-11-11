@@ -35,6 +35,8 @@ typedef struct {
     int  followers, following;
     char friend_code[24];  /* GR-123456; "" si aun no se sabe */
     int  avatar;           /* foto de perfil elegida (1..); 0 = aun no se sabe */
+    char country[4];       /* pais elegido, dos letras ("DO"); "" = sin indicar */
+    char caption_en[64];   /* la frase en ingles, si es una de las de la lista */
     bool admin;            /* la cuenta es de un administrador: ve las herramientas para crear logros */
 } gr_account;
 
@@ -57,6 +59,28 @@ gr_net_result gr_follow_code(gr_http_fn http, const gr_account *a, const char *c
 
 /* Cambia la foto de perfil por la numero `picture` de las que trae Greeny. */
 gr_net_result gr_set_avatar(gr_http_fn http, gr_account *a, int picture, char *err, size_t errlen);
+
+/* Cambia el pais del perfil ("" lo quita). */
+gr_net_result gr_set_country(gr_http_fn http, gr_account *a, const char *code, char *err, size_t errlen);
+
+/* Una fila del ranking. */
+typedef struct {
+    int  position;
+    char username[24];
+    char display[36];
+    int  avatar;
+    char country[4];
+    int  points;        /* los de esta clasificacion (totales o del juego) */
+    int  total_points;  /* para calcular el nivel */
+    int  achievements;
+} gr_rank_row;
+#define GR_RANK_TOP 10
+/* scope: "global", "country" o "friends". title: "" = por puntos totales, o un title id.
+ * Deja hasta GR_RANK_TOP filas en top; me.position = 0 si la cuenta no figura. */
+gr_net_result gr_ranking(gr_http_fn http, const gr_account *a, const char *scope, const char *country, const char *title,
+                         gr_rank_row *top, int *ntop, gr_rank_row *me, int *total);
+/* Sigue a alguien por su nombre de usuario. */
+gr_net_result gr_follow_user(gr_http_fn http, const gr_account *a, const char *username, char *err, size_t errlen);
 
 /* Entra con correo y contraseña y registra la consola de una vez. */
 gr_net_result gr_login_password(gr_http_fn http, const char *email, const char *password, const char *device_name,

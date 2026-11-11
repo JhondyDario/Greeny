@@ -13,14 +13,14 @@
 #define UI_COVER_BIG  150  /* caratula en la cuadricula */
 
 #define UI_APP_NAME    "Greeny"
-#define UI_APP_VERSION "0.0.17"
+#define UI_APP_VERSION "0.0.18"
 
 /* opciones, agrupadas en pestañas que se cambian con L y R */
 enum {
-    UI_OPT_LANG, UI_OPT_THEME, UI_OPT_ANIM, UI_OPT_GAMES_VIEW, UI_OPT_ACH_VIEW, UI_OPT_SOUND, UI_OPT_POPUP, UI_OPT_START, UI_OPT_SCOPE, UI_OPT_SHOW, UI_OPT_INGAME, UI_OPT_MUSIC, UI_OPT_SONG,
+    UI_OPT_LANG, UI_OPT_THEME, UI_OPT_ANIM, UI_OPT_GAMES_VIEW, UI_OPT_ACH_VIEW, UI_OPT_SOUND, UI_OPT_POPUP, UI_OPT_START, UI_OPT_SCOPE, UI_OPT_SHOW, UI_OPT_INGAME, UI_OPT_MUSIC, UI_OPT_SONG, UI_OPT_APPSOUND,
     UI_OPT_DIAG, UI_OPT_ABOUT, UI_OPT_SEARCH,
     /* pestaña Cuenta: unas u otras segun si la consola esta vinculada */
-    UI_OPT_ACC_LINK, UI_OPT_ACC_LOGIN, UI_OPT_ACC_INFO, UI_OPT_ACC_SYNC, UI_OPT_ACC_UNLINK,
+    UI_OPT_ACC_LINK, UI_OPT_ACC_LOGIN, UI_OPT_ACC_INFO, UI_OPT_ACC_SYNC, UI_OPT_ACC_UNLINK, UI_OPT_ACC_PHOTO, UI_OPT_ACC_COUNTRY,
     UI_OPT_COUNT
 };
 #define UI_TABS 6
@@ -104,6 +104,7 @@ typedef struct {
     const char *username;   /* "" si la consola no esta vinculada */
     const char *caption;
     const char *friend_code; /* "" si aun no se sabe */
+    const char *country;    /* pais, dos letras; "" = sin indicar */
     int avatar;             /* foto de perfil elegida, de 1 a UI_AVATAR_COUNT; 0 = la inicial del nombre */
     bool linked;
     bool social_known;      /* false = todavia no se sabe cuantos seguidores tiene */
@@ -127,6 +128,7 @@ void ui_background(gfx_canvas *c, float t);
 void ui_home(gfx_canvas *c, const ui_assets *a, const gr_model *m, const gr_config *cfg, int cursor, int top);
 void ui_detail(gfx_canvas *c, const ui_assets *a, const gr_model *m, const gr_config *cfg, int game, int cursor, int top);
 /* Buscador de juegos del catalogo. `shown` son los indices de `games` que pasan el filtro. */
+#include "account.h"
 #include "catalog.h"
 typedef enum { UI_BROWSE_LOADING, UI_BROWSE_OK, UI_BROWSE_OFFLINE } ui_browse_state;
 #define UI_BROWSE_ROWS 6
@@ -140,6 +142,24 @@ void ui_browse_game(gfx_canvas *c, const ui_assets *a, const gr_cat_game *game, 
 #define UI_SEARCH_LINES 15
 void ui_search(gfx_canvas *c, const ui_assets *a, unsigned value, int type_bits, int step, int row,
                const char lines[][128], int nlines, bool has_plan);
+
+/* Filtro rapido de la pantalla de logros de un juego (boton X). */
+typedef enum { UI_ACH_ALL, UI_ACH_GOT, UI_ACH_MISSING, UI_ACH_FILTERS } ui_ach_filter;
+void ui_set_ach_filter(int filter);
+/* Los logros de `g` que pasan el filtro: deja sus indices en map (LG_MAX_ACH) y devuelve cuantos son. */
+int ui_ach_visible(const lg_game *g, int filter, int *map);
+
+/* Paises: indice en la lista (scripts/paises.py) a partir del codigo de dos letras, o -1. */
+int ui_country_index(const char *code);
+const char *ui_country_code(int index);
+#define UI_COUNTRY_COLS 10
+void ui_countries(gfx_canvas *c, const ui_assets *a, int cursor, const char *current);
+
+/* Ranking. `state`: 0 cargando, 1 listo, 2 sin conexion, 3 falta elegir pais. */
+void ui_ranking(gfx_canvas *c, const ui_assets *a, const gr_rank_row *rows, int n, const gr_rank_row *me, int total,
+                const char *scope_es, const char *scope_en, const char *mode, int cursor, int state);
+/* El perfil de alguien del ranking, con la opcion de seguirlo. */
+void ui_user(gfx_canvas *c, const ui_assets *a, const gr_rank_row *who, bool can_follow);
 
 /* Un logro al detalle: imagen grande, puntos, dificultad y fecha. */
 void ui_achievement(gfx_canvas *c, const ui_assets *a, const gr_model *m, int game, int index);
