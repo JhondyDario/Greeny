@@ -147,6 +147,7 @@ make -C test
 | Música de fondo en la app (4 canciones que se bajan desde Opciones → Música) | Decodificación probada en PC; falta probarla en consola |
 | Aviso del juego con las medallas dibujadas (se leen de la SD) | Revisado en PC; falta probarlo en consola |
 | "Última vez jugado" en la lista de juegos | Falta probarlo en consola |
+| Buscador de valores (encuentra direcciones y cadenas de punteros para crear logros) | Probado en PC con memoria simulada; falta probarlo en consola |
 | Menú dentro del juego (overlay de Tesla), nombres de juegos desde una base pública | Pendiente |
 | Iconos por logro, música y animaciones en la app | Pendiente ([docs/RECURSOS.md](docs/RECURSOS.md)) |
 

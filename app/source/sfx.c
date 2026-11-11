@@ -1,6 +1,7 @@
 #include "sfx.h"
 
 #include <malloc.h>
+#include <stdio.h>
 #include <string.h>
 #include <switch.h>
 
@@ -19,11 +20,11 @@
 #define MUSIC_VOICE SFX_COUNT
 #define MUSIC_BUFS 4
 #define MUSIC_BUF_BYTES 0xC000 /* multiplo de pagina; 12288 cuadros en estereo */
-#define MUSIC_VOLUME 0.30f
+#define MUSIC_VOLUME 0.45f
 
 static const AudioRendererConfig k_config = {
     .output_rate     = AudioRendererOutputRate_48kHz,
-    .num_voices      = SFX_COUNT + 1,
+    .num_voices      = SFX_COUNT + 2, /* los sonidos, la musica y una de sobra */
     .num_effects     = 0,
     .num_sinks       = 1,
     .num_mix_objs    = 1,
@@ -133,33 +134,44 @@ void sfx_music_stop(void) {
 bool sfx_music_playing(void) { return g_ogg != NULL; }
 bool sfx_music_finished(void) { return g_ogg != NULL && g_music_finished; }
 
+static char g_music_note[96] = "sin intentar";
+const char *sfx_music_note(void) { return g_music_note; }
+
 bool sfx_music_play(const char *path) {
-    if (!g_ok || !g_music_pool) return false;
+    if (!g_ok) { snprintf(g_music_note, sizeof(g_music_note), "el audio de la app no arranco"); return false; }
+    if (!g_music_pool) { snprintf(g_music_note, sizeof(g_music_note), "sin memoria para la musica"); return false; }
     sfx_music_stop();
     int err = 0;
     g_ogg = stb_vorbis_open_filename(path, &err, NULL);
-    if (!g_ogg) return false;
+    if (!g_ogg) { snprintf(g_music_note, sizeof(g_music_note), "no se pudo abrir el OGG (error %d)", err); return false; }
     stb_vorbis_info info = stb_vorbis_get_info(g_ogg);
-    g_ogg_channels = info.channels >= 2 ? 2 : 1;
-    if (info.sample_rate < 8000 || info.sample_rate > 48000) { stb_vorbis_close(g_ogg); g_ogg = NULL; return false; }
-
-    audrvVoiceInit(&g_drv, MUSIC_VOICE, g_ogg_channels, PcmFormat_Int16, (int)info.sample_rate);
-    audrvVoiceSetDestinationMix(&g_drv, MUSIC_VOICE, AUDREN_FINAL_MIX_ID);
-    if (g_ogg_channels == 2) {
-        audrvVoiceSetMixFactor(&g_drv, MUSIC_VOICE, MUSIC_VOLUME, 0, 0);
-        audrvVoiceSetMixFactor(&g_drv, MUSIC_VOICE, 0.0f, 0, 1);
-        audrvVoiceSetMixFactor(&g_drv, MUSIC_VOICE, 0.0f, 1, 0);
-        audrvVoiceSetMixFactor(&g_drv, MUSIC_VOICE, MUSIC_VOLUME, 1, 1);
-    } else {
-        audrvVoiceSetMixFactor(&g_drv, MUSIC_VOICE, MUSIC_VOLUME, 0, 0);
-        audrvVoiceSetMixFactor(&g_drv, MUSIC_VOICE, MUSIC_VOLUME, 0, 1);
+    /* Siempre en mono: es exactamente el mismo camino que usan los sonidos de la app, que ya
+     * funcionan en la consola (una voz estereo necesita mas recursos del sistema de audio). */
+    g_ogg_channels = 1;
+    if (info.sample_rate < 8000 || info.sample_rate > 48000) {
+        snprintf(g_music_note, sizeof(g_music_note), "frecuencia no admitida (%u Hz)", info.sample_rate);
+        stb_vorbis_close(g_ogg);
+        g_ogg = NULL;
+        return false;
     }
+
+    bool voice = audrvVoiceInit(&g_drv, MUSIC_VOICE, 1, PcmFormat_Int16, (int)info.sample_rate);
+    audrvVoiceSetDestinationMix(&g_drv, MUSIC_VOICE, AUDREN_FINAL_MIX_ID);
+    audrvVoiceSetMixFactor(&g_drv, MUSIC_VOICE, MUSIC_VOLUME, 0, 0);
+    audrvVoiceSetMixFactor(&g_drv, MUSIC_VOICE, MUSIC_VOLUME, 0, 1);
     memset(g_music_wave, 0, sizeof(g_music_wave));
     g_music_eof = g_music_finished = false;
     for (int i = 0; i < MUSIC_BUFS; i++) music_fill(i);
     audrvVoiceStart(&g_drv, MUSIC_VOICE);
-    audrvUpdate(&g_drv);
-    return true;
+    Result rc = audrvUpdate(&g_drv);
+    snprintf(g_music_note, sizeof(g_music_note), "voz %s, %u Hz, primer trozo %d cuadros, update 0x%X", voice ? "ok" : "FALLO",
+             info.sample_rate, (int)g_music_wave[0].end_sample_offset, (unsigned)rc);
+    return voice;
+}
+
+/* Cuantos samples ha sonado ya la cancion: si se queda en 0, el sistema no la esta reproduciendo. */
+unsigned sfx_music_played(void) {
+    return g_ogg ? audrvVoiceGetPlayedSampleCount(&g_drv, MUSIC_VOICE) : 0;
 }
 
 void sfx_update(void) {

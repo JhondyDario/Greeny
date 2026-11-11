@@ -17,6 +17,7 @@
 #include "dmntcht.h"
 #include "engine.h"
 #include "sound.h"
+#include "search.h"
 #include "toast.h"
 
 #define DIR_ROOT     "sdmc:/config/greeny"
@@ -138,6 +139,7 @@ static u64 now_ms(void) {
 
 static lg_game g_game;
 static lg_bases g_bases;
+static u64 g_main_size, g_space_end; /* para el buscador de valores */
 static bool g_loaded;
 static char g_unlocked_path[96];
 
@@ -280,6 +282,8 @@ static attach_result attach(u64 pid, u64 tid) {
         return ATTACH_GIVE_UP;
     }
 
+    g_main_size = meta.main_nso_extents.size;
+    g_space_end = meta.address_space_extents.base + meta.address_space_extents.size;
     g_bases.main_base = meta.main_nso_extents.base;
     g_bases.heap_base = meta.heap_extents.base;
     log_line("%016lX: enganchado, build %.16s, main=0x%lX heap=0x%lX", tid, build, g_bases.main_base,
@@ -309,7 +313,7 @@ int main(int argc, char *argv[]) {
     log_line("Greeny iniciado");
     if (migrated) log_line("progreso migrado desde config/logros");
 
-    u64 cur_pid = 0, cur_tid = 0, attach_at = 0, scan_at = 0;
+    u64 cur_pid = 0, cur_tid = 0, attach_at = 0, scan_at = 0, search_at = 0;
     int retries = 0;
     bool pending = false, bad_defs = false, toast_fail_logged = false, sound_fail_logged = false;
 
@@ -397,6 +401,10 @@ int main(int argc, char *argv[]) {
                 if (g_config.popup)
                     toast_push(TOAST_UNLOCK, (int)lg_ach_tier(a), a->points, g_cfg_dark, en ? "ACHIEVEMENT UNLOCKED" : "LOGRO DESBLOQUEADO", lg_ach_name(a, en), lg_ach_desc(a, en));
                 if (g_config.sound) sound_play(SOUND_UNLOCK);
+            }
+            if (now >= search_at) { /* ordenes del buscador de valores, una vez por segundo */
+                search_at = now + 1000;
+                search_poll(g_bases.main_base, g_main_size, g_bases.heap_base, g_space_end);
             }
             if (g_game.debug) debug_report(cur_tid);
             if (g_game.nscan && now >= scan_at) {

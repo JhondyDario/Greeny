@@ -46,3 +46,7 @@ Result dmntchtReadCheatProcessMemory(u64 address, void *buffer, size_t size) {
         .buffers = { { buffer, size } },
     );
 }
+
+Result dmntchtQueryCheatProcessMemory(MemoryInfo *mem_info, u64 address) {
+    return serviceDispatchInOut(&g_dmntchtSrv, 65104, address, *mem_info);
+}

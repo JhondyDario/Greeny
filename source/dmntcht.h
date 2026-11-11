@@ -26,3 +26,6 @@ Result dmntchtHasCheatProcess(bool *out);
 Result dmntchtGetCheatProcessMetadata(DmntCheatProcessMetadata *out_metadata);
 Result dmntchtForceOpenCheatProcess(void);
 Result dmntchtReadCheatProcessMemory(u64 address, void *buffer, size_t size);
+
+/* Pregunta que hay en esa direccion del juego (para recorrer su memoria). */
+Result dmntchtQueryCheatProcessMemory(MemoryInfo *mem_info, u64 address);

@@ -256,6 +256,12 @@ int main(int argc, char **argv) {
             save(&c, out, "musica", sfx);
             ui_set_music(NULL, 0, -1);
         }
+        {
+            static const char lines[6][128] = { "Filtro terminado.", "Paso 3  |  valor 12  |  tipo u32  |  3 candidata(s)", "#0  heap+0x1A2B3C40",
+                                                "#1  heap+0x1A2B3D10", "#2  main+0x19F0124", "Ya son pocas: elige una y busca sus punteros." };
+            ui_search(&c, &a, 12, 32, 0, 0, lines, 6, true);
+            save(&c, out, "buscador_valores", sfx);
+        }
         ui_avatars(&c, &a, &chip, 7);
         save(&c, out, "avatars", sfx);
         {

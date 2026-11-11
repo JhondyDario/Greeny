@@ -56,7 +56,7 @@
 
 typedef enum {
     SCREEN_HOME, SCREEN_DETAIL, SCREEN_SETTINGS, SCREEN_DIAG, SCREEN_ABOUT, SCREEN_INTRO, SCREEN_LINK, SCREEN_MSG,
-    SCREEN_PROFILE, SCREEN_BADGES, SCREEN_ACH, SCREEN_AVATARS, SCREEN_BROWSE, SCREEN_BROWSE_GAME
+    SCREEN_PROFILE, SCREEN_BADGES, SCREEN_ACH, SCREEN_AVATARS, SCREEN_BROWSE, SCREEN_BROWSE_GAME, SCREEN_SEARCH
 } screen_t;
 
 static gr_model g_model;
@@ -606,6 +606,43 @@ static void follow_with_code(void) {
     sync_start(); /* para que el contador de \"siguiendo\" se ponga al dia */
 }
 
+/* ---------- buscador de valores (lo ejecuta el sysmodule; aqui solo se le dan ordenes) ---------- */
+#define SEARCH_DIR ROOT "/search"
+static char g_search_lines[UI_SEARCH_LINES][128];
+static int g_search_nlines;
+
+static void search_send(const char *fmt, ...) {
+    mkdir(SEARCH_DIR, 0777);
+    remove(SEARCH_DIR "/result.txt"); /* para no confundir la respuesta vieja con la nueva */
+    FILE *f = fopen(SEARCH_DIR "/cmd.txt", "w");
+    if (!f) return;
+    va_list ap;
+    va_start(ap, fmt);
+    vfprintf(f, fmt, ap);
+    va_end(ap);
+    fputc('\n', f);
+    fclose(f);
+    g_search_nlines = 1;
+    snprintf(g_search_lines[0], sizeof(g_search_lines[0]), "Orden enviada. Esperando al sistema de logros...");
+}
+
+/* Lee la respuesta. Devuelve true si cambio lo que hay que mostrar. */
+static bool search_read(void) {
+    FILE *f = fopen(SEARCH_DIR "/result.txt", "r");
+    if (!f) return false;
+    static char fresh[UI_SEARCH_LINES][128];
+    int n = 0;
+    while (n < UI_SEARCH_LINES && fgets(fresh[n], sizeof(fresh[n]), f)) {
+        fresh[n][strcspn(fresh[n], "\r\n")] = 0;
+        if (fresh[n][0]) n++;
+    }
+    fclose(f);
+    if (n == 0) return false;
+    bool changed = n != g_search_nlines || memcmp(fresh, g_search_lines, sizeof(fresh[0]) * (size_t)n) != 0;
+    if (changed) { memcpy(g_search_lines, fresh, sizeof(fresh)); g_search_nlines = n; }
+    return changed;
+}
+
 /* ---------- musica de fondo ---------- */
 #define MUSIC_URL "https://jhondydario.github.io/Greeny/music/"
 #define MUSIC_DIR ROOT "/music"
@@ -616,6 +653,8 @@ static ui_song g_songs[] = {
     { "excited_for_the_last_time", "Excited for the last time", 1244, false },
 };
 #define NSONGS ((int)(sizeof(g_songs) / sizeof(g_songs[0])))
+
+static int g_music_check; /* cuadros que faltan para anotar en el registro si la musica avanza */
 
 static void song_path(int i, char *out, size_t cap) { snprintf(out, cap, MUSIC_DIR "/%s.ogg", g_songs[i].id); }
 
@@ -636,7 +675,9 @@ static void music_apply(void) {
         if (strcmp(g_config.music_track, g_songs[i].id) || !g_songs[i].have) continue;
         char path[160];
         song_path(i, path, sizeof(path));
-        if (!sfx_music_play(path)) trace("musica: no se pudo abrir %s", path);
+        bool ok = sfx_music_play(path);
+        trace("musica: %s -> %s (%s)", g_songs[i].id, ok ? "puesta" : "no se pudo", sfx_music_note());
+        g_music_check = 180; /* en 3 segundos se anota si de verdad esta sonando */
         return;
     }
 }
@@ -857,6 +898,9 @@ int main(int argc, char *argv[]) {
           g_ns_ok ? "si" : "no", g_env.applet_mode ? "applet" : "aplicacion");
 
     int cursor = 0, top = 0, dcursor = 0, dtop = 0, stab = 0, srow = 0, intro_page = 0, acursor = 0, bcursor = 0, btop = 0, browse_pending = 0, song_pending = 0, song_wait = 0;
+    bool song_all = false;
+    int frow = 0, ftype = 0, fcand = 0;
+    unsigned fvalue = 10;
     screen_t screen = SCREEN_HOME;
 
     trace("usuario y cuenta");
@@ -1053,18 +1097,40 @@ int main(int argc, char *argv[]) {
                     song_pending = 0;
                     music_refresh();
                     ui_set_music(g_songs, NSONGS, -1);
-                    if (ok) {
+                    if (ok && song_all) {
+                        /* sigue con la proxima que falte; al terminar, enciende la musica si no habia ninguna elegida */
+                        for (int k = 0; k < NSONGS && song_pending == 0; k++)
+                            if (!g_songs[k].have) { song_pending = k + 1; song_wait = 2; ui_set_music(g_songs, NSONGS, k + 1); }
+                        if (song_pending == 0) {
+                            song_all = false;
+                            if (!g_config.music_track[0] || !g_config.music) {
+                                if (!g_config.music_track[0]) snprintf(g_config.music_track, sizeof(g_config.music_track), "%s", g_songs[0].id);
+                                g_config.music = true;
+                                save_config();
+                                music_apply();
+                            }
+                        }
+                    } else if (ok) {
                         snprintf(g_config.music_track, sizeof(g_config.music_track), "%s", g_songs[i].id);
                         g_config.music = true;
                         save_config();
                         music_apply();
                     } else {
+                        song_all = false;
                         show_message(false, "No se pudo descargar", "Revisa la conexión a internet e inténtalo de nuevo.", NULL);
                         g_msg_return = SCREEN_SETTINGS;
                         g_msg_tab = UI_TAB_MUSIC;
                         screen = SCREEN_MSG;
                     }
                 }
+            }
+            if ((down & HidNpadButton_X) && stab == UI_TAB_MUSIC && song_pending == 0) {
+                /* descargar todas las que falten, una detras de otra */
+                song_all = true;
+                for (int i = 0; i < NSONGS && song_pending == 0; i++)
+                    if (!g_songs[i].have) { song_pending = i + 1; song_wait = 2; ui_set_music(g_songs, NSONGS, i + 1); }
+                if (song_pending == 0) song_all = false;
+                accepted_alt = true;
             }
             if ((down & HidNpadButton_Y) && stab == UI_TAB_MUSIC && srow >= 1 && g_songs[srow - 1].have) {
                 char path[160];
@@ -1119,6 +1185,7 @@ int main(int argc, char *argv[]) {
                     case UI_OPT_START:      g_config.start_page = (g_config.start_page + 1) % GR_START_COUNT; break;
                     case UI_OPT_ABOUT:      screen = SCREEN_ABOUT; opened_rare = true; break;
                     case UI_OPT_DIAG:       run_diag(); screen = SCREEN_DIAG; break;
+                    case UI_OPT_SEARCH:     run_diag(); search_read(); frow = 0; screen = SCREEN_SEARCH; break;
                     case UI_OPT_ACC_LINK: {
                         char name[64], err[160] = "";
                         device_name(name, sizeof(name));
@@ -1238,6 +1305,29 @@ int main(int argc, char *argv[]) {
                 g_msg_tab = UI_TAB_ACCOUNT;
                 back = true;
             }
+        } else if (screen == SCREEN_SEARCH) {
+            static const int bits[3] = { 32, 8, 16 };
+            static int tick;
+            if (++tick % 30 == 0 && search_read()) dirty = true;
+            if (tap_item >= 0 && tap_item < 3) { frow = tap_item; dirty = true; }
+            if (down & HidNpadButton_AnyUp) { frow = (frow + 2) % 3; moved = true; }
+            if (down & HidNpadButton_AnyDown) { frow = (frow + 1) % 3; moved = true; }
+            int step = (nav & HidNpadButton_AnyRight) ? 1 : (nav & HidNpadButton_AnyLeft) ? -1 : 0;
+            if (down & HidNpadButton_R) step = 100;
+            if (down & HidNpadButton_L) step = -100;
+            if (step) {
+                if (frow == 0) {
+                    long v = (long)fvalue + step;
+                    fvalue = v < 0 ? 0 : v > 9999999 ? 9999999 : (unsigned)v;
+                } else if (frow == 1) ftype = (ftype + (step > 0 ? 1 : 2)) % 3;
+                else fcand = (fcand + (step > 0 ? 1 : 11)) % 12;
+                moved = true;
+            }
+            if (down & HidNpadButton_A) { search_send("new u%d %u", bits[ftype], fvalue); accepted = true; }
+            if (down & HidNpadButton_X) { search_send("next %u", fvalue); accepted = true; }
+            if (down & HidNpadButton_Y) { search_send("ptr %d", fcand); accepted = true; }
+            if (down & HidNpadButton_Minus) { search_send("check %u", fvalue); accepted = true; }
+            if (down & HidNpadButton_B) { screen = SCREEN_SETTINGS; back = true; }
         } else if (screen == SCREEN_DIAG) {
             if (down & HidNpadButton_Y) { rescan(); run_diag(); accepted_alt = true; }
             if (down & HidNpadButton_B) { screen = SCREEN_SETTINGS; back = true; }
@@ -1267,6 +1357,8 @@ int main(int argc, char *argv[]) {
             load_icons(g_model.games[cursor].tid);
             dirty = true;
         }
+        if (g_music_check > 0 && --g_music_check == 0)
+            trace("musica: a los 3 s han sonado %u samples%s", sfx_music_played(), sfx_music_playing() ? "" : " (ya no hay cancion puesta)");
         if (g_config.music && sfx_music_finished()) {
             music_next();
             if (screen == SCREEN_SETTINGS) dirty = true; /* para que "Sonando" pase a la cancion nueva */
@@ -1288,6 +1380,10 @@ int main(int argc, char *argv[]) {
             else if (screen == SCREEN_BADGES) ui_badges(&layer, &g_assets, &g_profile);
             else if (screen == SCREEN_AVATARS) ui_avatars(&layer, &g_assets, &g_profile, acursor);
             else if (screen == SCREEN_BROWSE) ui_browse(&layer, &g_assets, g_cat, g_cat_shown, g_cat_nshown, g_cat_n, g_cat_have, g_cat_query, g_cat_state, bcursor, btop);
+            else if (screen == SCREEN_SEARCH) {
+                static const int bits[3] = { 32, 8, 16 };
+                ui_search(&layer, &g_assets, fvalue, bits[ftype], fcand, frow, g_search_lines, g_search_nlines, g_env.sysmodule_running);
+            }
             else if (screen == SCREEN_BROWSE_GAME) ui_browse_game(&layer, &g_assets, &g_cat[g_cat_open], &g_cat_def, dcursor, dtop);
             else if (screen == SCREEN_LINK) ui_link(&layer, &g_assets, link_code, link_shown_left < 0 ? LINK_SECONDS : link_shown_left);
             else if (screen == SCREEN_MSG) ui_message(&layer, &g_assets, g_msg_title, g_msg_line1, g_msg_line2[0] ? g_msg_line2 : NULL, g_msg_ok);

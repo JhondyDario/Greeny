@@ -13,12 +13,12 @@
 #define UI_COVER_BIG  150  /* caratula en la cuadricula */
 
 #define UI_APP_NAME    "Greeny"
-#define UI_APP_VERSION "0.0.14"
+#define UI_APP_VERSION "0.0.15"
 
 /* opciones, agrupadas en pestañas que se cambian con L y R */
 enum {
     UI_OPT_LANG, UI_OPT_THEME, UI_OPT_ANIM, UI_OPT_GAMES_VIEW, UI_OPT_ACH_VIEW, UI_OPT_SOUND, UI_OPT_POPUP, UI_OPT_START, UI_OPT_SCOPE, UI_OPT_SHOW, UI_OPT_INGAME, UI_OPT_MUSIC, UI_OPT_SONG,
-    UI_OPT_DIAG, UI_OPT_ABOUT,
+    UI_OPT_DIAG, UI_OPT_ABOUT, UI_OPT_SEARCH,
     /* pestaña Cuenta: unas u otras segun si la consola esta vinculada */
     UI_OPT_ACC_LINK, UI_OPT_ACC_LOGIN, UI_OPT_ACC_INFO, UI_OPT_ACC_SYNC, UI_OPT_ACC_UNLINK,
     UI_OPT_COUNT
@@ -132,6 +132,12 @@ void ui_browse(gfx_canvas *c, const ui_assets *a, const gr_cat_game *games, cons
                const bool *have, const char *query, ui_browse_state state, int cursor, int top);
 /* Los logros de un juego del catalogo que no esta en la consola (solo para mirar). */
 void ui_browse_game(gfx_canvas *c, const ui_assets *a, const gr_cat_game *game, const lg_game *def, int cursor, int top);
+
+/* Buscador de valores (para quien crea logros). `row`: 0 valor, 1 tipo, 2 candidata.
+ * `lines` es lo que respondio el sysmodule (result.txt), ya partido en lineas. */
+#define UI_SEARCH_LINES 15
+void ui_search(gfx_canvas *c, const ui_assets *a, unsigned value, int type_bits, int candidate, int row,
+               const char lines[][128], int nlines, bool sysmodule_running);
 
 /* Un logro al detalle: imagen grande, puntos, dificultad y fecha. */
 void ui_achievement(gfx_canvas *c, const ui_assets *a, const gr_model *m, int game, int index);

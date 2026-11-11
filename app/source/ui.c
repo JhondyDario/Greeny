@@ -787,6 +787,67 @@ void ui_browse_game(gfx_canvas *c, const ui_assets *a, const gr_cat_game *game, 
     hint(c, hx, "+", T("Salir", "Exit"));
 }
 
+/* ---------- buscador de valores ---------- */
+
+static void search_field(gfx_canvas *c, int x, int y, int w, bool sel, const char *label, const char *value) {
+    card(c, x, y, w, 76, sel);
+    zone(x, y, w, 76, UI_ZONE_ITEM, (y - 116) / 88);
+    gfx_text(c, x + 20, y + 10, 18, P->gray, label);
+    gfx_text(c, x + 20, y + 34, 28, P->ink, value);
+    if (sel) gfx_text_right(c, x + w - 18, y + 26, 22, P->accent, "◀  ▶");
+}
+
+void ui_search(gfx_canvas *c, const ui_assets *a, unsigned value, int type_bits, int candidate, int row,
+               const char lines[][128], int nlines, bool sysmodule_running) {
+    begin(c);
+    header(c, a, NULL, T("Buscador de valores", "Value finder"),
+           T("Con el juego abierto: entra aquí desde el Álbum sin cerrarlo", "With the game open: come here from the Album without closing it"));
+
+    const int lx = MARGIN, lw = 330;
+    char buf[48];
+    snprintf(buf, sizeof(buf), "%u", value);
+    search_field(c, lx, 116, lw, row == 0, T("NÚMERO QUE VES EN EL JUEGO", "NUMBER YOU SEE IN THE GAME"), buf);
+    snprintf(buf, sizeof(buf), type_bits == 8 ? T("u8 (0 a 255)", "u8 (0 to 255)") : type_bits == 16 ? T("u16 (0 a 65535)", "u16 (0 to 65535)")
+                                                                                                     : T("u32 (lo normal)", "u32 (the usual)"));
+    search_field(c, lx, 204, lw, row == 1, T("TIPO", "TYPE"), buf);
+    snprintf(buf, sizeof(buf), "#%d", candidate);
+    search_field(c, lx, 292, lw, row == 2, T("CANDIDATA PARA PUNTEROS", "CANDIDATE FOR POINTERS"), buf);
+
+    gfx_text(c, lx + 4, 388, 18, P->gray, T("1. A: busca el número.", "1. A: search for the number."));
+    gfx_text(c, lx + 4, 414, 18, P->gray, T("2. Vuelve al juego y cámbialo.", "2. Go back to the game and change it."));
+    gfx_text(c, lx + 4, 440, 18, P->gray, T("3. X: filtra con el número nuevo.", "3. X: filter with the new number."));
+    gfx_text(c, lx + 4, 466, 18, P->gray, T("4. Repite hasta que queden pocas.", "4. Repeat until few are left."));
+    gfx_text(c, lx + 4, 492, 18, P->gray, T("5. Y: busca los punteros.", "5. Y: find the pointers."));
+    gfx_text(c, lx + 4, 518, 18, P->gray, T("6. Reinicia el juego y pulsa −:", "6. Restart the game and press −:"));
+    gfx_text(c, lx + 4, 544, 18, P->gray, T("   comprueba cuáles sirven.", "   checks which ones work."));
+    gfx_text(c, lx + 4, 580, 18, P->gray, T("L y R: de 100 en 100.", "L and R: steps of 100."));
+
+    /* lo que respondio el sysmodule */
+    const int rx = lx + lw + 20, rw = UI_W - MARGIN - rx;
+    card(c, rx, 116, rw, 524, false);
+    if (!sysmodule_running) {
+        gfx_text(c, rx + 24, 140, 24, C_RED, T("El sistema de logros no está corriendo.", "The achievement system is not running."));
+        gfx_text_fit(c, rx + 24, 180, 20, P->gray,
+                     T("Enciende “Logros en los juegos” en Opciones y reinicia la consola.", "Turn on “Achievements in games” in Options and restart the console."), rw - 48);
+    } else if (nlines == 0) {
+        gfx_text(c, rx + 24, 140, 24, P->ink, T("Todavía no hay resultados.", "No results yet."));
+        gfx_text_fit(c, rx + 24, 180, 20, P->gray,
+                     T("El juego tiene que estar abierto y tener un archivo de logros (aunque sea de prueba).",
+                       "The game must be open and have an achievement file (even a test one)."), rw - 48);
+    } else {
+        for (int i = 0; i < nlines && i < UI_SEARCH_LINES; i++)
+            gfx_text_fit(c, rx + 24, 132 + i * 33, i == 0 ? 22 : 20, i == 0 ? P->accent : P->ink, lines[i], rw - 48);
+    }
+
+    footer_bar(c);
+    int hx = hint(c, MARGIN, "A", T("Buscar", "Search"));
+    hx = hint(c, hx, "X", T("Filtrar", "Filter"));
+    hx = hint(c, hx, "Y", T("Punteros", "Pointers"));
+    hx = hint(c, hx, "−", T("Comprobar", "Check"));
+    hx = hint(c, hx, "B", T("Volver", "Back"));
+    hint(c, hx, "+", T("Salir", "Exit"));
+}
+
 /* ---------- opciones ---------- */
 
 static const struct { const char *es, *en; int n; int opt[4]; } k_tabs[UI_TABS] = {
@@ -795,7 +856,7 @@ static const struct { const char *es, *en; int n; int opt[4]; } k_tabs[UI_TABS] 
     { "En el juego", "In-game",  3, { UI_OPT_INGAME, UI_OPT_SOUND, UI_OPT_POPUP } },
     { "Música",      "Music",    0, { 0 } },  /* una fila para encender y una por cancion */
     { "Cuenta",      "Account",  0, { 0 } },  /* sus filas dependen de si la consola esta vinculada */
-    { "Ayuda",       "Help",     2, { UI_OPT_DIAG, UI_OPT_ABOUT } },
+    { "Ayuda",       "Help",     3, { UI_OPT_DIAG, UI_OPT_SEARCH, UI_OPT_ABOUT } },
 };
 
 int ui_tab_count(int tab, bool linked) {
@@ -884,8 +945,8 @@ void ui_settings(gfx_canvas *c, const ui_assets *a, const gr_config *cfg, int ta
         switch (ui_tab_option(tab, i, acc->linked)) {
             case UI_OPT_MUSIC:
                 option_row(c, y, sel, T("Música de fondo", "Background music"),
-                           T("Suena mientras usas la app. Al terminar una canción sigue la siguiente descargada.",
-                             "Plays while you use the app. When a song ends, the next downloaded one follows."),
+                           T("Al terminar una canción sigue la siguiente. Pulsa X para descargarlas todas.",
+                             "When a song ends the next one follows. Press X to download them all."),
                            cfg->music ? on : off, C_GREEN);
                 break;
             case UI_OPT_SONG: {
@@ -983,6 +1044,11 @@ void ui_settings(gfx_canvas *c, const ui_assets *a, const gr_config *cfg, int ta
                 option_row(c, y, sel, T("Página de inicio", "Start page"),
                            T("Qué pantalla se abre al entrar a la app.", "Which screen opens when you start the app."),
                            cfg->start_page == GR_START_PROFILE ? T("Mi perfil", "My profile") : T("Mis trofeos", "My trophies"), C_GREEN);
+                break;
+            case UI_OPT_SEARCH:
+                option_row(c, y, sel, T("Buscador de valores", "Value finder"),
+                           T("Para crear logros: encuentra dónde guarda el juego un número.", "For making achievements: finds where the game keeps a number."),
+                           open, C_NEUTRAL);
                 break;
             case UI_OPT_DIAG:
                 option_row(c, y, sel, T("Diagnóstico", "Diagnostics"),

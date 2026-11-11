@@ -95,6 +95,26 @@ Esta es la parte laboriosa, y es por juego y por versión del juego.
   en el juego, filtras y haces la búsqueda de punteros. Una dirección de `heap`
   sin cadena de punteros casi nunca sirve de una sesión a otra.
 
+### Con el buscador de valores de Greeny
+
+No hace falta otra herramienta. Sirve para cualquier número que veas en pantalla
+(monedas, estrellas, sellos, vidas).
+
+1. El juego necesita un archivo de logros, aunque sea de prueba con un solo logro,
+   para que Greeny se enganche a él.
+2. Con el juego abierto, pulsa HOME, entra al Álbum y abre Greeny **sin cerrar el juego**.
+3. Ve a Opciones → Ayuda → Buscador de valores.
+4. Pon el número que ves en el juego y pulsa **A**. Tarda un minuto o más.
+5. Vuelve al juego, haz que el número cambie, regresa y pulsa **X** con el número nuevo.
+   Repite hasta que queden pocas candidatas.
+6. Elige una candidata y pulsa **Y**: busca la cadena de punteros que llega hasta ella.
+   Puede tardar varios minutos.
+7. Cierra el juego, ábrelo de nuevo, vuelve al buscador y pulsa **−** con el valor de ese
+   momento. Las líneas marcadas con `SIRVE` son las que van en el `when` del logro.
+
+Todo queda escrito en `config/greeny/search/result.txt`, por si prefieres copiarlo desde la PC.
+Mientras el buscador trabaja, Greeny no revisa logros.
+
 ### Cuando el juego se actualiza: `scan`
 
 Si una cadena conocida dejó de funcionar en una versión nueva, casi siempre solo
