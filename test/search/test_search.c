@@ -76,6 +76,26 @@ int main(void) {
     fail += show("comprobar tras reiniciar", "SIRVE  main+0x1C00->0x18->0x138->0x48 u32");
     cmd("check 99");
     fail += show("comprobar con un valor que no es", "0 de");
+    /* lo mismo, pero como se usa dentro del juego: un plan y la combinacion de botones */
+    remove("sdmc:/config/greeny/search/state.txt");
+    FILE *pf = fopen("sdmc:/config/greeny/search/plan.txt", "w");
+    fprintf(pf, "u32 10 1\n"); fclose(pf);
+    char l1[64], l2[96];
+    where = build(0, 10);
+    search_button(SEARCH_NEXT, MAIN, MAIN_SIZE, HEAP, END, l1, sizeof(l1), l2, sizeof(l2));
+    printf("--- botones\n%s | %s\n", l1, l2);
+    put32(where, 11);
+    search_button(SEARCH_NEXT, MAIN, MAIN_SIZE, HEAP, END, l1, sizeof(l1), l2, sizeof(l2));
+    printf("%s | %s\n", l1, l2);
+    if (!strstr(l2, "1 candidata")) { printf("FALLO: el filtro por botones\n"); fail++; }
+    search_button(SEARCH_PTR, MAIN, MAIN_SIZE, HEAP, END, l1, sizeof(l1), l2, sizeof(l2));
+    printf("%s | %s\n", l1, l2);
+    where = build(0x5550, 11); /* se reinicia el juego con el mismo numero guardado */
+    search_button(SEARCH_CHECK, MAIN, MAIN_SIZE, HEAP, END, l1, sizeof(l1), l2, sizeof(l2));
+    printf("%s | %s\n", l1, l2);
+    if (!strstr(l2, "1 cadena")) { printf("FALLO: comprobar por botones\n"); fail++; }
+    fail += show("resultado final", "SIRVE  main+0x1C00->0x18->0x138->0x48 u32");
+
     printf("%s\n", fail ? "HAY FALLOS" : "buscador: todo bien");
     return fail != 0;
 }

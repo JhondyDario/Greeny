@@ -97,23 +97,27 @@ Esta es la parte laboriosa, y es por juego y por versión del juego.
 
 ### Con el buscador de valores de Greeny
 
-No hace falta otra herramienta. Sirve para cualquier número que veas en pantalla
-(monedas, estrellas, sellos, vidas).
+Sirve para cualquier número que veas en pantalla (monedas, estrellas, sellos, vidas).
+Solo aparece si la cuenta vinculada a la consola es de un administrador.
 
 1. El juego necesita un archivo de logros, aunque sea de prueba con un solo logro,
    para que Greeny se enganche a él.
-2. Con el juego abierto, pulsa HOME, entra al Álbum y abre Greeny **sin cerrar el juego**.
-3. Ve a Opciones → Ayuda → Buscador de valores.
-4. Pon el número que ves en el juego y pulsa **A**. Tarda un minuto o más.
-5. Vuelve al juego, haz que el número cambie, regresa y pulsa **X** con el número nuevo.
-   Repite hasta que queden pocas candidatas.
-6. Elige una candidata y pulsa **Y**: busca la cadena de punteros que llega hasta ella.
-   Puede tardar varios minutos.
-7. Cierra el juego, ábrelo de nuevo, vuelve al buscador y pulsa **−** con el valor de ese
-   momento. Las líneas marcadas con `SIRVE` son las que van en el `when` del logro.
+2. **Antes de abrir el juego**, en Greeny ve a Opciones → Ayuda → Buscador de valores.
+   Pon el número que tienes ahora (por ejemplo 10 estrellas) y cuánto cambia cada vez
+   (+1), y pulsa A para guardar el plan. Cierra Greeny.
+3. Abre el juego. Mantén **L + R + ZL + ZR** y pulsa **arriba** en la cruceta: busca el
+   número. Tarda un minuto o más; al terminar sale un aviso con cuántas candidatas hay.
+4. Haz que el número cambie (coge una estrella) y repite la combinación. Cada vez busca
+   el número siguiente. Sigue hasta que queden pocas candidatas.
+5. La misma combinación con **derecha**: busca la cadena de punteros de la primera
+   candidata. Puede tardar varios minutos.
+6. Cierra el juego y ábrelo otra vez, sin cambiar el número. La combinación con **abajo**
+   comprueba qué cadenas siguen funcionando.
+7. El resultado queda en `config/greeny/search/result.txt` y se ve en la misma pantalla
+   de Greeny. Las líneas marcadas con `SIRVE` son las que van en el `when` del logro.
 
-Todo queda escrito en `config/greeny/search/result.txt`, por si prefieres copiarlo desde la PC.
-Mientras el buscador trabaja, Greeny no revisa logros.
+Mientras el buscador trabaja, Greeny no revisa logros. Cuando termines, borra el plan
+(X en esa pantalla): mientras exista, el sistema de logros lee los botones del mando.
 
 ### Cuando el juego se actualiza: `scan`
 

@@ -13,7 +13,7 @@
 #define UI_COVER_BIG  150  /* caratula en la cuadricula */
 
 #define UI_APP_NAME    "Greeny"
-#define UI_APP_VERSION "0.0.16"
+#define UI_APP_VERSION "0.0.17"
 
 /* opciones, agrupadas en pestañas que se cambian con L y R */
 enum {
@@ -135,11 +135,11 @@ void ui_browse(gfx_canvas *c, const ui_assets *a, const gr_cat_game *games, cons
 /* Los logros de un juego del catalogo que no esta en la consola (solo para mirar). */
 void ui_browse_game(gfx_canvas *c, const ui_assets *a, const gr_cat_game *game, const lg_game *def, int cursor, int top);
 
-/* Buscador de valores (para quien crea logros). `row`: 0 valor, 1 tipo, 2 candidata.
+/* Buscador de valores (para quien crea logros). `row`: 0 valor, 1 tipo, 2 cuanto cambia cada vez.
  * `lines` es lo que respondio el sysmodule (result.txt), ya partido en lineas. */
 #define UI_SEARCH_LINES 15
-void ui_search(gfx_canvas *c, const ui_assets *a, unsigned value, int type_bits, int candidate, int row,
-               const char lines[][128], int nlines, bool sysmodule_running);
+void ui_search(gfx_canvas *c, const ui_assets *a, unsigned value, int type_bits, int step, int row,
+               const char lines[][128], int nlines, bool has_plan);
 
 /* Un logro al detalle: imagen grande, puntos, dificultad y fecha. */
 void ui_achievement(gfx_canvas *c, const ui_assets *a, const gr_model *m, int game, int index);

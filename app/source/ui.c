@@ -805,53 +805,50 @@ static void search_field(gfx_canvas *c, int x, int y, int w, bool sel, const cha
     if (sel) gfx_text_right(c, x + w - 18, y + 26, 22, P->accent, "◀  ▶");
 }
 
-void ui_search(gfx_canvas *c, const ui_assets *a, unsigned value, int type_bits, int candidate, int row,
-               const char lines[][128], int nlines, bool sysmodule_running) {
+void ui_search(gfx_canvas *c, const ui_assets *a, unsigned value, int type_bits, int step, int row,
+               const char lines[][128], int nlines, bool has_plan) {
     begin(c);
     header(c, a, NULL, T("Buscador de valores", "Value finder"),
-           T("Con el juego abierto: entra aquí desde el Álbum sin cerrarlo", "With the game open: come here from the Album without closing it"));
+           T("Prepara el plan aquí; la búsqueda se hace dentro del juego con botones", "Set the plan here; the search runs inside the game with buttons"));
 
     const int lx = MARGIN, lw = 330;
     char buf[48];
     snprintf(buf, sizeof(buf), "%u", value);
-    search_field(c, lx, 116, lw, row == 0, T("NÚMERO QUE VES EN EL JUEGO", "NUMBER YOU SEE IN THE GAME"), buf);
+    search_field(c, lx, 116, lw, row == 0, T("NÚMERO QUE TIENES AHORA", "NUMBER YOU HAVE NOW"), buf);
     snprintf(buf, sizeof(buf), type_bits == 8 ? T("u8 (0 a 255)", "u8 (0 to 255)") : type_bits == 16 ? T("u16 (0 a 65535)", "u16 (0 to 65535)")
                                                                                                      : T("u32 (lo normal)", "u32 (the usual)"));
     search_field(c, lx, 204, lw, row == 1, T("TIPO", "TYPE"), buf);
-    snprintf(buf, sizeof(buf), "#%d", candidate);
-    search_field(c, lx, 292, lw, row == 2, T("CANDIDATA PARA PUNTEROS", "CANDIDATE FOR POINTERS"), buf);
+    snprintf(buf, sizeof(buf), "%+d", step);
+    search_field(c, lx, 292, lw, row == 2, T("CADA VEZ CAMBIA EN", "EACH TIME IT CHANGES BY"), buf);
 
-    gfx_text(c, lx + 4, 388, 18, P->gray, T("1. A: busca el número.", "1. A: search for the number."));
-    gfx_text(c, lx + 4, 414, 18, P->gray, T("2. Vuelve al juego y cámbialo.", "2. Go back to the game and change it."));
-    gfx_text(c, lx + 4, 440, 18, P->gray, T("3. X: filtra con el número nuevo.", "3. X: filter with the new number."));
-    gfx_text(c, lx + 4, 466, 18, P->gray, T("4. Repite hasta que queden pocas.", "4. Repeat until few are left."));
-    gfx_text(c, lx + 4, 492, 18, P->gray, T("5. Y: busca los punteros.", "5. Y: find the pointers."));
-    gfx_text(c, lx + 4, 518, 18, P->gray, T("6. Reinicia el juego y pulsa −:", "6. Restart the game and press −:"));
-    gfx_text(c, lx + 4, 544, 18, P->gray, T("   comprueba cuáles sirven.", "   checks which ones work."));
-    gfx_text(c, lx + 4, 580, 18, P->gray, T("L y R: de 100 en 100.", "L and R: steps of 100."));
+    const char *help[] = {
+        T("1. A guarda el plan. Cierra Greeny.", "1. A saves the plan. Close Greeny."),
+        T("2. Abre el juego. Mantén L+R+ZL+ZR", "2. Start the game. Hold L+R+ZL+ZR"),
+        T("   y pulsa ARRIBA: busca el número.", "   and press UP: searches the number."),
+        T("3. Haz que cambie (coge una estrella)", "3. Make it change (grab a star)"),
+        T("   y repite la combinación.", "   and repeat the combo."),
+        T("4. Con pocas candidatas: la misma", "4. With few candidates: same combo"),
+        T("   combinación con DERECHA (punteros).", "   with RIGHT (pointers)."),
+        T("5. Cierra y abre el juego: la misma", "5. Close and reopen the game: same"),
+        T("   con ABAJO comprueba cuáles sirven.", "   with DOWN checks which ones work."),
+    };
+    for (int i = 0; i < 9; i++) gfx_text(c, lx + 4, 384 + i * 26, 18, P->gray, help[i]);
 
-    /* lo que respondio el sysmodule */
     const int rx = lx + lw + 20, rw = UI_W - MARGIN - rx;
     card(c, rx, 116, rw, 524, false);
-    if (!sysmodule_running) {
-        gfx_text(c, rx + 24, 140, 24, C_RED, T("El sistema de logros no está corriendo.", "The achievement system is not running."));
-        gfx_text_fit(c, rx + 24, 180, 20, P->gray,
-                     T("Enciende “Logros en los juegos” en Opciones y reinicia la consola.", "Turn on “Achievements in games” in Options and restart the console."), rw - 48);
-    } else if (nlines == 0) {
-        gfx_text(c, rx + 24, 140, 24, P->ink, T("Todavía no hay resultados.", "No results yet."));
-        gfx_text_fit(c, rx + 24, 180, 20, P->gray,
-                     T("El juego tiene que estar abierto y tener un archivo de logros (aunque sea de prueba).",
-                       "The game must be open and have an achievement file (even a test one)."), rw - 48);
-    } else {
-        for (int i = 0; i < nlines && i < UI_SEARCH_LINES; i++)
-            gfx_text_fit(c, rx + 24, 132 + i * 33, i == 0 ? 22 : 20, i == 0 ? P->accent : P->ink, lines[i], rw - 48);
-    }
+    gfx_text(c, rx + 24, 132, 22, has_plan ? P->accent : P->gray,
+             has_plan ? T("Hay un plan guardado. El resultado sale aquí al volver.", "A plan is saved. The result shows here when you come back.")
+                      : T("No hay plan guardado.", "No plan saved."));
+    if (nlines == 0)
+        gfx_text_fit(c, rx + 24, 176, 20, P->gray,
+                     T("Todavía no hay resultados. El juego avisa en pantalla después de cada paso.",
+                       "No results yet. The game shows a pop-up after each step."), rw - 48);
+    for (int i = 0; i < nlines && i < UI_SEARCH_LINES - 1; i++)
+        gfx_text_fit(c, rx + 24, 172 + i * 32, 20, P->ink, lines[i], rw - 48);
 
     footer_bar(c);
-    int hx = hint(c, MARGIN, "A", T("Buscar", "Search"));
-    hx = hint(c, hx, "X", T("Filtrar", "Filter"));
-    hx = hint(c, hx, "Y", T("Punteros", "Pointers"));
-    hx = hint(c, hx, "−", T("Comprobar", "Check"));
+    int hx = hint(c, MARGIN, "A", T("Guardar plan", "Save plan"));
+    hx = hint(c, hx, "X", T("Borrar plan", "Delete plan"));
     hx = hint(c, hx, "B", T("Volver", "Back"));
     hint(c, hx, "+", T("Salir", "Exit"));
 }

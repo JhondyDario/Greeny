@@ -27,10 +27,10 @@ int main(int argc, char **argv) {
     for (int y = 0; y < N * (TOAST_H + 24); y++)
         for (int x = 0; x < TOAST_W + 48; x++) backdrop(x, y, canvas[y][x]);
     toast_view v[N] = {
-        { TOAST_UNLOCK, 1, 5, false, "LOGRO DESBLOQUEADO", "Cinco cheles", "Ten 5 monedas" },
-        { TOAST_UNLOCK, 2, 20, false, "LOGRO DESBLOQUEADO", "Casi una vida", "Ten 90 monedas sin gastarlas en una vida" },
+        { TOAST_UNLOCK, 1, 5, true, "LOGRO DESBLOQUEADO", "Cinco cheles", "Ten 5 monedas" },
+        { TOAST_UNLOCK, 2, 20, true, "LOGRO DESBLOQUEADO", "Casi una vida", "Ten 90 monedas sin gastarlas en una vida" },
         { TOAST_UNLOCK, 3, 50, true, "LOGRO DESBLOQUEADO", "Inmortal: el nombre más largo que existe", "Acumula 99 vidas y además escribe una descripción larguísima que no cabe en dos líneas ni queriendo" },
-        { TOAST_INFO, 0, -1, false, "LOGROS ACTIVOS", "Super Mario 3D World", "7 de 12 desbloqueados" },
+        { TOAST_INFO, 0, -1, true, "LOGROS ACTIVOS", "Super Mario 3D World", "7 de 12 desbloqueados" },
         { TOAST_WARN, 0, -1, false, "LOGROS DESACTIVADOS", "Super Mario 3D World", "Tu juego es otra versión. Hace falta la 1.1.0." },
         { TOAST_WARN, 0, -1, true, "ACHIEVEMENTS OFF", "Pokémon Añil ¿Ñandú?", "The achievement file has an error." },
     };

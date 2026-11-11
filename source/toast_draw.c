@@ -131,86 +131,86 @@ static void draw_wrapped(toast_put_fn put, const tf_font *f, int x, int y, int m
     }
 }
 
-/* ---------- el aviso ---------- */
+/* ---------- el aviso ----------
+ * Una barra lisa pegada a la esquina de arriba a la derecha, como los avisos de la consola
+ * ("Amigos en linea"): dibujo redondo a la izquierda y el texto en tres lineas. */
+
+#define BAR_H 112 /* el resto de la capa queda transparente */
 
 void toast_draw(const toast_view *v, toast_put_fn put) {
-    const rgb card = v->dark ? RGB(0x1E2A22) : RGB(0xFFFFFF);
-    const rgb ink = v->dark ? RGB(0xFFFFFF) : RGB(0x1E2A1F);
-    const rgb soft = v->dark ? RGB(0xB8C6BB) : RGB(0x5C6B5E);
-    const rgb white = RGB(0xFFFFFF), yellow = RGB(0xF7C91E), on_yellow = RGB(0x1E2A1F);
+    const rgb bar = v->dark ? RGB(0x2B3441) : RGB(0xF0F1F2);
+    const rgb ink = v->dark ? RGB(0xFFFFFF) : RGB(0x2D2D2D);
+    const rgb soft = v->dark ? RGB(0xC3CBD6) : RGB(0x5A6470);
+    const rgb yellow = v->dark ? RGB(0xF7C91E) : RGB(0x9A6B00);
+    const rgb white = RGB(0xFFFFFF);
 
     rgb accent, head;
     switch (v->kind) {
-        case TOAST_WARN: accent = RGB(0xE5484D); head = v->dark ? RGB(0xFF8A8E) : RGB(0xC62F35); break;
+        case TOAST_WARN: accent = RGB(0xE5484D); head = v->dark ? RGB(0xFF9A9D) : RGB(0xC62F35); break;
         case TOAST_UNLOCK:
             accent = v->tier == 3 ? RGB(0xF0B400) : v->tier == 2 ? RGB(0x93A0AE) : RGB(0xB56A2C);
-            head = v->dark ? RGB(0x6FDC7C) : RGB(0x1E8A2E);
+            head = v->dark ? RGB(0x7FE08A) : RGB(0x1E8A2E);
             break;
-        default: accent = RGB(0x2FA63B); head = v->dark ? RGB(0x6FDC7C) : RGB(0x1E8A2E); break;
+        default: accent = RGB(0x2FA63B); head = v->dark ? RGB(0x7FE08A) : RGB(0x1E8A2E); break;
     }
-    const rgb edge = mix(card, accent, 0.55f);
 
-    /* etiqueta de puntos, arriba a la derecha */
-    uint8_t pts[12];
-    int npts = 0, pill_w = 0;
-    if (v->points >= 0) {
-        char tmp[12];
-        int p = v->points > 9999 ? 9999 : v->points, len = 0;
-        char digits[5];
-        do { digits[len++] = (char)('0' + p % 10); p /= 10; } while (p);
-        int k = 0;
-        tmp[k++] = '+';
-        while (len) tmp[k++] = digits[--len];
-        memcpy(tmp + k, " pts", 5);
-        npts = to_latin1(tmp, pts, sizeof(pts));
-        pill_w = text_width(&tf_small, pts, npts) + 20;
-    }
-    const float pill_x = TOAST_W - 16 - pill_w, pill_y = 14, pill_h = 24; /* la etiqueta se queda arriba */
-
-    const float bcx = 62, bcy = 64, br = 38;
+    const float bcx = 58, bcy = BAR_H / 2.0f, br = 36;
     for (int y = 0; y < TOAST_H; y++) {
         for (int x = 0; x < TOAST_W; x++) {
+            if (y >= BAR_H) { put(x, y, 0, 0, 0, 0); continue; }
             float px = x + 0.5f, py = y + 0.5f;
-            float outer = in_round_rect(px, py, 2, 2, TOAST_W - 4, TOAST_H - 4, 24);
-            if (outer <= 0) { put(x, y, 0, 0, 0, 0); continue; }
-            rgb c = mix(edge, card, in_round_rect(px, py, 4, 4, TOAST_W - 8, TOAST_H - 8, 22));
-
+            rgb c = bar;
             if (v->badge) {
                 int bx = x - ((int)bcx - TOAST_BADGE / 2), by = y - ((int)bcy - TOAST_BADGE / 2);
                 if (bx >= 0 && by >= 0 && bx < TOAST_BADGE && by < TOAST_BADGE) {
                     const unsigned char *p = v->badge + (by * TOAST_BADGE + bx) * 4;
                     c = mix(c, (rgb){ p[0], p[1], p[2] }, p[3] / 255.0f);
                 }
-            }
-            float badge = v->badge ? 0 : in_circle(px, py, bcx, bcy, br);
-            if (badge > 0) {
-                c = mix(c, mix(accent, white, 0.35f), badge);                      /* aro claro */
-                c = mix(c, accent, in_circle(px, py, bcx, bcy, br - 4));
-                float mark;
-                if (v->kind == TOAST_UNLOCK) mark = in_star(px, py, bcx, bcy + 1, 24);
-                else if (v->kind == TOAST_WARN) {
-                    mark = in_segment(px, py, bcx, bcy - 19, bcx, bcy + 5, 9);
-                    float dot = in_circle(px, py, bcx, bcy + 19, 5.5f);
-                    if (dot > mark) mark = dot;
-                } else {
-                    mark = in_segment(px, py, bcx - 17, bcy + 1, bcx - 5, bcy + 13, 9);
-                    float b = in_segment(px, py, bcx - 5, bcy + 13, bcx + 18, bcy - 12, 9);
-                    if (b > mark) mark = b;
+            } else {
+                /* sin dibujo en la SD: un circulo sencillo del color que toca */
+                float badge = in_circle(px, py, bcx, bcy, br);
+                if (badge > 0) {
+                    c = mix(c, accent, badge);
+                    float mark;
+                    if (v->kind == TOAST_UNLOCK) mark = in_star(px, py, bcx, bcy + 1, 22);
+                    else if (v->kind == TOAST_WARN) {
+                        mark = in_segment(px, py, bcx, bcy - 18, bcx, bcy + 5, 8);
+                        float dot = in_circle(px, py, bcx, bcy + 18, 5);
+                        if (dot > mark) mark = dot;
+                    } else {
+                        mark = in_segment(px, py, bcx - 16, bcy + 1, bcx - 5, bcy + 12, 8);
+                        float b = in_segment(px, py, bcx - 5, bcy + 12, bcx + 17, bcy - 11, 8);
+                        if (b > mark) mark = b;
+                    }
+                    c = mix(c, white, mark);
                 }
-                c = mix(c, white, mark);
             }
-            if (pill_w) c = mix(c, yellow, in_round_rect(px, py, pill_x, pill_y, (float)pill_w, pill_h, pill_h / 2));
-            put(x, y, (unsigned)c.r, (unsigned)c.g, (unsigned)c.b, (unsigned)(outer * 250));
+            put(x, y, (unsigned)c.r, (unsigned)c.g, (unsigned)c.b, 240);
         }
     }
 
-    const int tx = 116, tw = TOAST_W - tx - 18;
-    if (pill_w) draw_text(put, &tf_small, (int)pill_x + 10, (int)pill_y + 3, pts, npts, on_yellow, yellow);
-    /* si la descripcion cabe en una linea (o no hay), el texto baja para quedar centrado en la tarjeta */
+    /* puntos, arriba a la derecha, como texto */
+    const int tx = 112, right = TOAST_W - 18;
+    int pts_w = 0;
+    if (v->points >= 0) {
+        uint8_t pts[12];
+        char tmp[12], digits[5];
+        int p = v->points > 9999 ? 9999 : v->points, len = 0, k = 0;
+        do { digits[len++] = (char)('0' + p % 10); p /= 10; } while (p);
+        tmp[k++] = '+';
+        while (len) tmp[k++] = digits[--len];
+        memcpy(tmp + k, " pts", 5);
+        int npts = to_latin1(tmp, pts, sizeof(pts));
+        pts_w = text_width(&tf_small, pts, npts);
+        draw_text(put, &tf_small, right - pts_w, 14, pts, npts, yellow, bar);
+    }
+
+    /* si la descripcion cabe en una linea (o no hay), el texto baja para quedar centrado */
+    const int tw = right - tx;
     uint8_t probe[160];
     int nprobe = to_latin1(v->desc, probe, sizeof(probe));
-    int dy = nprobe == 0 ? 18 : text_width(&tf_small, probe, nprobe) <= tw ? 9 : 0;
-    draw_wrapped(put, &tf_small, tx, 17 + dy, tw - (pill_w ? pill_w + 8 : 0), 18, 1, v->title, head, card);
-    draw_wrapped(put, &tf_big, tx, 37 + dy, tw, 24, 1, v->name, ink, card);
-    draw_wrapped(put, &tf_small, tx, 68 + dy, tw, 19, 2, v->desc, soft, card);
+    int dy = nprobe == 0 ? 17 : text_width(&tf_small, probe, nprobe) <= tw ? 8 : 0;
+    draw_wrapped(put, &tf_small, tx, 12 + dy, tw - (pts_w ? pts_w + 10 : 0), 18, 1, v->title, head, bar);
+    draw_wrapped(put, &tf_big, tx, 31 + dy, tw, 24, 1, v->name, ink, bar);
+    draw_wrapped(put, &tf_small, tx, 60 + dy, tw, 19, 2, v->desc, soft, bar);
 }

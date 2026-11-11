@@ -259,7 +259,7 @@ int main(int argc, char **argv) {
         {
             static const char lines[6][128] = { "Filtro terminado.", "Paso 3  |  valor 12  |  tipo u32  |  3 candidata(s)", "#0  heap+0x1A2B3C40",
                                                 "#1  heap+0x1A2B3D10", "#2  main+0x19F0124", "Ya son pocas: elige una y busca sus punteros." };
-            ui_search(&c, &a, 12, 32, 0, 0, lines, 6, true);
+            ui_search(&c, &a, 10, 32, 1, 0, lines, 6, true);
             save(&c, out, "buscador_valores", sfx);
         }
         ui_avatars(&c, &a, &chip, 7);

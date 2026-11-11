@@ -46,8 +46,8 @@ void __libnx_init_time(void);
 static bool g_has_time;
 static bool g_system_spanish = true;
 static gr_config g_config;
-/* El aviso sale oscuro solo si el tema oscuro esta elegido a mano: el sysmodule no consulta el tema de la consola. */
-#define g_cfg_dark (g_config.theme == GR_THEME_DARK)
+/* El aviso es oscuro, como los de la consola; solo sale claro si el tema claro esta elegido a mano. */
+#define g_cfg_dark (g_config.theme != GR_THEME_LIGHT)
 
 static bool use_english(void) {
     if (g_config.lang == GR_LANG_EN) return true;
@@ -140,6 +140,49 @@ static u64 now_ms(void) {
 static lg_game g_game;
 static lg_bases g_bases;
 static u64 g_main_size, g_space_end; /* para el buscador de valores */
+
+/* Botones para el buscador de valores. Solo se abre el servicio de mandos si existe un plan de
+ * busqueda (lo deja la app, y solo a un administrador): un usuario normal nunca pasa por aqui. */
+static bool g_pad_ready, g_combo_held;
+static PadState g_pad;
+
+static void combo_init(void) {
+    if (g_pad_ready || !search_has_plan()) return;
+    if (R_FAILED(smInitialize())) return;
+    Result rc = hidInitialize();
+    smExit();
+    if (R_FAILED(rc)) { log_line("buscador: no se pudo abrir el servicio de mandos (rc=0x%X)", rc); return; }
+    padConfigureInput(8, HidNpadStyleSet_NpadStandard | HidNpadStyleTag_NpadSystemExt);
+    padInitializeAny(&g_pad);
+    g_pad_ready = true;
+    log_line("buscador: plan encontrado; L+R+ZL+ZR con la cruceta (arriba, derecha, abajo) lo maneja");
+}
+
+/* L+R+ZL+ZR mantenidos y una direccion de la cruceta: arriba = paso siguiente, derecha = punteros, abajo = comprobar. */
+static void combo_poll(u64 now) {
+    if (!g_pad_ready) return;
+    padUpdate(&g_pad);
+    u64 b = padGetButtons(&g_pad);
+    const u64 hold = HidNpadButton_L | HidNpadButton_R | HidNpadButton_ZL | HidNpadButton_ZR;
+    int action = -1;
+    if ((b & hold) == hold) {
+        if (b & HidNpadButton_Up) action = SEARCH_NEXT;
+        else if (b & HidNpadButton_Right) action = SEARCH_PTR;
+        else if (b & HidNpadButton_Down) action = SEARCH_CHECK;
+    }
+    if (action < 0) { g_combo_held = false; return; }
+    if (g_combo_held) return; /* una vez por pulsacion */
+    g_combo_held = true;
+
+    /* avisar antes, porque mientras busca el sysmodule no hace nada mas */
+    toast_push(TOAST_INFO, 0, -1, g_cfg_dark, "BUSCADOR DE VALORES", action == SEARCH_NEXT ? "Buscando..." : action == SEARCH_PTR ? "Buscando punteros..." : "Comprobando...",
+               "Puede tardar. Sigue jugando cuando salga el resultado.");
+    toast_update(now);
+    char l1[64], l2[96];
+    search_button((search_action)action, g_bases.main_base, g_main_size, g_bases.heap_base, g_space_end, l1, sizeof(l1), l2, sizeof(l2));
+    log_line("buscador: %s | %s", l1, l2);
+    toast_push(TOAST_INFO, 0, -1, g_cfg_dark, "BUSCADOR DE VALORES", l1, l2);
+}
 static bool g_loaded;
 static char g_unlocked_path[96];
 
@@ -358,6 +401,7 @@ int main(int argc, char *argv[]) {
                     snprintf(g_unlocked_path, sizeof(g_unlocked_path), DIR_UNLOCKED "/%016lX.txt", cur_tid);
                     lg_store_load(&g_game, g_unlocked_path);
                     g_loaded = true;
+                    combo_init();
                     g_debug_lines = 0;
                     g_scan_lines = 0;
                     scan_at = now + SCAN_PERIOD_MS;
@@ -402,6 +446,7 @@ int main(int argc, char *argv[]) {
                     toast_push(TOAST_UNLOCK, (int)lg_ach_tier(a), a->points, g_cfg_dark, en ? "ACHIEVEMENT UNLOCKED" : "LOGRO DESBLOQUEADO", lg_ach_name(a, en), lg_ach_desc(a, en));
                 if (g_config.sound) sound_play(SOUND_UNLOCK);
             }
+            combo_poll(now);
             if (now >= search_at) { /* ordenes del buscador de valores, una vez por segundo */
                 search_at = now + 1000;
                 search_poll(g_bases.main_base, g_main_size, g_bases.heap_base, g_space_end);

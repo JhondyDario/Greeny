@@ -11,8 +11,17 @@
  */
 #pragma once
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 /* Llamar de vez en cuando con el juego enganchado. Si hay una orden pendiente la ejecuta
  * (puede tardar minutos: mientras tanto no se revisan logros). */
 void search_poll(uint64_t main_base, uint64_t main_size, uint64_t heap_base, uint64_t space_end);
+
+/* Manejo sin salir del juego: la app deja un plan (plan.txt: "u32 10 1" = tipo, numero con el que
+ * se empieza y cuanto cambia cada vez) y dentro del juego se avanza con una combinacion de botones. */
+typedef enum { SEARCH_NEXT, SEARCH_PTR, SEARCH_CHECK } search_action;
+bool search_has_plan(void);
+/* Ejecuta el paso (puede tardar minutos) y deja en line1 y line2 un resumen para mostrar en el aviso. */
+void search_button(search_action action, uint64_t main_base, uint64_t main_size, uint64_t heap_base, uint64_t space_end,
+                   char *line1, size_t cap1, char *line2, size_t cap2);

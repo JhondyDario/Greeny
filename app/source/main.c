@@ -900,7 +900,7 @@ int main(int argc, char *argv[]) {
 
     int cursor = 0, top = 0, dcursor = 0, dtop = 0, stab = 0, srow = 0, intro_page = 0, acursor = 0, bcursor = 0, btop = 0, browse_pending = 0, song_pending = 0, song_wait = 0;
     bool song_all = false;
-    int frow = 0, ftype = 0, fcand = 0;
+    int frow = 0, ftype = 0, fcand = 1; /* fcand: cuanto cambia el numero cada vez */
     unsigned fvalue = 10;
     screen_t screen = SCREEN_HOME;
 
@@ -1321,13 +1321,27 @@ int main(int argc, char *argv[]) {
                     long v = (long)fvalue + step;
                     fvalue = v < 0 ? 0 : v > 9999999 ? 9999999 : (unsigned)v;
                 } else if (frow == 1) ftype = (ftype + (step > 0 ? 1 : 2)) % 3;
-                else fcand = (fcand + (step > 0 ? 1 : 11)) % 12;
+                else {
+                    fcand += step > 0 ? 1 : -1;
+                    if (fcand == 0) fcand += step > 0 ? 1 : -1; /* cero no tiene sentido: el numero tiene que cambiar */
+                    if (fcand > 100) fcand = 100;
+                    if (fcand < -100) fcand = -100;
+                }
                 moved = true;
             }
-            if (down & HidNpadButton_A) { search_send("new u%d %u", bits[ftype], fvalue); accepted = true; }
-            if (down & HidNpadButton_X) { search_send("next %u", fvalue); accepted = true; }
-            if (down & HidNpadButton_Y) { search_send("ptr %d", fcand); accepted = true; }
-            if (down & HidNpadButton_Minus) { search_send("check %u", fvalue); accepted = true; }
+            if (down & HidNpadButton_A) {
+                /* plan nuevo: se borra lo de la busqueda anterior para empezar limpio */
+                mkdir(SEARCH_DIR, 0777);
+                remove(SEARCH_DIR "/state.txt");
+                remove(SEARCH_DIR "/cand.bin");
+                remove(SEARCH_DIR "/chains.bin");
+                remove(SEARCH_DIR "/result.txt");
+                g_search_nlines = 0;
+                FILE *pf = fopen(SEARCH_DIR "/plan.txt", "w");
+                if (pf) { fprintf(pf, "u%d %u %d\n", bits[ftype], fvalue, fcand); fclose(pf); }
+                accepted = true;
+            }
+            if (down & HidNpadButton_X) { remove(SEARCH_DIR "/plan.txt"); accepted_alt = true; }
             if (down & HidNpadButton_B) { screen = SCREEN_SETTINGS; back = true; }
             if (!(g_account.linked && g_account.admin)) screen = SCREEN_SETTINGS; /* por si la cuenta dejo de ser admin */
         } else if (screen == SCREEN_DIAG) {
@@ -1384,7 +1398,8 @@ int main(int argc, char *argv[]) {
             else if (screen == SCREEN_BROWSE) ui_browse(&layer, &g_assets, g_cat, g_cat_shown, g_cat_nshown, g_cat_n, g_cat_have, g_cat_query, g_cat_state, bcursor, btop);
             else if (screen == SCREEN_SEARCH) {
                 static const int bits[3] = { 32, 8, 16 };
-                ui_search(&layer, &g_assets, fvalue, bits[ftype], fcand, frow, g_search_lines, g_search_nlines, g_env.sysmodule_running);
+                struct stat pst;
+                ui_search(&layer, &g_assets, fvalue, bits[ftype], fcand, frow, g_search_lines, g_search_nlines, stat(SEARCH_DIR "/plan.txt", &pst) == 0);
             }
             else if (screen == SCREEN_BROWSE_GAME) ui_browse_game(&layer, &g_assets, &g_cat[g_cat_open], &g_cat_def, dcursor, dtop);
             else if (screen == SCREEN_LINK) ui_link(&layer, &g_assets, link_code, link_shown_left < 0 ? LINK_SECONDS : link_shown_left);

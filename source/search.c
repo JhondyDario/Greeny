@@ -27,6 +27,8 @@
 static u64 g_main, g_main_size, g_heap, g_end;
 static int g_width = 4; /* bytes del tipo de la busqueda en curso */
 static int g_step;
+static unsigned long g_last_value; /* el ultimo numero que se busco o filtro */
+static unsigned g_last_count;     /* candidatas, cadenas o cadenas buenas de la ultima orden */
 
 typedef struct { u64 loc; u16 off; s16 parent; } node;   /* loc guarda un puntero a (nodo padre - off) */
 typedef struct { u64 base_off; u8 n; u16 off[PTR_DEPTH]; } chain; /* main+base_off->off[0]->off[1]... */
@@ -75,13 +77,14 @@ static bool matches(const u8 *p, u64 value) {
 
 static void save_state(void) {
     FILE *f = fopen(STATE_PATH, "w");
-    if (f) { fprintf(f, "%d %d\n", g_width, g_step); fclose(f); }
+    if (f) { fprintf(f, "%d %d %lu\n", g_width, g_step, g_last_value); fclose(f); }
 }
 
 static void load_state(void) {
     FILE *f = fopen(STATE_PATH, "r");
     if (f) {
-        if (fscanf(f, "%d %d", &g_width, &g_step) != 2 || (g_width != 1 && g_width != 2 && g_width != 4)) { g_width = 4; g_step = 0; }
+        g_last_value = 0;
+        if (fscanf(f, "%d %d %lu", &g_width, &g_step, &g_last_value) < 2 || (g_width != 1 && g_width != 2 && g_width != 4)) { g_width = 4; g_step = 0; }
         fclose(f);
     }
 }
@@ -155,6 +158,8 @@ static void do_new(int width, u64 value) {
     if (!c.out) { result_status("ERROR: no se pudo escribir en la SD."); return; }
     walk_memory(new_chunk, &c);
     fclose(c.out);
+    g_last_value = value;
+    g_last_count = c.count;
     save_state();
     write_candidates(c.overflow ? "Demasiadas coincidencias: solo se guardaron las primeras. Filtra para reducirlas."
                                 : "Busqueda nueva terminada.", value, c.count);
@@ -193,6 +198,8 @@ static void do_next(u64 value) {
     remove(CAND_PATH);
     rename(CAND_TMP, CAND_PATH);
     g_step++;
+    g_last_value = value;
+    g_last_count = kept;
     save_state();
     write_candidates("Filtro terminado.", value, kept);
 }
@@ -297,6 +304,7 @@ static void do_ptr(int which) {
         walk_memory(ptr_chunk, &p);
         if (g_nchains >= 6) break; /* con unas cuantas basta para comprobar */
     }
+    g_last_count = (unsigned)g_nchains;
     write_chains(g_nchains ? "Cadenas de punteros encontradas:" : "No se encontro ninguna cadena desde main. Prueba con otra candidata.");
 }
 
@@ -331,6 +339,7 @@ static void do_check(u64 value) {
         for (int k = 0; k < g_chains[i].n; k++) fprintf(r, "->0x%X", g_chains[i].off[k]);
         fprintf(r, " u%d\n", g_width * 8);
     }
+    g_last_count = (unsigned)good;
     fprintf(r, "%d de %d siguen dando el valor.%s\n", good, g_nchains, good ? " Esas lineas son las que van en el archivo de logros." : "");
     fclose(r);
 }
@@ -362,6 +371,60 @@ void search_poll(uint64_t main_base, uint64_t main_size, uint64_t heap_base, uin
     else if (sscanf(line, "ptr %d", &which) == 1 && which >= 0) do_ptr(which);
     else if (sscanf(line, "check %lu", &value) == 1) do_check(value);
     else result_status("ERROR: orden desconocida.");
+    free(g_w);
+    g_w = NULL;
+}
+
+/* ---------- manejo desde el juego, con botones ---------- */
+
+#define PLAN_PATH DIR_S "/plan.txt"
+
+bool search_has_plan(void) {
+    struct stat st;
+    return stat(PLAN_PATH, &st) == 0;
+}
+
+void search_button(search_action action, uint64_t main_base, uint64_t main_size, uint64_t heap_base, uint64_t space_end,
+                   char *line1, size_t cap1, char *line2, size_t cap2) {
+    line1[0] = line2[0] = 0;
+    char type[8] = "u32";
+    unsigned long start = 0;
+    long step = 1;
+    FILE *f = fopen(PLAN_PATH, "r");
+    if (!f || fscanf(f, "%7s %lu %ld", type, &start, &step) != 3) {
+        if (f) fclose(f);
+        snprintf(line1, cap1, "No hay plan de busqueda");
+        snprintf(line2, cap2, "Preparalo en Greeny antes de abrir el juego.");
+        return;
+    }
+    fclose(f);
+
+    g_main = main_base;
+    g_main_size = main_size;
+    g_heap = heap_base;
+    g_end = space_end;
+    g_w = malloc(sizeof(*g_w));
+    if (!g_w) { snprintf(line1, cap1, "Sin memoria para buscar"); return; }
+
+    g_step = 0;
+    load_state();
+    g_last_count = 0;
+    if (action == SEARCH_NEXT) {
+        if (g_step == 0) do_new(!strcmp(type, "u8") ? 1 : !strcmp(type, "u16") ? 2 : 4, start);
+        else do_next((unsigned long)((long)g_last_value + step));
+        snprintf(line1, cap1, "Paso %d: busque el %lu", g_step, g_last_value);
+        if (g_last_count == 0) snprintf(line2, cap2, "Ninguna candidata. Prepara otro plan.");
+        else if (g_last_count <= SHOWN) snprintf(line2, cap2, "%u candidata(s). Ya puedes buscar punteros.", g_last_count);
+        else snprintf(line2, cap2, "%u candidatas. Cambia el numero y repite.", g_last_count);
+    } else if (action == SEARCH_PTR) {
+        do_ptr(0);
+        snprintf(line1, cap1, "Punteros: %u cadena(s)", g_last_count);
+        snprintf(line2, cap2, g_last_count ? "Cierra el juego, abrelo y comprueba." : "No salio ninguna desde main.");
+    } else {
+        do_check(g_last_value);
+        snprintf(line1, cap1, "Comprobado con el %lu", g_last_value);
+        snprintf(line2, cap2, "%u cadena(s) sirven. Mira result.txt.", g_last_count);
+    }
     free(g_w);
     g_w = NULL;
 }

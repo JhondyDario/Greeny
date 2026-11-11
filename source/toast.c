@@ -16,8 +16,8 @@
 /* vi trabaja en coordenadas de 1920x1080; 1.5x igual que Tesla */
 #define LAYER_W 672
 #define LAYER_H 192
-#define LAYER_X (1920 - LAYER_W - 32)
-#define LAYER_Y 32
+#define LAYER_X (1920 - LAYER_W) /* pegado a la esquina de arriba a la derecha, como los avisos de la consola */
+#define LAYER_Y 0
 
 #define SHOW_MS 5000
 #define QUEUE_LEN 4
