@@ -132,6 +132,14 @@
     } }, "Copiar");
   }
 
+  // Paises que se pueden elegir (web/js/countries.js) y su bandera.
+  const COUNTRIES = (window.GreenyCountries || []).slice().sort((a, b) => a.es.localeCompare(b.es, "es"));
+  const countryName = (code) => { const c = COUNTRIES.find((x) => x.code === code); return c ? c.es : code; };
+  function flag(code, size) {
+    if (!code || !COUNTRIES.some((c) => c.code === code)) return null;
+    return h("img", { class: "flag", src: "img/flags/" + code.toLowerCase() + ".png", alt: countryName(code), title: countryName(code), width: size || 22, height: size || 22, loading: "lazy" });
+  }
+
   // La foto de perfil es una de las que trae Greeny, por numero (profiles.avatar).
   const AVATARS = 36;
   const avatarSrc = (n) => "img/avatars/" + String(n).padStart(2, "0") + ".png";
@@ -438,7 +446,7 @@
     return [
       h("section", { class: "card row" }, avatar(profile, "big"),
         h("div", { class: "grow" },
-          h("h1", { style: "margin-bottom:2px" }, shownName(profile)),
+          h("h1", { style: "margin-bottom:2px" }, shownName(profile), " ", flag(profile.country, 30)),
           h("div", { class: "muted" }, "@" + profile.username, profile.discord_username ? " · Discord: " + profile.discord_username : ""),
           profile.caption ? h("p", { style: "margin:8px 0 0;font-size:1.1rem" }, "“" + profile.caption + "”") : null,
           profile.friend_code ? h("div", { class: "small", style: "margin-top:8px" }, "Código de amigo: ", h("code", {}, profile.friend_code), " ", copyButton(profile.friend_code)) : null,
@@ -631,12 +639,16 @@
         h("input", { name: "display_name", maxlength: 32, value: me.display_name || "" })),
       h("label", {}, "Frase de tu perfil", h("span", { class: "hint" }, "Elige una o escribe la tuya (hasta 60 caracteres)."), select),
       customWrap,
+      h("label", {}, "País", h("span", { class: "hint" }, "Opcional. Sale como bandera en tu perfil y en el ranking."),
+        h("select", { name: "country" }, h("option", { value: "" }, "Sin indicar"),
+          COUNTRIES.map((c) => h("option", { value: c.code, selected: me.country === c.code }, c.es)))),
     ], "Guardar perfil", async (fd) => {
       const choice = fd.get("caption_choice");
       const caption = (choice === CUSTOM ? String(fd.get("caption_custom")).trim() : choice) || null;
       await checkUsername(fd.get("username"), me.id);
       must(await sb.from("profiles").update({
         username: fd.get("username"), display_name: String(fd.get("display_name")).trim() || null, caption,
+        country: fd.get("country") || null,
       }).eq("id", me.id));
       await loadMe();
       renderNav();
@@ -900,7 +912,13 @@
       const tid = fd.get("title_id");
       const patch = { name: String(fd.get("name")).trim(), version: String(fd.get("version")).trim() || null,
                       status: fd.get("status"), published: fd.get("published") === "on" };
-      must(await sb.from("games").update(patch).eq("title_id", tid));
+      // El nombre y la version tambien viven dentro del archivo de logros: se cambian ahi,
+      // asi la consola nota el cambio y vuelve a bajar el archivo.
+      const cur = must(await sb.from("games").select("definition").eq("title_id", tid).single());
+      let text = window.GreenyDefs.setHeader(cur.definition, "game", patch.name);
+      if (patch.version) text = window.GreenyDefs.setHeader(text, "version", patch.version);
+      window.GreenyDefs.parseDefinition(text);
+      must(await sb.from("games").update({ ...patch, definition: text }).eq("title_id", tid));
       Object.assign(games.find((x) => x.title_id === tid), patch);
       return "Datos guardados.";
     });
@@ -966,6 +984,75 @@
     ];
   }
 
+  // ---------- ranking ----------
+
+  async function viewRanking() {
+    const mine = session ? (await sb.from("profiles").select("country").eq("id", session.user.id).maybeSingle()).data : null;
+    // por juego: con sesion, los juegos donde ya tienes algun logro; sin sesion, todos los publicados
+    let gameList = (await sb.from("games").select("title_id,name").eq("published", true).order("name")).data || [];
+    if (session) {
+      const played = new Set(((await sb.from("game_points").select("title_id").eq("user_id", session.user.id)).data || []).map((g) => g.title_id));
+      if (played.size) gameList = gameList.filter((g) => played.has(g.title_id));
+    }
+    const state = { scope: "global", country: (mine && mine.country) || "DO", title: "" };
+    const out = h("div", { "aria-live": "polite" });
+
+    const scopes = [["global", "Global"], ["country", "Por país"], ["friends", "Amigos"]];
+    const scopeBtns = scopes.map(([id, label]) => h("button", { type: "button", class: "tab" + (id === state.scope ? " on" : ""), "aria-pressed": String(id === state.scope),
+      onclick: () => { state.scope = id; draw(); } }, label));
+    const countrySel = h("select", { "aria-label": "País", onchange: (ev) => { state.country = ev.target.value; draw(); } },
+      COUNTRIES.map((c) => h("option", { value: c.code, selected: c.code === state.country }, c.es)));
+    const gameSel = h("select", { "aria-label": "Clasificar por", onchange: (ev) => { state.title = ev.target.value; draw(); } },
+      h("option", { value: "" }, "Puntos totales"), gameList.map((g) => h("option", { value: g.title_id }, "Juego: " + g.name)));
+
+    function row(r, isMe) {
+      const lvl = window.GreenyProgress.level(r.total_points).level;
+      return h("a", { class: "card row rank-row" + (isMe ? " me" : ""), href: "#/u/" + encodeURIComponent(r.username) },
+        h("span", { class: "rank-pos" + (r.position <= 3 ? " top" + r.position : "") }, "#" + r.position),
+        avatar(r, ""),
+        h("div", { class: "grow clip" },
+          h("strong", {}, shownName(r)), " ", flag(r.country),
+          h("div", { class: "muted small" }, "@" + r.username + " · Nivel " + lvl)),
+        h("div", { class: "right" }, h("strong", { class: "rank-pts" }, fmtNum(r.points)), h("div", { class: "muted small" }, "puntos")));
+    }
+
+    let seq = 0;
+    async function draw() {
+      const id = ++seq;
+      scopeBtns.forEach((b, i) => { const on = scopes[i][0] === state.scope; b.classList.toggle("on", on); b.setAttribute("aria-pressed", String(on)); });
+      countrySel.hidden = state.scope !== "country";
+      if (state.scope === "friends" && !session) {
+        out.replaceChildren(h("p", { class: "card muted" }, "Para ver el ranking de tus amigos tienes que ", h("a", { href: "#/entrar" }, "entrar"), "."));
+        return;
+      }
+      out.replaceChildren(h("p", { class: "muted" }, "Cargando…"));
+      const res = await sb.rpc("ranking", { scope: state.scope, country: state.scope === "country" ? state.country : null, title: state.title || null });
+      if (id !== seq) return; // llego tarde: ya se pidio otra cosa
+      if (res.error) { out.replaceChildren(h("p", { class: "msg err" }, explain(res.error))); return; }
+      const data = res.data || { top: [], me: null, total: 0 };
+      if (!data.top.length) {
+        out.replaceChildren(h("div", { class: "card row" }, h("img", { src: "img/m_buscando.png", alt: "", width: 96, height: 96 }),
+          h("p", { style: "margin:0" }, "Todavía no hay nadie con puntos aquí.")));
+        return;
+      }
+      const inTop = data.me && data.top.some((r) => r.username === data.me.username);
+      out.replaceChildren(...[
+        h("div", { class: "stack" }, data.top.map((r) => row(r, data.me && r.username === data.me.username))),
+        data.me && !inTop ? h("div", { style: "margin-top:16px" }, h("h2", {}, "Tu posición"), row(data.me, true)) : null,
+        session && !data.me ? h("p", { class: "muted small", style: "margin-top:12px" }, "Todavía no apareces aquí: te falta tener puntos en esta clasificación.") : null,
+        h("p", { class: "muted small", style: "margin-top:12px" }, fmtNum(data.total) + " jugador(es) en esta clasificación."),
+      ].filter(Boolean));
+    }
+    draw();
+
+    return [
+      h("h1", {}, "Ranking"),
+      h("p", { class: "muted" }, "Los 10 jugadores con más puntos. Toca a alguien para ver su perfil y seguirlo."),
+      h("div", { class: "rank-filters" }, h("div", { class: "tabs", style: "margin:0;border:0;padding:0" }, scopeBtns), countrySel, gameSel),
+      out,
+    ];
+  }
+
   function notFound(text) {
     return [h("h1", {}, "No encontrado"), h("div", { class: "card row" }, h("img", { src: "img/m_buscando.png", alt: "", width: 110, height: 110 }), h("p", { style: "margin:0" }, text || "Esa página no existe.")), h("p", {}, h("a", { href: "#/" }, "Volver al inicio"))];
   }
@@ -976,7 +1063,7 @@
   async function render() {
     const id = ++renderId;
     const parts = location.hash.replace(/^#\/?/, "").split("/").map(decodeURIComponent);
-    const routes = { "": viewHome, juegos: viewGames, juego: viewGame, u: viewProfile, entrar: viewLogin, registro: viewRegister, recuperar: viewForgot, "nueva-clave": viewNewPassword, cuenta: viewAccount, admin: viewAdmin, desarrollador: viewAdmin };
+    const routes = { "": viewHome, ranking: viewRanking, juegos: viewGames, juego: viewGame, u: viewProfile, entrar: viewLogin, registro: viewRegister, recuperar: viewForgot, "nueva-clave": viewNewPassword, cuenta: viewAccount, admin: viewAdmin, desarrollador: viewAdmin };
     const view = routes[parts[0]];
     renderNav();
     try {

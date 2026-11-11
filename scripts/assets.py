@@ -16,6 +16,7 @@ del sysmodule van a 32 kHz porque ahi la memoria es muy limitada.
 Si cambias los tamaños, cambia tambien BIG_W/BIG_H/SMALL_W/SMALL_H en app/source/main.c.
 """
 import os
+import sys
 from PIL import Image
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -76,6 +77,9 @@ for name in ("usuario", "salir", "menu"):
 A = os.path.join(ROOT, "assets")
 BADGES = ["primer_logro", "logros_10", "logros_50", "logros_200", "primer_platino", "platinos_5", "juegos_3", "juegos_10",
           "puntos_100", "puntos_500", "puntos_2000"]
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from paises import PAISES  # los paises que se pueden elegir, con su bandera en assets/flags/
+
 AVATARS = sorted(f[:-4] for f in os.listdir(os.path.join(A, "avatars")) if f.endswith(".png"))
 app_images = [  # (nombre, archivo en assets/, ancho, alto, espejo)
     ("medal_bronce", "medals/bronce.png", 64, 64, False), ("medal_plata", "medals/plata.png", 64, 64, False),
@@ -94,7 +98,8 @@ app_images = [  # (nombre, archivo en assets/, ancho, alto, espejo)
 ] + [("m_" + m, "mascota/" + m + ".png", 260, 260, False)
      for m in ("buscando", "celebrando", "diagnostico", "durmiendo", "error", "saludando", "sorprendido", "triste")
 ] + [("badge_" + b, "badges/" + b + ".png", 96, 96, False) for b in BADGES + ["bloqueada"]
-] + [("avatar_" + a, "avatars/" + a + ".png", 160, 160, False) for a in AVATARS]
+] + [("avatar_" + a, "avatars/" + a + ".png", 160, 160, False) for a in AVATARS
+] + [("flag_" + code.lower(), "flags/" + code.lower() + ".png", 40, 40, False) for code, _, _ in PAISES]
 
 for old in os.listdir(os.path.join(ROOT, "app", "data")):
     if old.startswith("img_"):
@@ -113,6 +118,11 @@ with open(os.path.join(ROOT, "app", "source", "ui_images.h"), "w") as f:
     for name, _, w, h, _ in app_images:
         f.write("UI_IMG(%s, %d, %d)\n" % (name, w, h))
     f.write("#define UI_AVATAR_COUNT %d\n" % len(AVATARS))
+    f.write("#define UI_COUNTRY_COUNT %d\n" % len(PAISES))
+with open(os.path.join(ROOT, "app", "source", "ui_countries.h"), "w") as f:
+    f.write("/* Generado por scripts/assets.py desde scripts/paises.py. No editar a mano.\n * UI_COUNTRY(codigo, nombre en español, nombre en ingles), en el mismo orden que las banderas. */\n")
+    for code, es, en in PAISES:
+        f.write('UI_COUNTRY("%s", "%s", "%s")\n' % (code, es, en))
 print("imagenes de la app: %d, %d KB" % (len(app_images), total // 1024))
 
 # ---------- imagenes de la web ----------
@@ -133,6 +143,13 @@ for st in ("sin_empezar", "prueba", "jugable", "perfecto"):
     web_copy("estado/%s.png" % st, "st_%s.png" % st, 48, 48)
 for m in ("buscando", "celebrando", "durmiendo", "error", "saludando", "triste"):
     web_copy("mascota/%s.png" % m, "m_%s.png" % m, 320, 320)
+for code, _, _ in PAISES:
+    web_copy("flags/%s.png" % code.lower(), "flags/%s.png" % code.lower(), 48, 48)
+with open(os.path.join(ROOT, "web", "js", "countries.js"), "w") as f:
+    f.write("// Generado por scripts/assets.py desde scripts/paises.py. No editar a mano.\nwindow.GreenyCountries = [\n")
+    for code, es, en in PAISES:
+        f.write('  { code: "%s", es: "%s", en: "%s" },\n' % (code, es, en))
+    f.write("];\n")
 web_copy("relleno_caratula.png", "cover_fill.png", 256, 256)
 web_copy("relleno_logro.png", "ach_fill.png", 128, 128)
 web_copy("trofeo.png", "trophy.png", 96, 96)
@@ -141,14 +158,14 @@ web_copy("logo-greeny.png", "logo_simple.png", 360, 164)
 web_copy("app-icon.png", "favicon.png", 192, 192)
 
 # ---------- imagenes del aviso dentro del juego ----------
-# RGBA crudo de 76x76. Van a la SD (no dentro del sysmodule, que debe pesar poco); la app los lleva y los instala.
+# RGBA crudo de 60x60 (TOAST_BADGE en source/toast_draw.h). Van a la SD (no dentro del sysmodule, que debe pesar poco); la app los lleva y los instala.
 TOAST = os.path.join(ROOT, "sd", "config", "greeny", "toast")
 os.makedirs(TOAST, exist_ok=True)
 for name, file in (("bronce", "medals/bronce.png"), ("plata", "medals/plata.png"), ("oro", "medals/oro.png"),
                    ("ok", "logro_desbloqueado.png"), ("aviso", "mascota/error.png")):
     im = Image.open(os.path.join(A, file)).convert("RGBA")
     with open(os.path.join(TOAST, name + ".bin"), "wb") as f:
-        f.write(fit(im.crop(im.getbbox()), 76, 76).tobytes())
+        f.write(fit(im.crop(im.getbbox()), 60, 60).tobytes())
 
 # ---------- sonidos ----------
 import wave

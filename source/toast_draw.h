@@ -4,7 +4,7 @@
 
 #define TOAST_W 448
 #define TOAST_H 128
-#define TOAST_BADGE 76
+#define TOAST_BADGE 60
 
 typedef enum {
     TOAST_INFO,   /* logros cargados: circulo verde con check */

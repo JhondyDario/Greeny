@@ -79,5 +79,20 @@
     return lines.join("\n");
   }
 
-  window.GreenyDefs = { parseDefinition, setTier, tierFromPoints };
+  // Devuelve el archivo con `key = value` en la cabecera (antes del primer logro); si ya estaba, la cambia.
+  function setHeader(text, key, value) {
+    const lines = String(text).split(/\r?\n/);
+    let first = lines.findIndex((l) => l.trim().startsWith("["));
+    if (first < 0) first = lines.length;
+    const re = new RegExp("^\\s*" + key + "\\s*=");
+    for (let i = 0; i < first; i++) {
+      if (re.test(lines[i])) { lines[i] = key + " = " + value; return lines.join("\n"); }
+    }
+    let at = 0; // despues de los comentarios del principio
+    while (at < first && (lines[at].trim().startsWith("#") || !lines[at].trim())) at++;
+    lines.splice(at, 0, key + " = " + value);
+    return lines.join("\n");
+  }
+
+  window.GreenyDefs = { parseDefinition, setTier, setHeader, tierFromPoints };
 })();

@@ -36,6 +36,11 @@ alter table public.profiles add constraint profiles_username_reserved check (low
 -- el nombre de usuario es unico sin importar mayusculas
 create unique index if not exists profiles_username_lower_idx on public.profiles (lower(username));
 
+-- Pais (codigo de dos letras, ej. DO). Opcional: sale como bandera en el perfil y en el ranking.
+alter table public.profiles add column if not exists country text;
+alter table public.profiles drop constraint if exists profiles_country_format;
+alter table public.profiles add constraint profiles_country_format check (country is null or country ~ '^[A-Z]{2}$');
+
 -- Codigo de amigo: GR-123456 (seis numeros). Sirve para seguir a
 -- alguien sin tener que buscar su nombre. Se genera solo al crear el perfil.
 -- Foto de perfil: una de las que trae Greeny (web/img/avatars/NN.png), por numero.
@@ -552,7 +557,8 @@ returns jsonb
 language sql stable security definer set search_path = ''
 as $$
     select jsonb_build_object(
-               'username', p.username, 'display_name', p.display_name, 'caption', p.caption, 'avatar', p.avatar,
+               'username', p.username, 'display_name', p.display_name, 'caption', p.caption, 'avatar', p.avatar, 'country', p.country,
+               'caption_en', (select c.text_en from public.caption_presets c where c.text_es = p.caption limit 1),
                'friend_code', p.friend_code,
                'admin', exists (select 1 from public.admins a where a.user_id = p.id),
                'achievements', s.achievements, 'points', s.points, 'games', s.games, 'platinums', s.platinums,
@@ -577,6 +583,97 @@ begin
     update public.profiles set avatar = picture where id = v_uid;
     return true;
 end;
+$$;
+
+-- (consola) Cambia el pais del perfil. '' o null lo quita.
+create or replace function public.device_set_country(device_token text, code text)
+returns boolean
+language plpgsql security definer set search_path = ''
+as $$
+declare
+    v_uid uuid;
+    v_code text := nullif(upper(trim(coalesce(code, ''))), '');
+begin
+    select d.user_id into v_uid from public.devices d where d.token_hash = public.hash_token(device_token);
+    if v_uid is null then raise exception 'consola sin vincular'; end if;
+    if v_code is not null and v_code !~ '^[A-Z]{2}$' then raise exception 'pais invalido'; end if;
+    update public.profiles set country = v_code where id = v_uid;
+    return true;
+end;
+$$;
+
+-- (consola) Sigue a alguien por su nombre de usuario (desde el ranking). Devuelve el usuario seguido.
+create or replace function public.device_follow_user(device_token text, who text)
+returns text
+language plpgsql security definer set search_path = ''
+as $$
+declare
+    v_uid uuid;
+    target record;
+begin
+    select d.user_id into v_uid from public.devices d where d.token_hash = public.hash_token(device_token);
+    if v_uid is null then raise exception 'consola sin vincular'; end if;
+    select p.id, p.username into target from public.profiles p where lower(p.username) = lower(who);
+    if target.id is null then raise exception 'ese usuario no existe'; end if;
+    if target.id = v_uid then raise exception 'ese eres tu'; end if;
+    insert into public.follows (follower_id, followed_id) values (v_uid, target.id) on conflict do nothing;
+    return target.username;
+end;
+$$;
+
+-- RANKING ---------------------------------------------------------------------
+-- Puntos de cada usuario en cada juego.
+create or replace view public.game_points
+with (security_invoker = true) as
+select u.user_id, u.title_id, sum(a.points)::int as points, count(*)::int as achievements
+  from public.unlocks u
+  join public.achievements a on a.title_id = u.title_id and a.ach_id = u.ach_id
+ group by u.user_id, u.title_id;
+
+-- Los 10 primeros y la posicion de quien mira.
+--   scope: 'global', 'country' (usa p_country) o 'friends' (a quienes sigue `viewer`, y el mismo)
+--   p_title: null = por puntos totales; un title id = por puntos en ese juego
+create or replace function public.ranking_for(viewer uuid, scope text, p_country text, p_title text)
+returns jsonb
+language sql stable security definer set search_path = ''
+as $$
+    with base as (
+        select p.id, p.username, p.display_name, p.avatar, p.country,
+               s.points as total_points, s.achievements,
+               case when p_title is null then s.points else coalesce(g.points, 0) end as points
+          from public.profiles p
+          join public.profile_stats s on s.id = p.id
+          left join public.game_points g on g.user_id = p.id and g.title_id = p_title
+         where (scope is distinct from 'country' or p.country = upper(p_country))
+           and (scope is distinct from 'friends' or p.id = viewer
+                or exists (select 1 from public.follows f where f.follower_id = viewer and f.followed_id = p.id))
+    ), ranked as (
+        select b.*, row_number() over (order by b.points desc, lower(b.username)) as position
+          from base b where b.points > 0
+    )
+    select jsonb_build_object(
+        'top', coalesce((select jsonb_agg(to_jsonb(r) - 'id' order by r.position)
+                           from (select * from ranked order by position limit 10) r), '[]'::jsonb),
+        'me', (select to_jsonb(r) - 'id' from ranked r where r.id = viewer),
+        'total', (select count(*) from ranked));
+$$;
+
+-- (web) con o sin sesion
+create or replace function public.ranking(scope text default 'global', country text default null, title text default null)
+returns jsonb
+language sql stable security definer set search_path = ''
+as $$
+    select public.ranking_for((select auth.uid()), scope, country, title);
+$$;
+
+-- (consola)
+create or replace function public.device_ranking(device_token text, scope text default 'global', country text default null,
+                                                 title text default null)
+returns jsonb
+language sql stable security definer set search_path = ''
+as $$
+    select public.ranking_for((select d.user_id from public.devices d where d.token_hash = public.hash_token(device_token)),
+                              scope, country, title);
 $$;
 
 
@@ -657,7 +754,7 @@ grant insert, update, delete on public.games, public.achievements, public.captio
 -- del perfil solo se pueden cambiar estas columnas (no el id ni la fecha de alta)
 revoke update on public.profiles from anon, authenticated;
 revoke update (avatar_url) on public.profiles from authenticated;
-grant update (username, display_name, caption, avatar) on public.profiles to authenticated;
+grant update (username, display_name, caption, avatar, country) on public.profiles to authenticated;
 
 -- la llave de las consolas nunca sale por la API, ni siquiera su hash
 revoke select on public.devices from authenticated;
@@ -670,6 +767,12 @@ grant execute on function public.device_link_start(text) to anon, authenticated;
 grant execute on function public.device_whoami(text) to anon, authenticated;
 grant execute on function public.device_profile(text) to anon, authenticated;
 grant execute on function public.device_set_avatar(text, int) to anon, authenticated;
+grant execute on function public.device_set_country(text, text) to anon, authenticated;
+grant execute on function public.device_follow_user(text, text) to anon, authenticated;
+revoke all on function public.ranking_for(uuid, text, text, text) from public, anon, authenticated;
+grant execute on function public.ranking(text, text, text) to anon, authenticated;
+grant execute on function public.device_ranking(text, text, text, text) to anon, authenticated;
+grant select on public.game_points to anon, authenticated;
 grant execute on function public.device_follow_by_code(text, text) to anon, authenticated;
 grant execute on function public.follow_by_code(text) to authenticated;
 grant execute on function public.device_push_unlocks(text, jsonb) to anon, authenticated;

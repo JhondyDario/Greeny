@@ -237,3 +237,14 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fo
 .dev .ach-list table { min-width: 640px; }
 .dev .ach-list td, .dev .ach-list th { white-space: nowrap; padding-right: 18px; }
 .dev .ach-list td:nth-child(3) { white-space: normal; min-width: 180px; }
+
+/* ---- ranking y banderas ---- */
+.flag { vertical-align: middle; }
+.rank-filters { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin: 14px 0 18px; }
+.rank-filters select { max-width: 280px; }
+.rank-row { text-decoration: none; color: inherit; gap: 14px; }
+.rank-row:hover { box-shadow: inset 0 0 0 2px var(--green); }
+.rank-row.me { box-shadow: inset 0 0 0 3px var(--yellow); }
+.rank-pos { font-weight: 800; font-size: 1.25rem; min-width: 3ch; text-align: center; font-variant-numeric: tabular-nums; color: var(--muted); }
+.rank-pos.top1 { color: #c79a00; } .rank-pos.top2 { color: #7d8894; } .rank-pos.top3 { color: #b56a2c; }
+.rank-pts { font-size: 1.3rem; font-variant-numeric: tabular-nums; }

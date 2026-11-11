@@ -154,7 +154,7 @@ void toast_draw(const toast_view *v, toast_put_fn put) {
         default: accent = RGB(0x2FA63B); head = v->dark ? RGB(0x7FE08A) : RGB(0x1E8A2E); break;
     }
 
-    const float bcx = 58, bcy = BAR_H / 2.0f, br = 36;
+    const float bcx = 50, bcy = BAR_H / 2.0f, br = 28;
     for (int y = 0; y < TOAST_H; y++) {
         for (int x = 0; x < TOAST_W; x++) {
             if (y >= BAR_H) { put(x, y, 0, 0, 0, 0); continue; }
@@ -172,14 +172,14 @@ void toast_draw(const toast_view *v, toast_put_fn put) {
                 if (badge > 0) {
                     c = mix(c, accent, badge);
                     float mark;
-                    if (v->kind == TOAST_UNLOCK) mark = in_star(px, py, bcx, bcy + 1, 22);
+                    if (v->kind == TOAST_UNLOCK) mark = in_star(px, py, bcx, bcy + 1, 17);
                     else if (v->kind == TOAST_WARN) {
-                        mark = in_segment(px, py, bcx, bcy - 18, bcx, bcy + 5, 8);
-                        float dot = in_circle(px, py, bcx, bcy + 18, 5);
+                        mark = in_segment(px, py, bcx, bcy - 14, bcx, bcy + 4, 6);
+                        float dot = in_circle(px, py, bcx, bcy + 14, 4);
                         if (dot > mark) mark = dot;
                     } else {
-                        mark = in_segment(px, py, bcx - 16, bcy + 1, bcx - 5, bcy + 12, 8);
-                        float b = in_segment(px, py, bcx - 5, bcy + 12, bcx + 17, bcy - 11, 8);
+                        mark = in_segment(px, py, bcx - 12, bcy + 1, bcx - 4, bcy + 9, 6);
+                        float b = in_segment(px, py, bcx - 4, bcy + 9, bcx + 13, bcy - 8, 6);
                         if (b > mark) mark = b;
                     }
                     c = mix(c, white, mark);
@@ -190,7 +190,7 @@ void toast_draw(const toast_view *v, toast_put_fn put) {
     }
 
     /* puntos, arriba a la derecha, como texto */
-    const int tx = 112, right = TOAST_W - 18;
+    const int tx = 96, right = TOAST_W - 18;
     int pts_w = 0;
     if (v->points >= 0) {
         uint8_t pts[12];

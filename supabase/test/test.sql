@@ -395,4 +395,32 @@ begin
     end;
 end $$;
 
+-- ranking
+do $$
+declare j jsonb; who uuid; n int;
+begin
+    select count(*) into n from public.profile_stats where points > 0;
+    j := public.ranking_for(null, 'global', null, null);
+    assert (j ->> 'total')::int = n, 'ranking global: ' || j::text;
+    assert jsonb_array_length(j -> 'top') = least(n, 10), 'top 10';
+    if n > 0 then
+        assert (j -> 'top' -> 0 ->> 'position')::int = 1 and j -> 'top' -> 0 ? 'username' and not (j -> 'top' -> 0 ? 'id'), 'fila del ranking: ' || j::text;
+        select id into who from public.profile_stats order by points desc limit 1;
+        j := public.ranking_for(who, 'global', null, null);
+        assert (j -> 'me' ->> 'position')::int = 1, 'mi posicion';
+        update public.profiles set country = 'DO' where id = who;
+        j := public.ranking_for(who, 'country', 'do', null);
+        assert (j ->> 'total')::int = 1, 'ranking por pais: ' || j::text;
+        j := public.ranking_for(who, 'friends', null, null);
+        assert (j ->> 'total')::int >= 1, 'ranking de amigos me incluye';
+        j := public.ranking_for(who, 'global', null, '010028600EBDA000');
+        assert j ? 'top', 'ranking por juego';
+    end if;
+    begin
+        update public.profiles set country = 'dominicana' where id = (select id from public.profiles limit 1);
+        assert false, 'acepto un pais invalido';
+    exception when check_violation then null;
+    end;
+end $$;
+
 select 'TODAS LAS PRUEBAS PASARON' as resultado;
