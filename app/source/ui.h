@@ -13,11 +13,11 @@
 #define UI_COVER_BIG  150  /* caratula en la cuadricula */
 
 #define UI_APP_NAME    "Greeny"
-#define UI_APP_VERSION "0.0.11"
+#define UI_APP_VERSION "0.0.12"
 
 /* opciones, agrupadas en pestañas que se cambian con L y R */
 enum {
-    UI_OPT_LANG, UI_OPT_THEME, UI_OPT_ANIM, UI_OPT_GAMES_VIEW, UI_OPT_ACH_VIEW, UI_OPT_SOUND, UI_OPT_POPUP, UI_OPT_START, UI_OPT_SCOPE, UI_OPT_SHOW,
+    UI_OPT_LANG, UI_OPT_THEME, UI_OPT_ANIM, UI_OPT_GAMES_VIEW, UI_OPT_ACH_VIEW, UI_OPT_SOUND, UI_OPT_POPUP, UI_OPT_START, UI_OPT_SCOPE, UI_OPT_SHOW, UI_OPT_INGAME,
     UI_OPT_DIAG, UI_OPT_ABOUT,
     /* pestaña Cuenta: unas u otras segun si la consola esta vinculada */
     UI_OPT_ACC_LINK, UI_OPT_ACC_LOGIN, UI_OPT_ACC_INFO, UI_OPT_ACC_SYNC, UI_OPT_ACC_UNLINK,
@@ -36,6 +36,14 @@ typedef struct {
     const char *sync_es, *sync_en;  /* estado de la sincronizacion, ya redactado */
 } ui_account;
 
+/* Imagenes PNG que la app lleva dentro; la lista la genera scripts/assets.py. */
+#define UI_IMG(name, w, h) UI_IMG_##name,
+typedef enum {
+#include "ui_images.h"
+    UI_IMG_COUNT
+} ui_img;
+#undef UI_IMG
+
 /* iconos de botones, en el orden en que estan guardados en buttons.bin */
 enum { UI_BTN_A, UI_BTN_B, UI_BTN_X, UI_BTN_Y, UI_BTN_PLUS, UI_BTN_MINUS, UI_BTN_L, UI_BTN_R, UI_BTN_COUNT };
 #define UI_BTN_SIZE 38
@@ -51,6 +59,11 @@ typedef struct {
      * NULL = no hay icono guardado. El gris es para los que aun no se tienen. */
     const uint8_t *ach_icons[LG_MAX_ACH];
     const uint8_t *ach_icons_gray[LG_MAX_ACH];
+    /* los mismos al doble (GR_ICON_BIG), para el logro al detalle */
+    const uint8_t *ach_big[LG_MAX_ACH];
+    const uint8_t *ach_big_gray[LG_MAX_ACH];
+    /* imagenes fijas, RGBA en el tamaño que dice ui_images.h; NULL = no se pudo cargar */
+    const uint8_t *img[UI_IMG_COUNT];
 } ui_assets;
 
 /* columnas y filas visibles de una pantalla, para que la navegacion sea la misma en lista y cuadricula */
@@ -66,6 +79,8 @@ typedef struct {
 /* La zona que hay en ese punto, o NULL. */
 const ui_zone *ui_zone_at(int x, int y);
 
+/* ¿Estan encendidos los logros dentro de los juegos (existe boot2.flag)? Lo muestra Opciones. */
+void ui_set_ingame(bool on);
 void ui_set_english(bool english);
 void ui_set_dark(bool dark);
 /* Nombre para el saludo del inicio ("Bienvenido de vuelta, ..."); NULL o "" = sin saludo. */
@@ -77,6 +92,7 @@ typedef struct {
     const char *username;   /* "" si la consola no esta vinculada */
     const char *caption;
     const char *friend_code; /* "" si aun no se sabe */
+    int avatar;             /* foto de perfil elegida, de 1 a UI_AVATAR_COUNT; 0 = la inicial del nombre */
     bool linked;
     bool social_known;      /* false = todavia no se sabe cuantos seguidores tiene */
     int followers, following;
@@ -110,6 +126,9 @@ void ui_diag(gfx_canvas *c, const ui_assets *a, const gr_diag_item *items, int c
 void ui_about(gfx_canvas *c, const ui_assets *a);
 /* Perfil a pantalla completa (sin la barra de arriba) y detalle de las medallas. */
 void ui_profile_screen(gfx_canvas *c, const ui_assets *a, const ui_profile *p);
+/* Elegir foto de perfil: cuadricula con todas; `cursor` es la que esta marcada (0..UI_AVATAR_COUNT-1). */
+#define UI_AVATAR_COLS 6
+void ui_avatars(gfx_canvas *c, const ui_assets *a, const ui_profile *p, int cursor);
 void ui_badges(gfx_canvas *c, const ui_assets *a, const ui_profile *p);
 
 /* Introduccion de la primera vez: bienvenida, revision de la instalacion y que hacer despues. */

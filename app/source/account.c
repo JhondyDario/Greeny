@@ -155,6 +155,7 @@ void gr_account_load(gr_account *a, const char *path) {
         else if (!strcmp(line, "followers")) { a->followers = atoi(v); a->social_known = true; }
         else if (!strcmp(line, "following")) a->following = atoi(v);
         else if (!strcmp(line, "friend_code")) snprintf(a->friend_code, sizeof(a->friend_code), "%s", v);
+        else if (!strcmp(line, "avatar")) a->avatar = atoi(v);
     }
     fclose(f);
     if (!a->token[0]) a->linked = false;
@@ -168,6 +169,7 @@ int gr_account_save(const gr_account *a, const char *path) {
                      a->display, a->caption) > 0;
     if (ok && a->social_known) ok = fprintf(f, "followers=%d\nfollowing=%d\n", a->followers, a->following) > 0;
     if (ok && a->friend_code[0]) ok = fprintf(f, "friend_code=%s\n", a->friend_code) > 0;
+    if (ok && a->avatar > 0) ok = fprintf(f, "avatar=%d\n", a->avatar) > 0;
     if (fclose(f) != 0) ok = 0;
     return ok ? 0 : -1;
 }
@@ -226,7 +228,18 @@ gr_net_result gr_fetch_social(gr_http_fn http, gr_account *a) {
         a->social_known = true;
     }
     gr_json_string(resp, "friend_code", a->friend_code, sizeof(a->friend_code));
+    int avatar;
+    if (gr_json_int(resp, "avatar", &avatar) && avatar > 0) a->avatar = avatar;
     return GR_NET_OK;
+}
+
+gr_net_result gr_set_avatar(gr_http_fn http, gr_account *a, int picture, char *err, size_t errlen) {
+    char body[160], resp[RESP_MAX];
+    if (!a->token[0] || !a->linked) { snprintf(err, errlen, "Esta consola no está vinculada."); return GR_NET_REJECTED; }
+    snprintf(body, sizeof(body), "{\"device_token\":\"%s\",\"picture\":%d}", a->token, picture);
+    gr_net_result r = call(http, "/rest/v1/rpc/device_set_avatar", NULL, body, resp, sizeof(resp), err, errlen);
+    if (r == GR_NET_OK) a->avatar = picture;
+    return r;
 }
 
 gr_net_result gr_follow_code(gr_http_fn http, const gr_account *a, const char *code, char *who, size_t wholen,

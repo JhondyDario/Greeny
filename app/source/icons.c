@@ -39,13 +39,13 @@ bool gr_icon_load(const char *root, const char *tid, const char *ach_id, uint8_t
     cache_file(path, sizeof(path), root, tid, ach_id, "bin");
     FILE *f = fopen(path, "rb");
     if (!f) return false;
-    bool ok = fread(rgba, 1, GR_ICON_BYTES, f) == GR_ICON_BYTES;
+    bool ok = fread(rgba, 1, GR_ICON_BIG_BYTES, f) == GR_ICON_BIG_BYTES;
     fclose(f);
     return ok;
 }
 
-void gr_icon_gray(const uint8_t *src, uint8_t *dst) {
-    for (int i = 0; i < GR_ICON_SIZE * GR_ICON_SIZE; i++) {
+void gr_icon_gray(const uint8_t *src, uint8_t *dst, int side) {
+    for (int i = 0; i < side * side; i++) {
         const uint8_t *s = src + i * 4;
         unsigned y = (s[0] * 77u + s[1] * 150u + s[2] * 29u) >> 8;
         y = (y * 3 + 128) / 4; /* un poco lavado, para que no compita con los de color */
@@ -68,7 +68,7 @@ static bool up_to_date(const char *root, const char *tid, const char *id, const 
     if (strcmp(have, icon_path)) return false;
     cache_file(path, sizeof(path), root, tid, id, "bin");
     struct stat st;
-    return stat(path, &st) == 0 && st.st_size == GR_ICON_BYTES;
+    return stat(path, &st) == 0 && st.st_size == GR_ICON_BIG_BYTES; /* los de 60 de versiones viejas se vuelven a bajar */
 }
 
 static bool fetch_one(gr_get_fn get, const char *root, const char *tid, const char *id, const char *icon_path, uint8_t *work) {
@@ -92,20 +92,20 @@ static bool fetch_one(gr_get_fn get, const char *root, const char *tid, const ch
     }
     bool ok = false;
     if (w > 0 && h > 0 && w <= 2048 && h <= 2048) {
-        static uint8_t small[GR_ICON_BYTES];
+        static uint8_t small[GR_ICON_BIG_BYTES];
         /* si no es cuadrada se recorta al centro, para no deformarla */
         int side = w < h ? w : h, ox = (w - side) / 2, oy = (h - side) / 2;
         if (side != w || side != h) {
             for (int y = 0; y < side; y++) memmove(img + (size_t)y * side * 4, img + ((size_t)(y + oy) * w + ox) * 4, (size_t)side * 4);
             w = h = side;
         }
-        gfx_scale_rgba(img, w, h, small, GR_ICON_SIZE, GR_ICON_SIZE);
-        gfx_round_corners(small, GR_ICON_SIZE, GR_ICON_SIZE, 11);
+        gfx_scale_rgba(img, w, h, small, GR_ICON_BIG, GR_ICON_BIG);
+        gfx_round_corners(small, GR_ICON_BIG, GR_ICON_BIG, 22);
 
         cache_file(path, sizeof(path), root, tid, id, "bin");
         FILE *f = fopen(path, "wb");
         if (f) {
-            ok = fwrite(small, 1, GR_ICON_BYTES, f) == GR_ICON_BYTES;
+            ok = fwrite(small, 1, GR_ICON_BIG_BYTES, f) == GR_ICON_BIG_BYTES;
             if (fclose(f) != 0) ok = false;
         }
         if (ok) {

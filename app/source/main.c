@@ -50,7 +50,7 @@
 
 typedef enum {
     SCREEN_HOME, SCREEN_DETAIL, SCREEN_SETTINGS, SCREEN_DIAG, SCREEN_ABOUT, SCREEN_INTRO, SCREEN_LINK, SCREEN_MSG,
-    SCREEN_PROFILE, SCREEN_BADGES, SCREEN_ACH
+    SCREEN_PROFILE, SCREEN_BADGES, SCREEN_ACH, SCREEN_AVATARS
 } screen_t;
 
 static gr_model g_model;
@@ -79,9 +79,10 @@ static ui_profile g_profile;          /* lo que muestran la barra de arriba y la
 static char g_msg_title[80], g_msg_line1[160], g_msg_line2[160];
 static bool g_msg_ok;
 static screen_t g_msg_return = SCREEN_SETTINGS; /* a donde vuelve el mensaje al aceptarlo */
+static int g_msg_tab = UI_TAB_ACCOUNT;          /* y en que pestaña, si vuelve a Opciones */
 
 /* iconos de los logros del juego abierto */
-static uint8_t *g_icons[LG_MAX_ACH], *g_icons_gray[LG_MAX_ACH];
+static uint8_t *g_icons[LG_MAX_ACH], *g_icons_gray[LG_MAX_ACH], *g_icons_big[LG_MAX_ACH], *g_icons_big_gray[LG_MAX_ACH];
 static Thread g_icon_thread;
 static bool g_icon_thread_live;
 static volatile int g_icon_state;     /* 0 nada, 1 bajando, 2 termino */
@@ -144,7 +145,25 @@ static uint8_t *make_cover(const uint8_t *img, int w, int h, int size) {
     return out;
 }
 
-/* Carga la caratula de cada juego desde la propia consola (el icono del juego instalado). */
+/* La caratula que el juego tiene en el catalogo, si ya se bajo a la SD (catalog.c). */
+static uint8_t *catalog_cover(const char *tid, int *w, int *h) {
+    char path[160];
+    snprintf(path, sizeof(path), ROOT "/cache/%s/cover.img", tid);
+    FILE *f = fopen(path, "rb");
+    if (!f) return NULL;
+    fseek(f, 0, SEEK_END);
+    long len = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    uint8_t *raw = len > 16 && len <= 1024 * 1024 ? malloc((size_t)len) : NULL, *img = NULL;
+    int n;
+    if (raw && fread(raw, 1, (size_t)len, f) == (size_t)len) img = stbi_load_from_memory(raw, (int)len, w, h, &n, 4);
+    free(raw);
+    fclose(f);
+    return img;
+}
+
+/* Carga la caratula de cada juego: primero la del catalogo; si no hay (sin internet
+ * todavia, o el juego no tiene), el icono del juego instalado en la consola. */
 static void load_covers(void) {
     static NsApplicationControlData ctrl;
     for (int i = 0; i < GR_MAX_GAMES; i++) {
@@ -153,21 +172,23 @@ static void load_covers(void) {
         g_covers[i] = g_covers_big[i] = NULL;
         g_assets.covers[i] = g_assets.covers_big[i] = NULL;
     }
-    if (!g_ns_ok) return;
 
     for (int i = 0; i < g_model.ngames; i++) {
         trace("caratula de %s", g_model.games[i].tid);
-        u64 tid = strtoull(g_model.games[i].tid, NULL, 16);
-        u64 size = 0;
-        if (R_FAILED(nsGetApplicationControlData(NsApplicationControlSource_Storage, tid, &ctrl, sizeof(ctrl), &size)))
-            continue; /* el juego no esta instalado en esta consola */
-        if (size <= sizeof(ctrl.nacp)) continue;
-
         int w, h, n;
-        uint8_t *img = stbi_load_from_memory(ctrl.icon, (int)(size - sizeof(ctrl.nacp)), &w, &h, &n, 4);
+        uint8_t *img = catalog_cover(g_model.games[i].tid, &w, &h);
+        if (!img && g_ns_ok) {
+            u64 tid = strtoull(g_model.games[i].tid, NULL, 16);
+            u64 size = 0;
+            if (R_SUCCEEDED(nsGetApplicationControlData(NsApplicationControlSource_Storage, tid, &ctrl, sizeof(ctrl), &size)) &&
+                size > sizeof(ctrl.nacp))
+                img = stbi_load_from_memory(ctrl.icon, (int)(size - sizeof(ctrl.nacp)), &w, &h, &n, 4);
+        }
         if (!img) continue;
-        g_assets.covers[i] = g_covers[i] = make_cover(img, w, h, UI_COVER);
-        g_assets.covers_big[i] = g_covers_big[i] = make_cover(img, w, h, UI_COVER_BIG);
+        if (w > 0 && h > 0 && w <= 2048 && h <= 2048) {
+            g_assets.covers[i] = g_covers[i] = make_cover(img, w, h, UI_COVER);
+            g_assets.covers_big[i] = g_covers_big[i] = make_cover(img, w, h, UI_COVER_BIG);
+        }
         stbi_image_free(img);
     }
 }
@@ -272,6 +293,34 @@ static bool install_file(const char *path, const void *data, size_t size) {
     return rename(tmp, path) == 0;
 }
 
+/* Imagenes PNG que van dentro de la app (app/data/img_*.bin). Se decodifican una vez al abrir. */
+#define UI_IMG(name, w, h) extern const unsigned char img_##name##_bin[], img_##name##_bin_end[];
+#include "ui_images.h"
+#undef UI_IMG
+
+static void load_images(void) {
+    static const struct { const unsigned char *start, *end; int w, h; } k[UI_IMG_COUNT] = {
+#define UI_IMG(name, w, h) { img_##name##_bin, img_##name##_bin_end, w, h },
+#include "ui_images.h"
+#undef UI_IMG
+    };
+    int bad = 0;
+    for (int i = 0; i < UI_IMG_COUNT; i++) {
+        int w, h, n;
+        uint8_t *px = stbi_load_from_memory(k[i].start, (int)(k[i].end - k[i].start), &w, &h, &n, 4);
+        if (px && (w != k[i].w || h != k[i].h)) { stbi_image_free(px); px = NULL; }
+        g_assets.img[i] = px; /* NULL = la pantalla dibuja la version sencilla de antes */
+        if (!px) bad++;
+    }
+    trace("imagenes: %d de %d", UI_IMG_COUNT - bad, UI_IMG_COUNT);
+}
+
+#define BOOT2_FLAG SD "/atmosphere/contents/4200000000010690/flags/boot2.flag"
+static bool ingame_enabled(void) {
+    struct stat st;
+    return stat(BOOT2_FLAG, &st) == 0;
+}
+
 static void install_sysmodule(void) {
     static const char toolbox[] = "{\n    \"name\": \"Greeny\",\n    \"tid\": \"4200000000010690\",\n    \"requires_reboot\": true\n}\n";
 #define SYS_DIR SD "/atmosphere/contents/4200000000010690"
@@ -284,9 +333,13 @@ static void install_sysmodule(void) {
     mkdir(ROOT "/games", 0777);
     mkdir(ROOT "/sounds", 0777);
 
+    /* boot2.flag es lo que enciende los logros dentro de los juegos. Solo se pone en la primera
+     * instalacion: si despues alguien lo quita (opcion "Logros en los juegos"), se respeta. */
+    struct stat st;
+    bool fresh = stat(SYS_DIR "/exefs.nsp", &st) != 0;
     g_sysmodule_updated = install_file(SYS_DIR "/exefs.nsp", sysmodule_bin, sysmodule_bin_size);
     install_file(SYS_DIR "/toolbox.json", toolbox, sizeof(toolbox) - 1);
-    install_file(SYS_DIR "/flags/boot2.flag", "", 0);
+    if (fresh) install_file(SYS_DIR "/flags/boot2.flag", "", 0);
     install_file(ROOT "/sounds/cargado.pcm", snd_cargado_bin, snd_cargado_bin_size);
     install_file(ROOT "/sounds/logro.pcm", snd_logro_bin, snd_logro_bin_size);
     trace("instalacion revisada: sysmodule %s", g_sysmodule_updated ? "escrito (hay que reiniciar)" : "al dia");
@@ -311,15 +364,25 @@ static void load_icons(const char *tid) {
         free(g_icons[i]);
         free(g_icons_gray[i]);
         g_icons[i] = g_icons_gray[i] = NULL;
-        g_assets.ach_icons[i] = g_assets.ach_icons_gray[i] = NULL;
+        free(g_icons_big[i]);
+        free(g_icons_big_gray[i]);
+        g_icons_big[i] = g_icons_big_gray[i] = NULL;
+        g_assets.ach_icons[i] = g_assets.ach_icons_gray[i] = g_assets.ach_big[i] = g_assets.ach_big_gray[i] = NULL;
     }
     for (int i = 0; tid && i < g_model.cur.nach; i++) {
+        uint8_t *big = malloc(GR_ICON_BIG_BYTES), *big_gray = malloc(GR_ICON_BIG_BYTES);
         uint8_t *img = malloc(GR_ICON_BYTES), *gray = malloc(GR_ICON_BYTES);
-        if (img && gray && gr_icon_load(ROOT, tid, g_model.cur.ach[i].id, img)) {
-            gr_icon_gray(img, gray);
+        if (big && big_gray && img && gray && gr_icon_load(ROOT, tid, g_model.cur.ach[i].id, big)) {
+            gfx_scale_rgba(big, GR_ICON_BIG, GR_ICON_BIG, img, GR_ICON_SIZE, GR_ICON_SIZE); /* para la lista */
+            gr_icon_gray(big, big_gray, GR_ICON_BIG);
+            gr_icon_gray(img, gray, GR_ICON_SIZE);
             g_assets.ach_icons[i] = g_icons[i] = img;
             g_assets.ach_icons_gray[i] = g_icons_gray[i] = gray;
+            g_assets.ach_big[i] = g_icons_big[i] = big;
+            g_assets.ach_big_gray[i] = g_icons_big_gray[i] = big_gray;
         } else {
+            free(big);
+            free(big_gray);
             free(img);
             free(gray);
         }
@@ -376,6 +439,7 @@ static void refresh_greeting(void) {
     g_profile.name = linked ? (g_account.display[0] ? g_account.display : g_account.username) : (g_nick[0] ? g_nick : "Jugador");
     g_profile.caption = linked ? g_account.caption : "";
     g_profile.friend_code = linked ? g_account.friend_code : "";
+    g_profile.avatar = linked ? g_account.avatar : 0;
     g_profile.social_known = g_account.social_known;
     g_profile.followers = g_account.followers;
     g_profile.following = g_account.following;
@@ -641,8 +705,12 @@ int main(int argc, char *argv[]) {
     g_assets.small_w = SMALL_W;
     g_assets.small_h = SMALL_H;
 
+    trace("imagenes");
+    load_images();
+
     trace("instalacion");
     install_sysmodule();
+    ui_set_ingame(ingame_enabled());
     list_installed_titles();
 
     trace("configuracion");
@@ -657,7 +725,7 @@ int main(int argc, char *argv[]) {
     trace("listo: %d juego(s), audio %s, caratulas %s, modo %s", g_model.ngames, sfx_ok ? "si" : "no",
           g_ns_ok ? "si" : "no", g_env.applet_mode ? "applet" : "aplicacion");
 
-    int cursor = 0, top = 0, dcursor = 0, dtop = 0, stab = 0, srow = 0, intro_page = 0;
+    int cursor = 0, top = 0, dcursor = 0, dtop = 0, stab = 0, srow = 0, intro_page = 0, acursor = 0;
     screen_t screen = SCREEN_HOME;
 
     trace("usuario y cuenta");
@@ -726,7 +794,7 @@ int main(int argc, char *argv[]) {
 
         if (down & HidNpadButton_Plus) { plus_pressed = true; break; }
 
-        bool moved = false, accepted = false, accepted_alt = false, opened = false, back = false;
+        bool moved = false, accepted = false, accepted_alt = false, opened = false, opened_rare = false, back = false;
 
         if (screen == SCREEN_HOME) {
             ui_layout l = ui_home_layout(&g_config);
@@ -754,8 +822,8 @@ int main(int argc, char *argv[]) {
                 dcursor = dtop = 0;
                 opened = true;
             }
-            if (down & HidNpadButton_X) { screen = SCREEN_SETTINGS; stab = srow = 0; opened = true; }
-            if (down & HidNpadButton_R) { screen = SCREEN_PROFILE; opened = true; }
+            if (down & HidNpadButton_X) { screen = SCREEN_SETTINGS; stab = srow = 0; accepted_alt = true; }
+            if (down & HidNpadButton_R) { screen = SCREEN_PROFILE; accepted_alt = true; }
         } else if (screen == SCREEN_DETAIL) {
             ui_layout l = ui_detail_layout(&g_config);
             int n = g_model.games[cursor].broken ? 0 : g_model.cur.nach;
@@ -800,12 +868,23 @@ int main(int argc, char *argv[]) {
                     case UI_OPT_ANIM:       g_config.animated_bg = !g_config.animated_bg; break;
                     case UI_OPT_GAMES_VIEW: g_config.games_view = (g_config.games_view + 1) % GR_VIEW_COUNT; break;
                     case UI_OPT_ACH_VIEW:   g_config.ach_view = (g_config.ach_view + 1) % GR_VIEW_COUNT; break;
+                    case UI_OPT_INGAME:
+                        /* boot2.flag es lo que hace que Atmosphere arranque el sysmodule */
+                        if (ingame_enabled()) remove(BOOT2_FLAG);
+                        else install_file(BOOT2_FLAG, "", 0);
+                        ui_set_ingame(ingame_enabled());
+                        show_message(true, ingame_enabled() ? "Logros en los juegos: activados" : "Logros en los juegos: desactivados",
+                                     "Reinicia la consola para que el cambio se aplique.", "Apagar y encender; suspender no basta.");
+                        g_msg_return = SCREEN_SETTINGS;
+                        g_msg_tab = stab;
+                        screen = SCREEN_MSG;
+                        break;
                     case UI_OPT_SOUND:      g_config.sound = !g_config.sound; break;
                     case UI_OPT_POPUP:      g_config.popup = !g_config.popup; break;
                     case UI_OPT_SCOPE:      g_config.games_scope = (g_config.games_scope + 1) % GR_SCOPE_COUNT; rescan(); cursor = top = 0; break;
                     case UI_OPT_SHOW:       g_config.games_show = (g_config.games_show + 1) % GR_SHOW_COUNT; rescan(); cursor = top = 0; break;
                     case UI_OPT_START:      g_config.start_page = (g_config.start_page + 1) % GR_START_COUNT; break;
-                    case UI_OPT_ABOUT:      screen = SCREEN_ABOUT; break;
+                    case UI_OPT_ABOUT:      screen = SCREEN_ABOUT; opened_rare = true; break;
                     case UI_OPT_DIAG:       run_diag(); screen = SCREEN_DIAG; break;
                     case UI_OPT_ACC_LINK: {
                         char name[64], err[160] = "";
@@ -885,19 +964,45 @@ int main(int argc, char *argv[]) {
         } else if (screen == SCREEN_PROFILE) {
             if (down & (HidNpadButton_L | HidNpadButton_B)) { screen = SCREEN_HOME; back = true; }
             if (down & HidNpadButton_X) { screen = SCREEN_BADGES; opened = true; }
+            if ((down & HidNpadButton_A) && g_account.linked) {
+                acursor = g_account.avatar > 0 && g_account.avatar <= UI_AVATAR_COUNT ? g_account.avatar - 1 : 0;
+                screen = SCREEN_AVATARS;
+                accepted = true;
+            }
             if ((down & HidNpadButton_Y) && g_account.linked) {
                 follow_with_code();
                 g_msg_return = SCREEN_PROFILE;
                 screen = SCREEN_MSG;
                 opened = true;
             }
+        } else if (screen == SCREEN_AVATARS) {
+            TAP_SELECT(acursor, UI_AVATAR_COUNT);
+            moved = move_cursor(&acursor, UI_AVATAR_COUNT, UI_AVATAR_COLS, nav);
+            if (down & HidNpadButton_B) { screen = SCREEN_PROFILE; back = true; }
+            if (down & HidNpadButton_A) {
+                char err[160] = "";
+                if (!net_online()) {
+                    show_message(false, "Sin conexión", "Conecta la consola a internet para cambiar la foto.", NULL);
+                } else if (gr_set_avatar(net_http, &g_account, acursor + 1, err, sizeof(err)) == GR_NET_OK) {
+                    gr_account_save(&g_account, ACCOUNT_PATH);
+                    refresh_greeting();
+                    show_message(true, "Foto cambiada", "Ya se ve en la app y en la web.", NULL);
+                } else {
+                    trace("cambiar foto: %s %s", err, net_last_error());
+                    show_message(false, "No se pudo cambiar la foto", err[0] ? err : "Inténtalo de nuevo en un momento.", NULL);
+                }
+                g_msg_return = SCREEN_PROFILE;
+                screen = SCREEN_MSG;
+                accepted = true;
+            }
         } else if (screen == SCREEN_BADGES) {
             if (down & HidNpadButton_B) { screen = SCREEN_PROFILE; back = true; }
         } else if (screen == SCREEN_MSG) {
             if (down & (HidNpadButton_A | HidNpadButton_B)) {
                 screen = g_msg_return;
-                if (screen == SCREEN_SETTINGS) { stab = UI_TAB_ACCOUNT; srow = 0; }
+                if (screen == SCREEN_SETTINGS) { stab = g_msg_tab; srow = 0; }
                 g_msg_return = SCREEN_SETTINGS;
+                g_msg_tab = UI_TAB_ACCOUNT;
                 back = true;
             }
         } else if (screen == SCREEN_DIAG) {
@@ -919,11 +1024,11 @@ int main(int argc, char *argv[]) {
         }
 
         if (back) sfx_play(SFX_BACK);
-        else if (opened) sfx_play(SFX_OPEN);
-        else if (accepted) sfx_play(SFX_ACCEPT);
+        else if (opened_rare) sfx_play(SFX_OPEN); /* solo para pantallas que casi nunca se abren */
+        else if (accepted || opened) sfx_play(SFX_ACCEPT);
         else if (accepted_alt) sfx_play(SFX_ACCEPT_ALT);
         else if (moved) sfx_play(SFX_NAV);
-        if (moved || accepted || accepted_alt || opened || back) dirty = true;
+        if (moved || accepted || accepted_alt || opened || opened_rare || back) dirty = true;
         if (sync_collect()) dirty = true;
         if (icons_collect(screen == SCREEN_DETAIL || screen == SCREEN_ACH ? g_model.games[cursor].tid : NULL)) {
             load_icons(g_model.games[cursor].tid);
@@ -944,6 +1049,7 @@ int main(int argc, char *argv[]) {
             }
             else if (screen == SCREEN_PROFILE) ui_profile_screen(&layer, &g_assets, &g_profile);
             else if (screen == SCREEN_BADGES) ui_badges(&layer, &g_assets, &g_profile);
+            else if (screen == SCREEN_AVATARS) ui_avatars(&layer, &g_assets, &g_profile, acursor);
             else if (screen == SCREEN_LINK) ui_link(&layer, &g_assets, link_code, link_shown_left < 0 ? LINK_SECONDS : link_shown_left);
             else if (screen == SCREEN_MSG) ui_message(&layer, &g_assets, g_msg_title, g_msg_line1, g_msg_line2[0] ? g_msg_line2 : NULL, g_msg_ok);
             else if (screen == SCREEN_DIAG) ui_diag(&layer, &g_assets, g_diag, g_ndiag);

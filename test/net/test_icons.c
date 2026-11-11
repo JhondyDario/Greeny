@@ -48,14 +48,14 @@ int main(int argc, char **argv) {
     printf("segunda vez: rc=%d, bajados=%d, pedidos=%d (solo la lista)\n", rc, n, g_requests);
     if (rc != 0 || n != 0 || g_requests != 1) { printf("FALLO: no debe volver a bajar lo que ya tiene (ni lo que no pudo abrir)\n"); fail++; }
 
-    static uint8_t icon[GR_ICON_BYTES], gray[GR_ICON_BYTES];
+    static uint8_t icon[GR_ICON_BIG_BYTES], gray[GR_ICON_BIG_BYTES];
     if (!gr_icon_load(argv[1], argv[2], "vidas_10", icon)) { printf("FALLO: no se puede leer vidas_10\n"); fail++; }
     else {
-        gr_icon_gray(icon, gray);
-        int corner = icon[3], center = icon[(30 * GR_ICON_SIZE + 30) * 4 + 3];
+        gr_icon_gray(icon, gray, GR_ICON_BIG);
+        int corner = icon[3], center = icon[(60 * GR_ICON_BIG + 60) * 4 + 3];
         printf("vidas_10: alfa esquina=%d (redondeada), alfa centro=%d\n", corner, center);
         if (corner != 0 || center != 255) { printf("FALLO: esquinas\n"); fail++; }
-        const uint8_t *g = gray + (30 * GR_ICON_SIZE + 30) * 4;
+        const uint8_t *g = gray + (60 * GR_ICON_BIG + 60) * 4;
         if (g[0] != g[1] || g[1] != g[2]) { printf("FALLO: el gris no es gris\n"); fail++; }
     }
     if (gr_icon_load(argv[1], argv[2], "no_existe", icon) || gr_icon_load(argv[1], argv[2], "../x", icon)) { printf("FALLO: lee iconos que no hay\n"); fail++; }

@@ -70,6 +70,76 @@ for name in ("usuario", "salir", "menu"):
     im = Image.open(os.path.join(ROOT, "assets", "icons", name + ".png")).convert("RGBA")
     fit(im.crop(im.getbbox()), 56, 56).save(os.path.join(web, name + ".png"), optimize=True)
 
+# ---------- imagenes de la app ----------
+# Cada una va como PNG dentro de la app (app/data/img_<nombre>.bin) y se decodifica al abrir.
+# La lista con sus tamaños se escribe en app/source/ui_images.h, que es lo que lee el codigo.
+A = os.path.join(ROOT, "assets")
+BADGES = ["primer_logro", "logros_10", "logros_50", "logros_200", "primer_platino", "platinos_5", "juegos_3", "juegos_10",
+          "puntos_100", "puntos_500", "puntos_2000"]
+AVATARS = sorted(f[:-4] for f in os.listdir(os.path.join(A, "avatars")) if f.endswith(".png"))
+app_images = [  # (nombre, archivo en assets/, ancho, alto, espejo)
+    ("medal_bronce", "medals/bronce.png", 64, 64, False), ("medal_plata", "medals/plata.png", 64, 64, False),
+    ("medal_oro", "medals/oro.png", 64, 64, False),
+    ("ach_fill", "relleno_logro.png", 120, 120, False),
+    ("lock", "logro_bloqueado.png", 44, 44, False), ("check", "logro_desbloqueado.png", 44, 44, False),
+    ("trophy", "trofeo.png", 72, 72, False), ("cover_fill", "relleno_caratula.png", 256, 256, False),
+    ("stat_juegos", "stats/juegos.png", 56, 56, False), ("stat_logros", "stats/logros.png", 56, 56, False),
+    ("stat_completados", "stats/completados.png", 56, 56, False), ("stat_puntos", "stats/puntos.png", 56, 56, False),
+    ("stat_seguidores", "stats/seguidores.png", 56, 56, False),
+    ("st_sin_empezar", "estado/sin_empezar.png", 40, 40, False), ("st_prueba", "estado/prueba.png", 40, 40, False),
+    ("st_jugable", "estado/jugable.png", 40, 40, False), ("st_perfecto", "estado/perfecto.png", 40, 40, False),
+    ("arrow_r", "icons/flecha.png", 72, 72, False), ("arrow_l", "icons/flecha.png", 72, 72, True),
+    ("toggle_on", "icons/toggle_on.png", 92, 44, False), ("toggle_off", "icons/toggle_off.png", 92, 44, False),
+    ("logo", "logo-greeny-detalles.png", 300, 152, False),
+] + [("m_" + m, "mascota/" + m + ".png", 260, 260, False)
+     for m in ("buscando", "celebrando", "diagnostico", "durmiendo", "error", "saludando", "sorprendido", "triste")
+] + [("badge_" + b, "badges/" + b + ".png", 96, 96, False) for b in BADGES + ["bloqueada"]
+] + [("avatar_" + a, "avatars/" + a + ".png", 128, 128, False) for a in AVATARS]
+
+for old in os.listdir(os.path.join(ROOT, "app", "data")):
+    if old.startswith("img_"):
+        os.remove(os.path.join(ROOT, "app", "data", old))
+total = 0
+for name, file, w, h, mirror in app_images:
+    im = Image.open(os.path.join(A, file)).convert("RGBA")
+    im = fit(im.crop(im.getbbox()), w, h)
+    if mirror:
+        im = im.transpose(Image.FLIP_LEFT_RIGHT)
+    out = os.path.join(ROOT, "app", "data", "img_" + name + ".bin")
+    im.save(out, format="PNG", optimize=True)
+    total += os.path.getsize(out)
+with open(os.path.join(ROOT, "app", "source", "ui_images.h"), "w") as f:
+    f.write("/* Generado por scripts/assets.py. No editar a mano.\n * UI_IMG(nombre, ancho, alto): imagenes PNG que la app lleva dentro. */\n")
+    for name, _, w, h, _ in app_images:
+        f.write("UI_IMG(%s, %d, %d)\n" % (name, w, h))
+    f.write("#define UI_AVATAR_COUNT %d\n" % len(AVATARS))
+print("imagenes de la app: %d, %d KB" % (len(app_images), total // 1024))
+
+# ---------- imagenes de la web ----------
+def web_copy(file, out, w, h):
+    im = Image.open(os.path.join(A, file)).convert("RGBA")
+    os.makedirs(os.path.dirname(os.path.join(web, out)), exist_ok=True)
+    fit(im.crop(im.getbbox()), w, h).save(os.path.join(web, out), optimize=True)
+
+for b in BADGES + ["bloqueada"]:
+    web_copy("badges/%s.png" % b, "badges/%s.png" % b, 128, 128)
+for a in AVATARS:
+    web_copy("avatars/%s.png" % a, "avatars/%s.png" % a, 192, 192)
+for t in ("bronce", "plata", "oro"):
+    web_copy("medals/%s.png" % t, "medal_%s.png" % t, 64, 64)
+for st in ("juegos", "logros", "completados", "puntos", "seguidores"):
+    web_copy("stats/%s.png" % st, "stat_%s.png" % st, 96, 96)
+for st in ("sin_empezar", "prueba", "jugable", "perfecto"):
+    web_copy("estado/%s.png" % st, "st_%s.png" % st, 48, 48)
+for m in ("buscando", "celebrando", "durmiendo", "error", "saludando", "triste"):
+    web_copy("mascota/%s.png" % m, "m_%s.png" % m, 320, 320)
+web_copy("relleno_caratula.png", "cover_fill.png", 256, 256)
+web_copy("relleno_logro.png", "ach_fill.png", 128, 128)
+web_copy("trofeo.png", "trophy.png", 96, 96)
+web_copy("logo-greeny-detalles.png", "logo.png", 600, 304)
+web_copy("logo-greeny.png", "logo_simple.png", 360, 164)
+web_copy("app-icon.png", "favicon.png", 192, 192)
+
 # ---------- sonidos ----------
 import wave
 

@@ -1,7 +1,8 @@
 /*
  * La creacion de la capa sigue el mismo procedimiento que libtesla (WerWolv, GPLv2):
  * capa administrada de vi + framebuffer RGBA4444 block-linear de 448 px de ancho.
- * La capa se crea con el primer popup y se queda viva (transparente) despues.
+ * La capa solo existe mientras hay un aviso en pantalla: al ocultarse se destruye,
+ * para no dejar una capa ni memoria grafica ocupada mientras se juega.
  */
 #include "toast.h"
 
@@ -114,6 +115,15 @@ fail:
     return rc;
 }
 
+static void gfx_exit(void) {
+    framebufferClose(&g_fb);
+    nwindowClose(&g_win);
+    viDestroyManagedLayer(&g_layer);
+    eventClose(&g_vsync);
+    viCloseDisplay(&g_disp);
+    viExit();
+}
+
 /* ---------- dibujo ---------- */
 
 static u16 *g_px;
@@ -194,6 +204,10 @@ void toast_update(uint64_t now_ms) {
     if (g_showing && now_ms >= g_until) {
         present(NULL);
         g_showing = false;
+        if (g_count == 0) { /* no hay otro en cola: soltar la capa */
+            gfx_exit();
+            g_init = false;
+        }
     }
     if (g_showing || g_count == 0) return;
 

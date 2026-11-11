@@ -4,11 +4,12 @@
  *   <root>/games/<TITLE_ID>.txt   el archivo de logros
  *   <root>/games/<TITLE_ID>.src   de que version del catalogo salio
  * Un archivo puesto a mano (sin su .src) no se toca nunca.
+ * Tambien baja la caratula de cada juego a <root>/cache/<TITLE_ID>/cover.img.
  * Portable: la descarga la pone quien llama.
  */
 #pragma once
 #include "icons.h" /* gr_get_fn */
 
 /* `tids` son los juegos instalados (16 hex en mayusculas). Devuelve 0 si pudo
- * consultar el catalogo, -1 si no hubo conexion. *downloaded = archivos nuevos o actualizados. */
+ * consultar el catalogo, -1 si no hubo conexion. *downloaded = archivos y caratulas nuevos o actualizados. */
 int gr_catalog_sync(gr_get_fn get, const char *root, const char (*tids)[17], int count, int *downloaded);

@@ -81,6 +81,25 @@ int main(int argc, char **argv) {
         if (!bg[i] || w != UI_W || h != UI_H) { fprintf(stderr, "fondo %d invalido\n", i); return 1; }
     }
     a.mascot_small = slurp(argv[4], "mascot_small.bin", 66 * 66 * 4); a.small_w = 66; a.small_h = 66;
+    {
+        static const struct { const char *name; int w, h; } imgs[UI_IMG_COUNT] = {
+#define UI_IMG(name, w, h) { #name, w, h },
+#include "../../app/source/ui_images.h"
+#undef UI_IMG
+        };
+        for (int i = 0; i < UI_IMG_COUNT; i++) {
+            char path[512];
+            snprintf(path, sizeof(path), "%s/img_%s.bin", argv[4], imgs[i].name);
+            int w, h, n;
+            static uint8_t file[512 * 1024];
+            FILE *f = fopen(path, "rb");
+            size_t len = f ? fread(file, 1, sizeof(file), f) : 0;
+            if (f) fclose(f);
+            uint8_t *px = len ? stbi_load_from_memory(file, (int)len, &w, &h, &n, 4) : NULL;
+            if (!px || w != imgs[i].w || h != imgs[i].h) { fprintf(stderr, "imagen %s invalida\n", imgs[i].name); return 1; }
+            a.img[i] = px;
+        }
+    }
     gfx_canvas c = { malloc(UI_W * UI_H * 4), UI_W, UI_H, UI_W };
 
     gr_scan(&m, root);
@@ -101,7 +120,7 @@ int main(int argc, char **argv) {
         bool dark = v & 1, en = v & 2;
         char sfx[32];
         snprintf(sfx, sizeof(sfx), "%s%s", dark ? "_dark" : "", en ? "_en" : "");
-        static ui_profile chip = { .name = "Jhondy", .username = "megaJHONDY", .caption = "", .linked = true, .stats = { 1, 7, 0, 180 } };
+        static ui_profile chip = { .name = "Jhondy", .username = "megaJHONDY", .caption = "", .linked = true, .avatar = 4, .stats = { 1, 7, 0, 180 } };
         ui_set_profile(&chip);
         ui_set_dark(dark);
         ui_set_background(bg[dark]);
@@ -120,13 +139,16 @@ int main(int argc, char **argv) {
             for (int g = 0; g < m.ngames; g++) {
                 gr_open(&m, g, root);
                 /* iconos guardados en <sd>/config/greeny/cache, si los hay */
-                for (int i = 0; i < LG_MAX_ACH; i++) a.ach_icons[i] = a.ach_icons_gray[i] = NULL;
+                for (int i = 0; i < LG_MAX_ACH; i++) a.ach_icons[i] = a.ach_icons_gray[i] = a.ach_big[i] = a.ach_big_gray[i] = NULL;
                 for (int i = 0; i < m.cur.nach; i++) {
+                    uint8_t *big = malloc(GR_ICON_BIG_BYTES), *big_gray = malloc(GR_ICON_BIG_BYTES);
                     uint8_t *img = malloc(GR_ICON_BYTES), *gray = malloc(GR_ICON_BYTES);
-                    if (gr_icon_load(root, m.games[g].tid, m.cur.ach[i].id, img)) {
-                        gr_icon_gray(img, gray);
-                        a.ach_icons[i] = img;
-                        a.ach_icons_gray[i] = gray;
+                    if (i != 2 && gr_icon_load(root, m.games[g].tid, m.cur.ach[i].id, big)) { /* el tercero queda sin icono: se ve el de relleno */
+                        gfx_scale_rgba(big, GR_ICON_BIG, GR_ICON_BIG, img, GR_ICON_SIZE, GR_ICON_SIZE);
+                        gr_icon_gray(big, big_gray, GR_ICON_BIG);
+                        gr_icon_gray(img, gray, GR_ICON_SIZE);
+                        a.ach_icons[i] = img; a.ach_icons_gray[i] = gray;
+                        a.ach_big[i] = big; a.ach_big_gray[i] = big_gray;
                     }
                 }
                 snprintf(name, sizeof(name), grid ? "detail%d_grid" : "detail%d", g);
@@ -221,6 +243,8 @@ int main(int argc, char **argv) {
         memset(bare.covers_big, 0, sizeof(bare.covers_big));
         ui_home(&c, &bare, &empty, &cfg, 0, 0);
         save(&c, out, "home_empty", sfx);
+        ui_avatars(&c, &a, &chip, 7);
+        save(&c, out, "avatars", sfx);
         empty.hidden = 3; /* hay juegos, pero el filtro los deja fuera */
         ui_home(&c, &bare, &empty, &cfg, 0, 0);
         save(&c, out, "home_filtro", sfx);

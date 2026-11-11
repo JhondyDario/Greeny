@@ -44,7 +44,8 @@ int main(int argc, char **argv) {
 
     int rc = gr_catalog_sync(get_curl, root, tids, 3, &n);
     printf("primera vez: rc=%d, bajados=%d, pedidos=%d\n", rc, n, g_requests);
-    if (rc != 0 || n != 1) { printf("FALLO: debia bajar solo Mario\n"); fail++; }
+    /* 1 si el juego no tiene caratula en el catalogo, 2 si la tiene (archivo + caratula) */
+    if (rc != 0 || n < 1 || n > 2) { printf("FALLO: debia bajar solo Mario\n"); fail++; }
 
     /* lo que bajo tiene que ser un archivo que el motor entiende */
     snprintf(path, sizeof(path), "%s/games/010028600EBDA000.txt", root);

@@ -175,19 +175,16 @@ begin
 
     assert not public.is_admin(), 'Ana no es admin';
 
-    -- foto de perfil: solo en su propia carpeta
-    insert into storage.objects (bucket_id, name) values ('avatars', auth.uid()::text || '/foto.jpg');
+    -- foto de perfil: ya no se sube ninguna, ni en la carpeta propia
     ok := false;
-    begin insert into storage.objects (bucket_id, name) values ('avatars', '00000000-0000-0000-0000-00000000000d/foto.jpg');
+    begin insert into storage.objects (bucket_id, name) values ('avatars', auth.uid()::text || '/foto.jpg');
     exception when insufficient_privilege then ok := true; end;
-    assert ok, 'no puede subir una foto a la carpeta de otro';
+    assert ok, 'ya no se suben fotos propias';
+    update public.profiles set avatar = 7 where id = auth.uid();
     ok := false;
-    begin insert into storage.objects (bucket_id, name) values ('avatars', 'suelta.jpg');
+    begin update public.profiles set avatar_url = 'https://example.com/x.png' where id = auth.uid();
     exception when insufficient_privilege then ok := true; end;
-    assert ok, 'ni fuera de una carpeta';
-    delete from storage.objects o where o.bucket_id = 'avatars' and o.name = auth.uid()::text || '/foto.jpg';
-    get diagnostics n = row_count;
-    assert n = 1, 'puede borrar su propia foto';
+    assert ok, 'no se puede poner un enlace como foto';
 end $$;
 reset role;
 reset request.jwt.claim.sub;
@@ -382,6 +379,20 @@ begin
     exception when check_violation then null;
     end;
     update public.achievements set tier = 'oro' where ach_id = 'monedas_5';
+end $$;
+
+-- foto de perfil: un numero de la lista, al azar al crear la cuenta
+do $$
+declare lo int; hi int; total int; who uuid;
+begin
+    select min(avatar), max(avatar), count(*) into lo, hi, total from public.profiles;
+    assert total > 0 and lo >= 1 and hi <= 18, 'fotos al crear la cuenta: ' || coalesce(lo, -1) || '..' || coalesce(hi, -1);
+    select id into who from public.profiles limit 1;
+    begin
+        update public.profiles set avatar = 99 where id = who;
+        assert false, 'acepto una foto fuera de rango';
+    exception when check_violation then null;
+    end;
 end $$;
 
 select 'TODAS LAS PRUEBAS PASARON' as resultado;

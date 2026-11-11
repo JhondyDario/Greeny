@@ -34,6 +34,7 @@ typedef struct {
     bool social_known;   /* ya se consultaron seguidores y siguiendo alguna vez */
     int  followers, following;
     char friend_code[24];  /* GR-123456; "" si aun no se sabe */
+    int  avatar;           /* foto de perfil elegida (1..); 0 = aun no se sabe */
 } gr_account;
 
 void gr_account_load(gr_account *a, const char *path);
@@ -52,6 +53,9 @@ gr_net_result gr_fetch_social(gr_http_fn http, gr_account *a);
 /* Sigue a alguien por su codigo de amigo. Deja en `who` el usuario seguido. */
 gr_net_result gr_follow_code(gr_http_fn http, const gr_account *a, const char *code, char *who, size_t wholen,
                              char *err, size_t errlen);
+
+/* Cambia la foto de perfil por la numero `picture` de las que trae Greeny. */
+gr_net_result gr_set_avatar(gr_http_fn http, gr_account *a, int picture, char *err, size_t errlen);
 
 /* Entra con correo y contraseña y registra la consola de una vez. */
 gr_net_result gr_login_password(gr_http_fn http, const char *email, const char *password, const char *device_name,

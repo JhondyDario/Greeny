@@ -68,6 +68,44 @@ static bool fetch_definition(gr_get_fn get, const char *root, const char *tid, c
     return ok;
 }
 
+/* Baja la caratula que el juego tiene en el catalogo y la deja en la SD tal cual (JPEG o PNG):
+ *   <root>/cache/<TITLE_ID>/cover.img   la imagen
+ *   <root>/cache/<TITLE_ID>/cover.src   de que archivo del servidor salio */
+#define COVER_MAX (1024 * 1024)
+static bool fetch_cover(gr_get_fn get, const char *root, const char *tid, const char *cover_path) {
+    char url[384], path[320], have[160];
+    snprintf(path, sizeof(path), "%s/cache/%s/cover.src", root, tid);
+    read_line(path, have, sizeof(have));
+    snprintf(path, sizeof(path), "%s/cache/%s/cover.img", root, tid);
+    if (!strcmp(have, cover_path) && exists(path)) return false; /* ya esta al dia */
+    if (strstr(cover_path, "..") || strlen(cover_path) > 120) return false;
+
+    uint8_t *buf = malloc(COVER_MAX);
+    if (!buf) return false;
+    size_t len = 0;
+    long status = 0;
+    snprintf(url, sizeof(url), GR_BACKEND_URL "/storage/v1/object/public/covers/%s", cover_path);
+    bool ok = get(url, buf, COVER_MAX, &len, &status) == 0 && status == 200 && len > 16;
+    if (ok) {
+        char dir[320];
+        snprintf(dir, sizeof(dir), "%s/cache", root);
+        mkdir(dir, 0777);
+        snprintf(dir, sizeof(dir), "%s/cache/%s", root, tid);
+        mkdir(dir, 0777);
+        FILE *f = fopen(path, "wb");
+        ok = f && fwrite(buf, 1, len, f) == len;
+        if (f && fclose(f) != 0) ok = false;
+        if (ok) {
+            snprintf(path, sizeof(path), "%s/cache/%s/cover.src", root, tid);
+            f = fopen(path, "w");
+            ok = f && fprintf(f, "%s\n", cover_path) > 0;
+            if (f && fclose(f) != 0) ok = false;
+        }
+    }
+    free(buf);
+    return ok;
+}
+
 int gr_catalog_sync(gr_get_fn get, const char *root, const char (*tids)[17], int count, int *downloaded) {
     *downloaded = 0;
     char *list = malloc(LIST_MAX), *json = malloc(DEF_JSON_MAX), *text = malloc(DEF_MAX);
@@ -82,7 +120,7 @@ int gr_catalog_sync(gr_get_fn get, const char *root, const char (*tids)[17], int
 
     for (int start = 0; start < count && rc == 0; start += CHUNK) {
         /* ¿cuales de estos juegos estan en el catalogo, y de cuando es su version? */
-        int n = sprintf(url, GR_BACKEND_URL "/rest/v1/games?select=title_id,updated_at&published=eq.true&title_id=in.(");
+        int n = sprintf(url, GR_BACKEND_URL "/rest/v1/games?select=title_id,updated_at,cover_path&published=eq.true&title_id=in.(");
         int added = 0;
         for (int i = start; i < count && i < start + CHUNK; i++) {
             if (!valid_tid(tids[i])) continue;
@@ -103,7 +141,10 @@ int gr_catalog_sync(gr_get_fn get, const char *root, const char (*tids)[17], int
             if (!end) break;
             char saved = end[1];
             end[1] = 0;
-            char tid[24], stamp[48], have[48], txt[320], src[320];
+            char tid[24], stamp[48], have[48], txt[320], src[320], cover[160];
+            if (gr_json_string(p, "title_id", tid, sizeof(tid)) && valid_tid(tid) &&
+                gr_json_string(p, "cover_path", cover, sizeof(cover)) && cover[0] && fetch_cover(get, root, tid, cover))
+                (*downloaded)++; /* la caratula se baja aunque el archivo de logros lo haya puesto el usuario */
             if (gr_json_string(p, "title_id", tid, sizeof(tid)) && valid_tid(tid) &&
                 gr_json_string(p, "updated_at", stamp, sizeof(stamp)) && stamp[0]) {
                 snprintf(txt, sizeof(txt), "%s/games/%s.txt", root, tid);

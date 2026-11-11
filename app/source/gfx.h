@@ -24,6 +24,8 @@ void gfx_compose(gfx_canvas *dst, const gfx_canvas *layer);
 /* Circulo translucido (alpha 0..255), para fondos. */
 void gfx_circle_alpha(gfx_canvas *c, int cx, int cy, int r, gfx_color col, unsigned alpha);
 void gfx_rect(gfx_canvas *c, int x, int y, int w, int h, gfx_color col);
+/* Rectangulo con degradado horizontal de `left` a `right`. */
+void gfx_gradient(gfx_canvas *c, int x, int y, int w, int h, gfx_color left, gfx_color right);
 void gfx_round_rect(gfx_canvas *c, int x, int y, int w, int h, int r, gfx_color col);
 void gfx_circle(gfx_canvas *c, int cx, int cy, int r, gfx_color col);
 void gfx_line(gfx_canvas *c, int x0, int y0, int x1, int y1, int thick, gfx_color col);

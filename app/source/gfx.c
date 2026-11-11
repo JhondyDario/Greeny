@@ -75,6 +75,20 @@ void gfx_rect(gfx_canvas *c, int x, int y, int w, int h, gfx_color col) {
         for (int xx = x0; xx < x1; xx++) c->px[yy * c->stride + xx] = col | 0xFF000000u;
 }
 
+void gfx_gradient(gfx_canvas *c, int x, int y, int w, int h, gfx_color left, gfx_color right) {
+    int x0 = x < 0 ? 0 : x, y0 = y < 0 ? 0 : y;
+    int x1 = x + w > c->w ? c->w : x + w, y1 = y + h > c->h ? c->h : y + h;
+    for (int xx = x0; xx < x1; xx++) {
+        unsigned t = w > 1 ? (unsigned)((xx - x) * 256 / (w - 1)) : 0;
+        gfx_color col = 0xFF000000u;
+        for (int k = 0; k < 24; k += 8) {
+            unsigned a = (left >> k) & 255, b = (right >> k) & 255;
+            col |= ((a * (256 - t) + b * t) >> 8) << k;
+        }
+        for (int yy = y0; yy < y1; yy++) c->px[yy * c->stride + xx] = col;
+    }
+}
+
 /* cobertura de un pixel respecto a un circulo: 255 dentro, borde suavizado */
 static inline unsigned disc_cov(float dx, float dy, float r) {
     float d = sqrtf(dx * dx + dy * dy);

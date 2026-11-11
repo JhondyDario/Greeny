@@ -38,6 +38,16 @@ create unique index if not exists profiles_username_lower_idx on public.profiles
 
 -- Codigo de amigo: GR-123456 (seis numeros). Sirve para seguir a
 -- alguien sin tener que buscar su nombre. Se genera solo al crear el perfil.
+-- Foto de perfil: una de las que trae Greeny (web/img/avatars/NN.png), por numero.
+-- Al crear la cuenta toca una al azar. Ya no se aceptan fotos propias ni enlaces.
+alter table public.profiles add column if not exists avatar smallint;
+update public.profiles set avatar = 1 + floor(random() * 18)::int where avatar is null;
+update public.profiles set avatar_url = null where avatar_url is not null;
+alter table public.profiles alter column avatar set default (1 + floor(random() * 18)::int);
+alter table public.profiles alter column avatar set not null;
+alter table public.profiles drop constraint if exists profiles_avatar_range;
+alter table public.profiles add constraint profiles_avatar_range check (avatar between 1 and 64);
+
 alter table public.profiles add column if not exists friend_code text;
 
 create or replace function public.new_friend_code()
@@ -412,10 +422,9 @@ begin
 
     for attempt in 1..8 loop
         begin
-            insert into public.profiles (id, username, display_name, avatar_url, discord_username)
+            insert into public.profiles (id, username, display_name, discord_username)
             values (new.id, candidate,
                     nullif(left(coalesce(meta ->> 'full_name', meta ->> 'name', ''), 32), ''),
-                    meta ->> 'avatar_url',
                     case when new.raw_app_meta_data ->> 'provider' = 'discord'
                          then coalesce(meta ->> 'user_name', meta ->> 'name') end);
             return new;
@@ -543,7 +552,7 @@ returns jsonb
 language sql stable security definer set search_path = ''
 as $$
     select jsonb_build_object(
-               'username', p.username, 'display_name', p.display_name, 'caption', p.caption, 'avatar_url', p.avatar_url,
+               'username', p.username, 'display_name', p.display_name, 'caption', p.caption, 'avatar', p.avatar,
                'friend_code', p.friend_code,
                'achievements', s.achievements, 'points', s.points, 'games', s.games, 'platinums', s.platinums,
                'followers', s.followers, 'following', s.following)
@@ -551,6 +560,22 @@ as $$
       join public.profiles p on p.id = d.user_id
       join public.profile_stats s on s.id = p.id
      where d.token_hash = public.hash_token(device_token);
+$$;
+
+-- (consola) Cambia la foto de perfil por una de las que trae Greeny.
+create or replace function public.device_set_avatar(device_token text, picture int)
+returns boolean
+language plpgsql security definer set search_path = ''
+as $$
+declare
+    v_uid uuid;
+begin
+    select d.user_id into v_uid from public.devices d where d.token_hash = public.hash_token(device_token);
+    if v_uid is null then raise exception 'consola sin vincular'; end if;
+    if picture is null or picture < 1 or picture > 64 then raise exception 'foto invalida'; end if;
+    update public.profiles set avatar = picture where id = v_uid;
+    return true;
+end;
 $$;
 
 
@@ -630,7 +655,8 @@ grant insert, update, delete on public.games, public.achievements, public.captio
 
 -- del perfil solo se pueden cambiar estas columnas (no el id ni la fecha de alta)
 revoke update on public.profiles from anon, authenticated;
-grant update (username, display_name, caption, avatar_url) on public.profiles to authenticated;
+revoke update (avatar_url) on public.profiles from authenticated;
+grant update (username, display_name, caption, avatar) on public.profiles to authenticated;
 
 -- la llave de las consolas nunca sale por la API, ni siquiera su hash
 revoke select on public.devices from authenticated;
@@ -642,6 +668,7 @@ grant execute on function public.is_admin() to anon, authenticated;
 grant execute on function public.device_link_start(text) to anon, authenticated;
 grant execute on function public.device_whoami(text) to anon, authenticated;
 grant execute on function public.device_profile(text) to anon, authenticated;
+grant execute on function public.device_set_avatar(text, int) to anon, authenticated;
 grant execute on function public.device_follow_by_code(text, text) to anon, authenticated;
 grant execute on function public.follow_by_code(text) to authenticated;
 grant execute on function public.device_push_unlocks(text, jsonb) to anon, authenticated;
@@ -663,14 +690,9 @@ on conflict (id) do update set public = excluded.public;
 drop policy if exists greeny_avatars_read on storage.objects;
 create policy greeny_avatars_read on storage.objects for select using (bucket_id = 'avatars');
 
+-- Ya no se suben fotos propias: se elige una de las que trae Greeny (profiles.avatar).
 drop policy if exists greeny_avatars_insert_own on storage.objects;
-create policy greeny_avatars_insert_own on storage.objects for insert
-    with check (bucket_id = 'avatars' and split_part(name, '/', 1) = (select auth.uid())::text);
-
 drop policy if exists greeny_avatars_update_own on storage.objects;
-create policy greeny_avatars_update_own on storage.objects for update
-    using (bucket_id = 'avatars' and split_part(name, '/', 1) = (select auth.uid())::text)
-    with check (bucket_id = 'avatars' and split_part(name, '/', 1) = (select auth.uid())::text);
 
 drop policy if exists greeny_avatars_delete_own on storage.objects;
 create policy greeny_avatars_delete_own on storage.objects for delete
