@@ -12,6 +12,7 @@ typedef struct {
     char version[16];
     int  total, unlocked;
     int  points, points_got;
+    unsigned long long last_played; /* unix: ultima vez que se abrio con Greeny, o su ultimo logro; 0 = nunca */
     bool broken;
     char err[96];
 } gr_game_entry;

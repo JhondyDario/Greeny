@@ -41,9 +41,9 @@ create unique index if not exists profiles_username_lower_idx on public.profiles
 -- Foto de perfil: una de las que trae Greeny (web/img/avatars/NN.png), por numero.
 -- Al crear la cuenta toca una al azar. Ya no se aceptan fotos propias ni enlaces.
 alter table public.profiles add column if not exists avatar smallint;
-update public.profiles set avatar = 1 + floor(random() * 18)::int where avatar is null;
+update public.profiles set avatar = 1 + floor(random() * 36)::int where avatar is null;
 update public.profiles set avatar_url = null where avatar_url is not null;
-alter table public.profiles alter column avatar set default (1 + floor(random() * 18)::int);
+alter table public.profiles alter column avatar set default (1 + floor(random() * 36)::int);
 alter table public.profiles alter column avatar set not null;
 alter table public.profiles drop constraint if exists profiles_avatar_range;
 alter table public.profiles add constraint profiles_avatar_range check (avatar between 1 and 64);

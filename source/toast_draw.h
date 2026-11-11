@@ -4,6 +4,7 @@
 
 #define TOAST_W 448
 #define TOAST_H 128
+#define TOAST_BADGE 76
 
 typedef enum {
     TOAST_INFO,   /* logros cargados: circulo verde con check */
@@ -17,6 +18,7 @@ typedef struct {
     int  points; /* puntos del logro; negativo = no mostrar */
     bool dark;   /* tarjeta oscura */
     const char *title, *name, *desc; /* UTF-8 */
+    const unsigned char *badge;      /* dibujo RGBA de TOAST_BADGE de lado, o NULL: se pinta el circulo sencillo */
 } toast_view;
 
 /* Recibe cada pixel una o mas veces; el ultimo valor es el bueno. Componentes de 0 a 255. */

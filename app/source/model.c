@@ -48,7 +48,11 @@ static void summarize(gr_game_entry *e, const lg_game *g) {
     e->unlocked = e->points = e->points_got = 0;
     for (int i = 0; i < g->nach; i++) {
         e->points += g->ach[i].points;
-        if (g->ach[i].unlocked) { e->unlocked++; e->points_got += g->ach[i].points; }
+        if (g->ach[i].unlocked) {
+            e->unlocked++;
+            e->points_got += g->ach[i].points;
+            if (g->ach[i].unlocked_at > e->last_played) e->last_played = g->ach[i].unlocked_at;
+        }
     }
 }
 
@@ -78,6 +82,13 @@ void gr_scan(gr_model *m, const char *root) {
             e->broken = true;
             memcpy(e->name, e->tid, sizeof(e->tid));
             continue;
+        }
+        /* el sysmodule anota aqui cuando se abrio el juego por ultima vez */
+        snprintf(path, sizeof(path), "%s/played/%s.txt", root, e->tid);
+        FILE *pf = fopen(path, "r");
+        if (pf) {
+            if (fscanf(pf, "%llu", &e->last_played) != 1) e->last_played = 0;
+            fclose(pf);
         }
         summarize(e, &m->cur);
         m->total += e->total;

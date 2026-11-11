@@ -13,18 +13,19 @@
 #define UI_COVER_BIG  150  /* caratula en la cuadricula */
 
 #define UI_APP_NAME    "Greeny"
-#define UI_APP_VERSION "0.0.12"
+#define UI_APP_VERSION "0.0.13"
 
 /* opciones, agrupadas en pestañas que se cambian con L y R */
 enum {
-    UI_OPT_LANG, UI_OPT_THEME, UI_OPT_ANIM, UI_OPT_GAMES_VIEW, UI_OPT_ACH_VIEW, UI_OPT_SOUND, UI_OPT_POPUP, UI_OPT_START, UI_OPT_SCOPE, UI_OPT_SHOW, UI_OPT_INGAME,
+    UI_OPT_LANG, UI_OPT_THEME, UI_OPT_ANIM, UI_OPT_GAMES_VIEW, UI_OPT_ACH_VIEW, UI_OPT_SOUND, UI_OPT_POPUP, UI_OPT_START, UI_OPT_SCOPE, UI_OPT_SHOW, UI_OPT_INGAME, UI_OPT_MUSIC, UI_OPT_SONG,
     UI_OPT_DIAG, UI_OPT_ABOUT,
     /* pestaña Cuenta: unas u otras segun si la consola esta vinculada */
     UI_OPT_ACC_LINK, UI_OPT_ACC_LOGIN, UI_OPT_ACC_INFO, UI_OPT_ACC_SYNC, UI_OPT_ACC_UNLINK,
     UI_OPT_COUNT
 };
-#define UI_TABS 5
-#define UI_TAB_ACCOUNT 3
+#define UI_TABS 6
+#define UI_TAB_MUSIC 3
+#define UI_TAB_ACCOUNT 4
 int ui_tab_count(int tab, bool linked);            /* cuantas opciones tiene la pestaña */
 int ui_tab_option(int tab, int row, bool linked);  /* cual UI_OPT_* esta en esa fila */
 
@@ -78,6 +79,15 @@ typedef struct {
 } ui_zone;
 /* La zona que hay en ese punto, o NULL. */
 const ui_zone *ui_zone_at(int x, int y);
+
+/* Canciones de la musica de fondo, para la pestaña Musica de Opciones. */
+typedef struct {
+    const char *id, *title;
+    int kb;          /* lo que pesa la descarga */
+    bool have;       /* ya esta en la SD */
+} ui_song;
+/* `busy` = fila que se esta descargando ahora, o -1. Se guarda el puntero: debe seguir vivo. */
+void ui_set_music(const ui_song *songs, int count, int busy);
 
 /* ¿Estan encendidos los logros dentro de los juegos (existe boot2.flag)? Lo muestra Opciones. */
 void ui_set_ingame(bool on);
@@ -136,7 +146,7 @@ void ui_about(gfx_canvas *c, const ui_assets *a);
 /* Perfil a pantalla completa (sin la barra de arriba) y detalle de las medallas. */
 void ui_profile_screen(gfx_canvas *c, const ui_assets *a, const ui_profile *p);
 /* Elegir foto de perfil: cuadricula con todas; `cursor` es la que esta marcada (0..UI_AVATAR_COUNT-1). */
-#define UI_AVATAR_COLS 6
+#define UI_AVATAR_COLS 9
 void ui_avatars(gfx_canvas *c, const ui_assets *a, const ui_profile *p, int cursor);
 void ui_badges(gfx_canvas *c, const ui_assets *a, const ui_profile *p);
 

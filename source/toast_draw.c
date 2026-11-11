@@ -175,7 +175,14 @@ void toast_draw(const toast_view *v, toast_put_fn put) {
             if (outer <= 0) { put(x, y, 0, 0, 0, 0); continue; }
             rgb c = mix(edge, card, in_round_rect(px, py, 4, 4, TOAST_W - 8, TOAST_H - 8, 22));
 
-            float badge = in_circle(px, py, bcx, bcy, br);
+            if (v->badge) {
+                int bx = x - ((int)bcx - TOAST_BADGE / 2), by = y - ((int)bcy - TOAST_BADGE / 2);
+                if (bx >= 0 && by >= 0 && bx < TOAST_BADGE && by < TOAST_BADGE) {
+                    const unsigned char *p = v->badge + (by * TOAST_BADGE + bx) * 4;
+                    c = mix(c, (rgb){ p[0], p[1], p[2] }, p[3] / 255.0f);
+                }
+            }
+            float badge = v->badge ? 0 : in_circle(px, py, bcx, bcy, br);
             if (badge > 0) {
                 c = mix(c, mix(accent, white, 0.35f), badge);                      /* aro claro */
                 c = mix(c, accent, in_circle(px, py, bcx, bcy, br - 4));

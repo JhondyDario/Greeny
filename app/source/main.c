@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 #include <sys/stat.h>
 
 #include <switch.h>
@@ -28,6 +29,11 @@
 #include "buttons_bin.h"
 #include "snd_cargado_bin.h"
 #include "snd_logro_bin.h"
+#include "toast_aviso_bin.h"
+#include "toast_bronce_bin.h"
+#include "toast_ok_bin.h"
+#include "toast_oro_bin.h"
+#include "toast_plata_bin.h"
 #include "sysmodule_bin.h"
 #include "mascot_big_bin.h"
 #include "mascot_small_bin.h"
@@ -342,6 +348,12 @@ static void install_sysmodule(void) {
     if (fresh) install_file(SYS_DIR "/flags/boot2.flag", "", 0);
     install_file(ROOT "/sounds/cargado.pcm", snd_cargado_bin, snd_cargado_bin_size);
     install_file(ROOT "/sounds/logro.pcm", snd_logro_bin, snd_logro_bin_size);
+    mkdir(ROOT "/toast", 0777); /* dibujos del aviso dentro del juego */
+    install_file(ROOT "/toast/bronce.bin", toast_bronce_bin, toast_bronce_bin_size);
+    install_file(ROOT "/toast/plata.bin", toast_plata_bin, toast_plata_bin_size);
+    install_file(ROOT "/toast/oro.bin", toast_oro_bin, toast_oro_bin_size);
+    install_file(ROOT "/toast/ok.bin", toast_ok_bin, toast_ok_bin_size);
+    install_file(ROOT "/toast/aviso.bin", toast_aviso_bin, toast_aviso_bin_size);
     trace("instalacion revisada: sysmodule %s", g_sysmodule_updated ? "escrito (hay que reiniciar)" : "al dia");
 #undef SYS_DIR
 }
@@ -594,6 +606,61 @@ static void follow_with_code(void) {
     sync_start(); /* para que el contador de \"siguiendo\" se ponga al dia */
 }
 
+/* ---------- musica de fondo ---------- */
+#define MUSIC_URL "https://jhondydario.github.io/Greeny/music/"
+#define MUSIC_DIR ROOT "/music"
+static ui_song g_songs[] = {
+    { "rest_garden", "Rest garden", 1171, false },
+    { "cold_in_summer", "Cold in summer", 1112, false },
+    { "beyond_the_end", "Beyond the end", 1295, false },
+    { "excited_for_the_last_time", "Excited for the last time", 1244, false },
+};
+#define NSONGS ((int)(sizeof(g_songs) / sizeof(g_songs[0])))
+
+static void song_path(int i, char *out, size_t cap) { snprintf(out, cap, MUSIC_DIR "/%s.ogg", g_songs[i].id); }
+
+static void music_refresh(void) {
+    for (int i = 0; i < NSONGS; i++) {
+        char path[160];
+        struct stat st;
+        song_path(i, path, sizeof(path));
+        g_songs[i].have = stat(path, &st) == 0 && st.st_size > 1024;
+    }
+}
+
+/* Pone a sonar lo que diga la configuracion, o calla si la musica esta apagada o falta el archivo. */
+static void music_apply(void) {
+    sfx_music_stop();
+    if (!g_config.music) return;
+    for (int i = 0; i < NSONGS; i++) {
+        if (strcmp(g_config.music_track, g_songs[i].id) || !g_songs[i].have) continue;
+        char path[160];
+        song_path(i, path, sizeof(path));
+        if (!sfx_music_play(path)) trace("musica: no se pudo abrir %s", path);
+        return;
+    }
+}
+
+static bool music_download(int i) {
+    const size_t cap = 4 * 1024 * 1024;
+    char url[200], path[160];
+    uint8_t *buf = malloc(cap);
+    if (!buf) return false;
+    size_t len = 0;
+    long status = 0;
+    snprintf(url, sizeof(url), MUSIC_URL "%s.ogg", g_songs[i].id);
+    bool ok = net_online() && net_get(url, buf, cap, &len, &status) == 0 && status == 200 && len > 1024 && !memcmp(buf, "OggS", 4);
+    if (ok) {
+        mkdir(MUSIC_DIR, 0777);
+        song_path(i, path, sizeof(path));
+        ok = install_file(path, buf, len);
+        struct stat st;
+        if (!ok) ok = stat(path, &st) == 0 && (size_t)st.st_size == len; /* install_file devuelve false si ya estaba igual */
+    } else trace("musica: descarga de %s fallo (%ld) %s", g_songs[i].id, status, net_last_error());
+    free(buf);
+    return ok;
+}
+
 /* ---------- buscador de juegos del catalogo ---------- */
 #define CAT_MAX 300
 static gr_cat_game g_cat[CAT_MAX];
@@ -763,6 +830,9 @@ int main(int argc, char *argv[]) {
     trace("configuracion");
     gr_config_load(&g_config, CONFIG_PATH);
     apply_config();
+    music_refresh();
+    ui_set_music(g_songs, NSONGS, -1);
+    music_apply();
     rescan();
     /* capa donde se dibuja la pantalla; el fondo se pinta aparte en cada cuadro */
     static u32 layer_px[UI_W * UI_H];
@@ -772,7 +842,7 @@ int main(int argc, char *argv[]) {
     trace("listo: %d juego(s), audio %s, caratulas %s, modo %s", g_model.ngames, sfx_ok ? "si" : "no",
           g_ns_ok ? "si" : "no", g_env.applet_mode ? "applet" : "aplicacion");
 
-    int cursor = 0, top = 0, dcursor = 0, dtop = 0, stab = 0, srow = 0, intro_page = 0, acursor = 0, bcursor = 0, btop = 0, browse_pending = 0;
+    int cursor = 0, top = 0, dcursor = 0, dtop = 0, stab = 0, srow = 0, intro_page = 0, acursor = 0, bcursor = 0, btop = 0, browse_pending = 0, song_pending = 0, song_wait = 0;
     screen_t screen = SCREEN_HOME;
 
     trace("usuario y cuenta");
@@ -886,18 +956,19 @@ int main(int argc, char *argv[]) {
             if (g_cat_nshown > 0) moved = move_cursor(&bcursor, g_cat_nshown, 1, nav);
             if (bcursor < btop) btop = bcursor;
             if (bcursor >= btop + UI_BROWSE_ROWS) btop = bcursor - UI_BROWSE_ROWS + 1;
-            if (down & HidNpadButton_B) { screen = SCREEN_HOME; back = true; }
+            if (down & (HidNpadButton_B | HidNpadButton_R)) { screen = SCREEN_HOME; back = true; }
             if (down & HidNpadButton_Y) { g_cat_state = UI_BROWSE_LOADING; browse_pending = 2; bcursor = btop = 0; accepted_alt = true; }
-            if ((down & HidNpadButton_X) && g_cat_state == UI_BROWSE_OK) {
-                char q[40];
-                if (ask_text("Nombre del juego / Game name", false, false, q, sizeof(q))) {
-                    snprintf(g_cat_query, sizeof(g_cat_query), "%s", q);
-                    browse_filter();
-                    bcursor = btop = 0;
-                }
+            if ((down & HidNpadButton_X) && g_cat_state == UI_BROWSE_OK && g_cat_nshown > 0) {
+                /* saltar al primer juego de la letra siguiente; al final vuelve al principio */
+                char now = (char)toupper((unsigned char)g_cat[g_cat_shown[bcursor]].name[0]);
+                int next = 0;
+                for (int i = bcursor + 1; i < g_cat_nshown; i++)
+                    if ((char)toupper((unsigned char)g_cat[g_cat_shown[i]].name[0]) != now) { next = i; break; }
+                bcursor = next;
+                if (bcursor < btop) btop = bcursor;
+                if (bcursor >= btop + UI_BROWSE_ROWS) btop = bcursor - UI_BROWSE_ROWS + 1;
                 accepted_alt = true;
             }
-            if ((down & HidNpadButton_Minus) && g_cat_query[0]) { g_cat_query[0] = 0; browse_filter(); bcursor = btop = 0; accepted_alt = true; }
             if ((down & HidNpadButton_A) && g_cat_state == UI_BROWSE_OK && g_cat_nshown > 0) {
                 int idx = g_cat_shown[bcursor], local = -1;
                 for (int i = 0; i < g_model.ngames; i++)
@@ -960,6 +1031,36 @@ int main(int argc, char *argv[]) {
             }
             if (srow >= ui_tab_count(stab, linked)) srow = 0;
             moved = move_cursor(&srow, ui_tab_count(stab, linked), 1, nav);
+            if (song_pending > 0) {
+                dirty = true;
+                if (--song_wait <= 0) {
+                    int i = song_pending - 1;
+                    bool ok = music_download(i);
+                    song_pending = 0;
+                    music_refresh();
+                    ui_set_music(g_songs, NSONGS, -1);
+                    if (ok) {
+                        snprintf(g_config.music_track, sizeof(g_config.music_track), "%s", g_songs[i].id);
+                        g_config.music = true;
+                        save_config();
+                        music_apply();
+                    } else {
+                        show_message(false, "No se pudo descargar", "Revisa la conexión a internet e inténtalo de nuevo.", NULL);
+                        g_msg_return = SCREEN_SETTINGS;
+                        g_msg_tab = UI_TAB_MUSIC;
+                        screen = SCREEN_MSG;
+                    }
+                }
+            }
+            if ((down & HidNpadButton_Y) && stab == UI_TAB_MUSIC && srow >= 1 && g_songs[srow - 1].have) {
+                char path[160];
+                bool current = !strcmp(g_config.music_track, g_songs[srow - 1].id);
+                if (current) { sfx_music_stop(); g_config.music_track[0] = 0; g_config.music = false; save_config(); }
+                song_path(srow - 1, path, sizeof(path));
+                remove(path);
+                music_refresh();
+                accepted_alt = true;
+            }
             if (down & HidNpadButton_A) {
                 int opt = ui_tab_option(stab, srow, linked);
                 switch (opt) {
@@ -978,6 +1079,24 @@ int main(int argc, char *argv[]) {
                         g_msg_return = SCREEN_SETTINGS;
                         g_msg_tab = stab;
                         screen = SCREEN_MSG;
+                        break;
+                    case UI_OPT_MUSIC:
+                        g_config.music = !g_config.music;
+                        if (g_config.music && !g_config.music_track[0]) /* aun no hay cancion elegida: la primera que este descargada */
+                            for (int i = 0; i < NSONGS && !g_config.music_track[0]; i++)
+                                if (g_songs[i].have) snprintf(g_config.music_track, sizeof(g_config.music_track), "%s", g_songs[i].id);
+                        music_apply();
+                        break;
+                    case UI_OPT_SONG:
+                        if (g_songs[srow - 1].have) {
+                            snprintf(g_config.music_track, sizeof(g_config.music_track), "%s", g_songs[srow - 1].id);
+                            g_config.music = true;
+                            music_apply();
+                        } else {
+                            song_pending = srow; /* primero se pinta "Descargando…" */
+                            song_wait = 2;
+                            ui_set_music(g_songs, NSONGS, srow);
+                        }
                         break;
                     case UI_OPT_SOUND:      g_config.sound = !g_config.sound; break;
                     case UI_OPT_POPUP:      g_config.popup = !g_config.popup; break;

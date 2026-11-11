@@ -47,6 +47,11 @@ static const ui_assets *g_a;     /* recursos de la pantalla que se esta dibujand
 static bool g_ingame = true;
 void ui_set_ingame(bool on) { g_ingame = on; }
 
+static const ui_song *g_songs;
+static int g_nsongs, g_song_busy = -1;
+void ui_set_music(const ui_song *songs, int count, int busy) { g_songs = songs; g_nsongs = count; g_song_busy = busy; }
+static int g_row_index; /* fila que se esta dibujando en Opciones, para su zona tactil */
+
 static const struct { short w, h; } k_img[UI_IMG_COUNT] = {
 #define UI_IMG(name, w, h) { w, h },
 #include "ui_images.h"
@@ -163,19 +168,18 @@ static void header(gfx_canvas *c, const ui_assets *a, const uint8_t *cover, cons
     g_a = a;
     gfx_gradient(c, 0, 0, UI_W, HEADER_H, GFX_RGB(0x1F, 0x8F, 0x30), GFX_RGB(0x4C, 0xC2, 0x4A));
     gfx_gradient(c, 0, HEADER_H, UI_W, 5, GFX_RGB(0x15, 0x66, 0x22), GFX_RGB(0x2A, 0x93, 0x34));
+    /* a la izquierda solo va la caratula cuando la pantalla es de un juego; el logo ya no se repite */
+    int tx = MARGIN;
     if (cover) {
         gfx_round_rect(c, 62 - UI_COVER / 2 - 3, 48 - UI_COVER / 2 - 3, UI_COVER + 6, UI_COVER + 6, 13, C_WHITE);
         gfx_image(c, 62 - UI_COVER / 2, 48 - UI_COVER / 2, cover, UI_COVER, UI_COVER);
-    } else {
-        gfx_circle(c, 62, 48, 41, C_WHITE);
-        if (a->mascot_small)
-            gfx_image(c, 62 - a->small_w / 2, 48 - a->small_h / 2, a->mascot_small, a->small_w, a->small_h);
+        tx = 122;
     }
     if (sub) {
-        gfx_text_fit(c, 122, 12, 38, C_WHITE, title, 640);
-        gfx_text_fit(c, 124, 58, 21, C_GREEN_LT, sub, 760);
+        gfx_text_fit(c, tx, 12, 38, C_WHITE, title, 640);
+        gfx_text_fit(c, tx + 2, 58, 21, C_GREEN_LT, sub, 760);
     } else {
-        gfx_text(c, 122, 22, 46, C_WHITE, title);
+        gfx_text(c, tx, 22, 46, C_WHITE, title);
     }
     user_chip(c);
 }
@@ -192,10 +196,11 @@ static void first_letter(const char *text, char out[5]) {
 }
 
 static void avatar(gfx_canvas *c, int cx, int cy, int r, const char *name, int pic) {
+    /* la foto llena el circulo entero, sin aro blanco alrededor */
+    if (pic >= 1 && pic <= UI_AVATAR_COUNT && img_fit(c, g_a, UI_IMG_avatar_01 + pic - 1, cx - r - 3, cy - r - 3, r * 2 + 6)) return;
     char letter[5];
     first_letter(name, letter);
     gfx_circle(c, cx, cy, r + 3, C_WHITE);
-    if (pic >= 1 && pic <= UI_AVATAR_COUNT && img_fit(c, g_a, UI_IMG_avatar_01 + pic - 1, cx - r, cy - r, r * 2)) return;
     gfx_circle(c, cx, cy, r, C_GREEN_DK);
     int fs = r * 11 / 10;
     gfx_text(c, cx - gfx_text_width(fs, letter) / 2, cy - fs * 6 / 10, fs, C_WHITE, letter);
@@ -337,15 +342,19 @@ static void home_list(gfx_canvas *c, const ui_assets *a, const gr_model *m, int 
             continue;
         }
         char buf[80];
-        if (g->version[0])
-            snprintf(buf, sizeof(buf), T("Compatible con la versión %s del juego", "Works with game version %s"), g->version);
-        else snprintf(buf, sizeof(buf), "%s", T("Versión compatible sin indicar", "Supported version not specified"));
-        gfx_text_fit(c, tx, y + 54, 20, P->gray, buf, 640);
+        if (g->last_played) {
+            char when[32] = "";
+            time_t t = (time_t)g->last_played;
+            struct tm tm;
+            if (localtime_r(&t, &tm)) strftime(when, sizeof(when), "%d/%m/%Y", &tm);
+            snprintf(buf, sizeof(buf), T("Última vez jugado: %s", "Last played: %s"), when);
+        } else snprintf(buf, sizeof(buf), "%s", T("Aún no lo has jugado con Greeny", "Not played with Greeny yet"));
+        gfx_text_fit(c, tx, y + 54, 20, P->gray, buf, 560);
 
         snprintf(buf, sizeof(buf), "%d / %d", g->unlocked, g->total);
         gfx_text_right(c, x + w - 28, y + 12, 28, g->unlocked == g->total ? P->accent : P->ink, buf);
         progress(c, x + w - 28 - 340, y + 24, 230, g->unlocked, g->total);
-        snprintf(buf, sizeof(buf), "%d / %d pts", g->points_got, g->points);
+        snprintf(buf, sizeof(buf), "%d / %d pts  ·  %d%%", g->points_got, g->points, g->total > 0 ? g->unlocked * 100 / g->total : 0);
         gfx_text_right(c, x + w - 28, y + 54, 20, P->points, buf);
     }
     scrollbar(c, 124, rows * (h + 13) - 13, top, rows, m->ngames);
@@ -373,7 +382,7 @@ static void home_grid(gfx_canvas *c, const ui_assets *a, const gr_model *m, int 
             pill(c, cx + UI_COVER_BIG / 2 - 6, y + 12 + UI_COVER_BIG - 34, C_ON_YELLOW, C_WHITE, buf);
         }
         progress(c, x + 20, y + 200, w - 40, g->unlocked, g->total);
-        snprintf(buf, sizeof(buf), "%d / %d  ·  %d pts", g->unlocked, g->total, g->points_got);
+        snprintf(buf, sizeof(buf), "%d / %d  ·  %d pts  ·  %d%%", g->unlocked, g->total, g->points_got, g->total > 0 ? g->unlocked * 100 / g->total : 0);
         text_center(c, cx, y + 220, 17, P->gray, buf, w - 20);
     }
     scrollbar(c, 124, l.rows * (h + gy) - gy, top, l.rows, (m->ngames + l.cols - 1) / l.cols);
@@ -382,11 +391,9 @@ static void home_grid(gfx_canvas *c, const ui_assets *a, const gr_model *m, int 
 void ui_home(gfx_canvas *c, const ui_assets *a, const gr_model *m, const gr_config *cfg, int cursor, int top) {
     begin(c);
     g_chip_opens_profile = true;
-    header(c, a, NULL, UI_APP_NAME, NULL);
-    char tagline[96];
-    if (g_user[0]) snprintf(tagline, sizeof(tagline), T("¡Bienvenido de vuelta, %s!", "Welcome back, %s!"), g_user);
-    else snprintf(tagline, sizeof(tagline), "%s", T("Logros para tu Switch", "Achievements for your Switch"));
-    gfx_text_fit(c, 122 + gfx_text_width(46, UI_APP_NAME) + 14, 44, 22, C_GREEN_LT, tagline, 520);
+    header(c, a, NULL, T("Mis juegos", "My games"),
+           cfg->games_scope == GR_SCOPE_PLAYED ? T("Logros de todos los juegos que has jugado", "Achievements for every game you have played")
+                                               : T("Logros de tus juegos activos", "Achievements for your active games"));
 
     if (m->ngames == 0 && m->hidden > 0) {
         card(c, MARGIN, 190, CONTENT_W, 300, false);
@@ -704,11 +711,16 @@ static const char *status_name(const char *status) {
 
 void ui_browse(gfx_canvas *c, const ui_assets *a, const gr_cat_game *games, const int *shown, int nshown, int total,
                const bool *have, const char *query, ui_browse_state state, int cursor, int top) {
+    (void)query;
     begin(c);
-    char sub[128];
-    if (query && query[0]) snprintf(sub, sizeof(sub), T("Buscando “%s”  ·  %d de %d", "Searching “%s”  ·  %d of %d"), query, nshown, total);
-    else snprintf(sub, sizeof(sub), T("%d juegos con logros en el catálogo", "%d games with achievements in the catalogue"), total);
-    header(c, a, NULL, T("Buscar juegos", "Find games"), state == UI_BROWSE_OK ? sub : T("Catálogo de Greeny", "Greeny catalogue"));
+    g_buttons = a->buttons; /* sin barra arriba, igual que el perfil */
+    g_a = a;
+
+    gfx_text(c, MARGIN, 26, 42, P->ink, T("Buscar juegos", "Find games"));
+    char sub[96];
+    if (state == UI_BROWSE_OK) snprintf(sub, sizeof(sub), T("%d juegos con logros, de la A a la Z", "%d games with achievements, A to Z"), total);
+    else snprintf(sub, sizeof(sub), "%s", T("Catálogo de Greeny", "Greeny catalogue"));
+    gfx_text(c, MARGIN + 2, 78, 20, P->gray, sub);
 
     if (state != UI_BROWSE_OK || nshown == 0) {
         card(c, MARGIN, 180, CONTENT_W, 320, false);
@@ -719,15 +731,21 @@ void ui_browse(gfx_canvas *c, const ui_assets *a, const gr_cat_game *games, cons
         else if (state == UI_BROWSE_OFFLINE) {
             t1 = T("No hay conexión", "No connection");
             t2 = T("Conecta la consola a internet y pulsa Y para intentarlo de nuevo.", "Connect the console to the internet and press Y to try again.");
-        } else if (total == 0) { t1 = T("El catálogo está vacío", "The catalogue is empty"); t2 = T("Todavía no se ha publicado ningún juego.", "No games have been published yet."); }
-        else { t1 = T("No encontré nada", "Nothing found"); t2 = T("Prueba con otra palabra (X) o borra la búsqueda (−).", "Try another word (X) or clear the search (−)."); }
+        } else { t1 = T("El catálogo está vacío", "The catalogue is empty"); t2 = T("Todavía no se ha publicado ningún juego.", "No games have been published yet."); }
         gfx_text(c, MARGIN + 320, 290, 36, P->ink, t1);
         gfx_text_fit(c, MARGIN + 320, 350, 23, P->gray, t2, CONTENT_W - 360);
     } else {
+        /* a la derecha del titulo, la letra por la que va la lista */
+        char letter[5];
+        first_letter(games[shown[cursor]].name, letter);
+        if (letter[0] >= 'a' && letter[0] <= 'z') letter[0] = (char)(letter[0] - 32);
+        gfx_circle(c, UI_W - MARGIN - 34, 60, 34, C_GREEN);
+        gfx_text(c, UI_W - MARGIN - 34 - gfx_text_width(38, letter) / 2, 37, 38, C_WHITE, letter);
+
         const int x = MARGIN, w = CONTENT_W - 24, h = 78;
         for (int i = top; i < nshown && i < top + UI_BROWSE_ROWS; i++) {
             const gr_cat_game *g = &games[shown[i]];
-            int y = 116 + (i - top) * (h + 10);
+            int y = 122 + (i - top) * (h + 10);
             card(c, x, y, w, h, i == cursor);
             zone(x, y, w, h, UI_ZONE_ITEM, i);
             img(c, a, status_img(g->status), x + 22, y + h / 2 - 20);
@@ -738,15 +756,14 @@ void ui_browse(gfx_canvas *c, const ui_assets *a, const gr_cat_game *games, cons
             gfx_text_fit(c, x + 82, y + 45, 19, P->gray, line, w - 82 - 380);
             if (have[shown[i]]) pill(c, x + w - 22, y + h / 2 - 14, C_GREEN, C_WHITE, T("EN TU CONSOLA", "ON YOUR CONSOLE"));
         }
-        scrollbar(c, 116, UI_BROWSE_ROWS * (h + 10) - 10, top, UI_BROWSE_ROWS, nshown);
+        scrollbar(c, 122, UI_BROWSE_ROWS * (h + 10) - 10, top, UI_BROWSE_ROWS, nshown);
     }
 
     footer_bar(c);
     int hx = MARGIN;
     if (state == UI_BROWSE_OK && nshown > 0) hx = hint(c, hx, "A", T("Ver logros", "View achievements"));
-    hx = hint(c, hx, "B", T("Volver", "Back"));
-    if (state == UI_BROWSE_OK) hx = hint(c, hx, "X", T("Buscar", "Search"));
-    if (state == UI_BROWSE_OK && query && query[0]) hx = hint(c, hx, "−", T("Borrar búsqueda", "Clear search"));
+    hx = hint(c, hx, "R", T("Mis juegos", "My games"));
+    if (state == UI_BROWSE_OK && nshown > UI_BROWSE_ROWS) hx = hint(c, hx, "X", T("Siguiente letra", "Next letter"));
     hx = hint(c, hx, "Y", T("Recargar", "Reload"));
     hint(c, hx, "+", T("Salir", "Exit"));
 }
@@ -776,11 +793,13 @@ static const struct { const char *es, *en; int n; int opt[4]; } k_tabs[UI_TABS] 
     { "General",     "General",  4, { UI_OPT_LANG, UI_OPT_THEME, UI_OPT_ANIM, UI_OPT_START } },
     { "Vista",       "View",     4, { UI_OPT_SCOPE, UI_OPT_SHOW, UI_OPT_GAMES_VIEW, UI_OPT_ACH_VIEW } },
     { "En el juego", "In-game",  3, { UI_OPT_INGAME, UI_OPT_SOUND, UI_OPT_POPUP } },
+    { "Música",      "Music",    0, { 0 } },  /* una fila para encender y una por cancion */
     { "Cuenta",      "Account",  0, { 0 } },  /* sus filas dependen de si la consola esta vinculada */
     { "Ayuda",       "Help",     2, { UI_OPT_DIAG, UI_OPT_ABOUT } },
 };
 
 int ui_tab_count(int tab, bool linked) {
+    if (tab == UI_TAB_MUSIC) return 1 + g_nsongs;
     if (tab == UI_TAB_ACCOUNT) return linked ? 3 : 2;
     return k_tabs[tab].n;
 }
@@ -788,6 +807,7 @@ int ui_tab_count(int tab, bool linked) {
 int ui_tab_option(int tab, int row, bool linked) {
     static const int with[3] = { UI_OPT_ACC_INFO, UI_OPT_ACC_SYNC, UI_OPT_ACC_UNLINK };
     static const int without[2] = { UI_OPT_ACC_LINK, UI_OPT_ACC_LOGIN };
+    if (tab == UI_TAB_MUSIC) return row == 0 ? UI_OPT_MUSIC : UI_OPT_SONG;
     if (tab == UI_TAB_ACCOUNT) return linked ? with[row] : without[row];
     return k_tabs[tab].opt[row];
 }
@@ -799,7 +819,7 @@ static void option_row(gfx_canvas *c, int y, bool selected, const char *label, c
                        gfx_color value_bg) {
     const int x = MARGIN, w = CONTENT_W, h = 88;
     card(c, x, y, w, h, selected);
-    zone(x, y, w, h, UI_ZONE_ITEM, (y - 184) / 104);
+    zone(x, y, w, h, UI_ZONE_ITEM, g_row_index);
     gfx_text(c, x + 28, y + 12, 27, P->ink, label);
     gfx_text_fit(c, x + 28, y + 51, 19, P->gray, help, w - 56 - 300);
     if (value == k_on || value == k_off) { /* encendido o apagado: la palanquita */
@@ -858,9 +878,30 @@ void ui_settings(gfx_canvas *c, const ui_assets *a, const gr_config *cfg, int ta
 
     int count = ui_tab_count(tab, acc->linked);
     for (int i = 0; i < count; i++) {
-        int y = 184 + i * 104;
+        int y = tab == UI_TAB_MUSIC ? 176 + i * 94 : 184 + i * 104; /* en Musica caben cinco filas */
         bool sel = i == row;
+        g_row_index = i;
         switch (ui_tab_option(tab, i, acc->linked)) {
+            case UI_OPT_MUSIC:
+                option_row(c, y, sel, T("Música de fondo", "Background music"),
+                           T("Suena mientras usas la app. Elige abajo la canción; se descargan una sola vez.",
+                             "Plays while you use the app. Pick a song below; each one downloads only once."),
+                           cfg->music ? on : off, C_GREEN);
+                break;
+            case UI_OPT_SONG: {
+                const ui_song *sg = &g_songs[i - 1];
+                bool current = !strcmp(cfg->music_track, sg->id);
+                char help[96];
+                if (g_song_busy == i) snprintf(help, sizeof(help), "%s", T("Descargando, un momento…", "Downloading, one moment…"));
+                else if (sg->have) snprintf(help, sizeof(help), "%s", current ? T("Es la canción elegida. Y la borra de la SD.", "This is the chosen song. Y removes it from the SD card.")
+                                                                              : T("Descargada. A la pone; Y la borra de la SD.", "Downloaded. A plays it; Y removes it from the SD card."));
+                else snprintf(help, sizeof(help), T("Sin descargar · %d.%d MB", "Not downloaded · %d.%d MB"), sg->kb / 1024, sg->kb % 1024 * 10 / 1024);
+                option_row(c, y, sel, sg->title, help,
+                           g_song_busy == i ? T("Descargando…", "Downloading…") : !sg->have ? T("Descargar", "Download")
+                           : current ? (cfg->music ? T("Sonando", "Playing") : T("Elegida", "Chosen")) : T("Usar", "Use"),
+                           sg->have && current ? C_GREEN : C_NEUTRAL);
+                break;
+            }
             case UI_OPT_ACC_LINK:
                 option_row(c, y, sel, T("Vincular con un código", "Link with a code"),
                            T("Te da un código para escribir en la web. Sirve también si entras con Discord.",
@@ -1029,7 +1070,6 @@ void ui_about(gfx_canvas *c, const ui_assets *a) {
     int tx = x + 36, y = 150;
     gfx_text(c, tx, y, 40, P->ink, UI_APP_NAME);
     gfx_text(c, tx + gfx_text_width(40, UI_APP_NAME) + 16, y + 16, 22, P->gray, T("versión " UI_APP_VERSION, "version " UI_APP_VERSION));
-    img(c, a, UI_IMG_logo, x + w - 320, 132);
     gfx_text(c, tx, y + 60, 22, P->gray,
              T("El primer sistema de logros no oficial para la Switch.", "The first unofficial achievement system for the Switch."));
 
@@ -1049,7 +1089,9 @@ void ui_about(gfx_canvas *c, const ui_assets *a) {
                  T("Proyecto de fans. No está afiliado ni avalado por Nintendo.",
                    "Fan project. Not affiliated with or endorsed by Nintendo."), w - 72);
 
-    if (a->mascot_big) gfx_image(c, x + w + (UI_W - MARGIN - x - w - a->big_w) / 2 + 10, 250, a->mascot_big, a->big_w, a->big_h);
+    int side = x + w + (UI_W - MARGIN - x - w) / 2 + 10; /* centro de la columna derecha */
+    img(c, a, UI_IMG_logo, side - 150, 132);
+    if (a->mascot_big) gfx_image(c, side - a->big_w / 2, 320, a->mascot_big, a->big_w, a->big_h);
 
     footer_bar(c);
     int hx = hint(c, MARGIN, "B", T("Volver", "Back"));
@@ -1258,8 +1300,8 @@ void ui_profile_screen(gfx_canvas *c, const ui_assets *a, const ui_profile *p) {
     const int lx = MARGIN, lw = 400, ly = 34, lh = 600;
     card(c, lx, ly, lw, lh, false);
     int cx = lx + lw / 2;
-    gfx_circle(c, cx, ly + 110, 84, C_YELLOW);
-    avatar(c, cx, ly + 110, 76, p->name, p->avatar);
+    if (p->avatar < 1 || p->avatar > UI_AVATAR_COUNT) gfx_circle(c, cx, ly + 110, 84, C_YELLOW);
+    avatar(c, cx, ly + 110, 77, p->name, p->avatar);
     text_center(c, cx, ly + 214, 34, P->ink, p->name, lw - 40);
     if (p->linked && p->username[0]) {
         snprintf(buf, sizeof(buf), "@%s", p->username);
@@ -1296,10 +1338,10 @@ void ui_profile_screen(gfx_canvas *c, const ui_assets *a, const ui_profile *p) {
     snprintf(v[3], 16, "%d", p->stats.points);
     if (p->linked && p->social_known) { snprintf(v[4], 16, "%d", p->followers); snprintf(v[5], 16, "%d", p->following); }
     else { snprintf(v[4], 16, "–"); snprintf(v[5], 16, "–"); }
-    const char *labels[6] = { T("Juegos jugados", "Games played"), T("Logros", "Achievements"), T("Juegos platinados", "Platinum games"),
+    const char *labels[6] = { T("Mis juegos", "My games"), T("Logros", "Achievements"), T("Platinados", "Platinum"),
                               T("Puntos", "Points"), T("Seguidores", "Followers"), T("Siguiendo", "Following") };
     static const int icons[6] = { UI_IMG_stat_juegos, UI_IMG_stat_logros, UI_IMG_stat_completados, UI_IMG_stat_puntos,
-                                  UI_IMG_stat_seguidores, UI_IMG_stat_seguidores };
+                                  UI_IMG_stat_seguidores, UI_IMG_stat_siguiendo };
     for (int i = 0; i < 6; i++) stat_tile(c, a, rx + (i % 3) * (tw + gap), ly + (i / 3) * 124, tw, icons[i], v[i], labels[i]);
     if (!p->linked)
         gfx_text(c, rx + 4, ly + 252, 18, P->gray,
@@ -1330,13 +1372,13 @@ void ui_profile_screen(gfx_canvas *c, const ui_assets *a, const ui_profile *p) {
 void ui_avatars(gfx_canvas *c, const ui_assets *a, const ui_profile *p, int cursor) {
     begin(c);
     header(c, a, NULL, T("Foto de perfil", "Profile picture"), T("Elige una; se ve en la app y en la web", "Pick one; it shows in the app and on the website"));
-    const int cell = 150, size = 128, rows = (UI_AVATAR_COUNT + UI_AVATAR_COLS - 1) / UI_AVATAR_COLS;
+    const int cell = 128, size = 108, rows = (UI_AVATAR_COUNT + UI_AVATAR_COLS - 1) / UI_AVATAR_COLS;
     const int x0 = (UI_W - UI_AVATAR_COLS * cell) / 2, y0 = 124 + (520 - rows * cell) / 2;
     for (int i = 0; i < UI_AVATAR_COUNT; i++) {
         int cx = x0 + (i % UI_AVATAR_COLS) * cell + cell / 2, cy = y0 + (i / UI_AVATAR_COLS) * cell + cell / 2;
         if (i == cursor) gfx_circle(c, cx, cy, size / 2 + 9, C_YELLOW);
         else if (i + 1 == p->avatar) gfx_circle(c, cx, cy, size / 2 + 6, C_GREEN);
-        img(c, a, UI_IMG_avatar_01 + i, cx - size / 2, cy - size / 2);
+        img_fit(c, a, UI_IMG_avatar_01 + i, cx - size / 2, cy - size / 2, size);
         zone(cx - cell / 2, cy - cell / 2, cell, cell, UI_ZONE_ITEM, i);
     }
     footer_bar(c);

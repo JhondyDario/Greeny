@@ -34,6 +34,18 @@ int main(int argc, char **argv) {
         { TOAST_WARN, 0, -1, false, "LOGROS DESACTIVADOS", "Super Mario 3D World", "Tu juego es otra versión. Hace falta la 1.1.0." },
         { TOAST_WARN, 0, -1, true, "ACHIEVEMENTS OFF", "Pokémon Añil ¿Ñandú?", "The achievement file has an error." },
     };
+    /* con los dibujos de la SD, igual que en la consola (generados por scripts/assets.py) */
+    static unsigned char badge[N][TOAST_BADGE * TOAST_BADGE * 4];
+    for (int i = 0; i < N; i++) {
+        const char *file = v[i].kind == TOAST_WARN ? "aviso" : v[i].kind == TOAST_INFO ? "ok" : v[i].tier == 3 ? "oro" : v[i].tier == 2 ? "plata" : "bronce";
+        char path[256];
+        snprintf(path, sizeof(path), "sd/config/greeny/toast/%s.bin", file);
+        FILE *bf = fopen(path, "rb");
+        if (bf) {
+            if (fread(badge[i], 1, sizeof(badge[i]), bf) == sizeof(badge[i])) v[i].badge = badge[i];
+            fclose(bf);
+        }
+    }
     for (int i = 0; i < N; i++) { g_oy = 12 + i * (TOAST_H + 24); toast_draw(&v[i], put); }
     FILE *f = fopen(argv[1], "wb");
     if (!f) return 1;

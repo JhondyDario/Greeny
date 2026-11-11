@@ -22,6 +22,8 @@ void gr_config_defaults(gr_config *c) {
     c->start_page = GR_START_TROPHIES;
     c->games_scope = GR_SCOPE_ACTIVE;
     c->games_show = GR_SHOW_ALL;
+    c->music = false;
+    c->music_track[0] = 0;
 }
 
 /* deja *out intacto si el valor no es uno de los nombres validos */
@@ -54,6 +56,14 @@ void gr_config_load(gr_config *c, const char *path) {
         else if (!strcmp(key, "start_page")) pick(val, k_start, GR_START_COUNT, &c->start_page);
         else if (!strcmp(key, "games_scope")) pick(val, k_scope, GR_SCOPE_COUNT, &c->games_scope);
         else if (!strcmp(key, "games_show")) pick(val, k_show, GR_SHOW_COUNT, &c->games_show);
+        else if (!strcmp(key, "music")) pick_bool(val, &c->music);
+        else if (!strcmp(key, "music_track")) {
+            /* solo letras, numeros y _: es parte del nombre de un archivo */
+            bool ok = true;
+            for (const char *p = val; *p; p++)
+                if (!((*p >= 'a' && *p <= 'z') || (*p >= '0' && *p <= '9') || *p == '_')) ok = false;
+            if (ok) snprintf(c->music_track, sizeof(c->music_track), "%s", val);
+        }
     }
     fclose(f);
 }
@@ -66,11 +76,12 @@ int gr_config_save(const gr_config *c, const char *path) {
     FILE *f = fopen(path, "w");
     if (!f) return -1;
     int ok = fprintf(f, "# Configuracion de Greeny. La app la escribe; el sysmodule la lee al abrir un juego.\n"
-                        "lang = %s\ntheme = %s\ngames_view = %s\nach_view = %s\nsound = %d\npopup = %d\nanimated_bg = %d\nintro_done = %d\nstart_page = %s\ngames_scope = %s\ngames_show = %s\n",
+                        "lang = %s\ntheme = %s\ngames_view = %s\nach_view = %s\nsound = %d\npopup = %d\nanimated_bg = %d\nintro_done = %d\nstart_page = %s\ngames_scope = %s\ngames_show = %s\nmusic = %d\n",
                      name_of(k_lang, GR_LANG_COUNT, c->lang), name_of(k_theme, GR_THEME_COUNT, c->theme),
                      name_of(k_view, GR_VIEW_COUNT, c->games_view), name_of(k_view, GR_VIEW_COUNT, c->ach_view),
                      c->sound ? 1 : 0, c->popup ? 1 : 0, c->animated_bg ? 1 : 0, c->intro_done ? 1 : 0, name_of(k_start, GR_START_COUNT, c->start_page),
-                     name_of(k_scope, GR_SCOPE_COUNT, c->games_scope), name_of(k_show, GR_SHOW_COUNT, c->games_show)) > 0;
+                     name_of(k_scope, GR_SCOPE_COUNT, c->games_scope), name_of(k_show, GR_SHOW_COUNT, c->games_show), c->music ? 1 : 0) > 0;
+    if (ok && c->music_track[0]) ok = fprintf(f, "music_track = %s\n", c->music_track) > 0;
     if (fclose(f) != 0) ok = 0;
     return ok ? 0 : -1;
 }

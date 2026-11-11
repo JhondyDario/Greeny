@@ -213,7 +213,7 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fo
 .locked .icon.tier-bronce, .locked .icon.tier-plata, .locked .icon.tier-oro { border-color: var(--line); }
 
 /* ---- recursos nuevos ---- */
-.avatar-picker { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 10px; max-width: 620px; }
+.avatar-picker { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 10px; max-width: 860px; }
 .avatar-option { padding: 0; border: 0; background: none; border-radius: 50%; cursor: pointer; line-height: 0; outline-offset: 3px; }
 .avatar-option img { width: 100%; height: auto; border-radius: 50%; box-shadow: 0 0 0 3px transparent; transition: box-shadow .12s; }
 .avatar-option:hover img { box-shadow: 0 0 0 3px var(--line); }

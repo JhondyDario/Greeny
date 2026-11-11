@@ -85,7 +85,7 @@ app_images = [  # (nombre, archivo en assets/, ancho, alto, espejo)
     ("trophy", "trofeo.png", 72, 72, False), ("cover_fill", "relleno_caratula.png", 256, 256, False),
     ("stat_juegos", "stats/juegos.png", 56, 56, False), ("stat_logros", "stats/logros.png", 56, 56, False),
     ("stat_completados", "stats/completados.png", 56, 56, False), ("stat_puntos", "stats/puntos.png", 56, 56, False),
-    ("stat_seguidores", "stats/seguidores.png", 56, 56, False),
+    ("stat_seguidores", "stats/seguidores.png", 56, 56, False), ("stat_siguiendo", "stats/siguiendo.png", 56, 56, False),
     ("st_sin_empezar", "estado/sin_empezar.png", 40, 40, False), ("st_prueba", "estado/prueba.png", 40, 40, False),
     ("st_jugable", "estado/jugable.png", 40, 40, False), ("st_perfecto", "estado/perfecto.png", 40, 40, False),
     ("arrow_r", "icons/flecha.png", 72, 72, False), ("arrow_l", "icons/flecha.png", 72, 72, True),
@@ -94,7 +94,7 @@ app_images = [  # (nombre, archivo en assets/, ancho, alto, espejo)
 ] + [("m_" + m, "mascota/" + m + ".png", 260, 260, False)
      for m in ("buscando", "celebrando", "diagnostico", "durmiendo", "error", "saludando", "sorprendido", "triste")
 ] + [("badge_" + b, "badges/" + b + ".png", 96, 96, False) for b in BADGES + ["bloqueada"]
-] + [("avatar_" + a, "avatars/" + a + ".png", 128, 128, False) for a in AVATARS]
+] + [("avatar_" + a, "avatars/" + a + ".png", 160, 160, False) for a in AVATARS]
 
 for old in os.listdir(os.path.join(ROOT, "app", "data")):
     if old.startswith("img_"):
@@ -127,7 +127,7 @@ for a in AVATARS:
     web_copy("avatars/%s.png" % a, "avatars/%s.png" % a, 192, 192)
 for t in ("bronce", "plata", "oro"):
     web_copy("medals/%s.png" % t, "medal_%s.png" % t, 64, 64)
-for st in ("juegos", "logros", "completados", "puntos", "seguidores"):
+for st in ("juegos", "logros", "completados", "puntos", "seguidores", "siguiendo"):
     web_copy("stats/%s.png" % st, "stat_%s.png" % st, 96, 96)
 for st in ("sin_empezar", "prueba", "jugable", "perfecto"):
     web_copy("estado/%s.png" % st, "st_%s.png" % st, 48, 48)
@@ -139,6 +139,16 @@ web_copy("trofeo.png", "trophy.png", 96, 96)
 web_copy("logo-greeny-detalles.png", "logo.png", 600, 304)
 web_copy("logo-greeny.png", "logo_simple.png", 360, 164)
 web_copy("app-icon.png", "favicon.png", 192, 192)
+
+# ---------- imagenes del aviso dentro del juego ----------
+# RGBA crudo de 76x76. Van a la SD (no dentro del sysmodule, que debe pesar poco); la app los lleva y los instala.
+TOAST = os.path.join(ROOT, "sd", "config", "greeny", "toast")
+os.makedirs(TOAST, exist_ok=True)
+for name, file in (("bronce", "medals/bronce.png"), ("plata", "medals/plata.png"), ("oro", "medals/oro.png"),
+                   ("ok", "logro_desbloqueado.png"), ("aviso", "mascota/error.png")):
+    im = Image.open(os.path.join(A, file)).convert("RGBA")
+    with open(os.path.join(TOAST, name + ".bin"), "wb") as f:
+        f.write(fit(im.crop(im.getbbox()), 76, 76).tobytes())
 
 # ---------- sonidos ----------
 import wave

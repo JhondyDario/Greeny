@@ -10,11 +10,20 @@
 #include "sfx_navegar_bin.h"
 #include "sfx_regresar_bin.h"
 
+#define STB_VORBIS_HEADER_ONLY
+#include "third_party/stb_vorbis.c"
+
 #define RATE 48000 /* PCM 16 bit mono, generado por scripts/assets.py */
+
+/* musica: una voz mas, alimentada con trozos de un cuarto de segundo */
+#define MUSIC_VOICE SFX_COUNT
+#define MUSIC_BUFS 4
+#define MUSIC_BUF_BYTES 0xC000 /* multiplo de pagina; 12288 cuadros en estereo */
+#define MUSIC_VOLUME 0.30f
 
 static const AudioRendererConfig k_config = {
     .output_rate     = AudioRendererOutputRate_48kHz,
-    .num_voices      = SFX_COUNT,
+    .num_voices      = SFX_COUNT + 1,
     .num_effects     = 0,
     .num_sinks       = 1,
     .num_mix_objs    = 1,
@@ -25,6 +34,11 @@ static bool g_ok;
 static AudioDriver g_drv;
 static AudioDriverWaveBuf g_wave[SFX_COUNT];
 static void *g_pool;
+
+static stb_vorbis *g_ogg;
+static int g_ogg_channels;
+static void *g_music_pool;
+static AudioDriverWaveBuf g_music_wave[MUSIC_BUFS];
 
 bool sfx_init(void) {
     /* mismo orden que sfx_id */
@@ -63,6 +77,13 @@ bool sfx_init(void) {
         audrvVoiceSetMixFactor(&g_drv, i, 0.7f, 0, 0);
         audrvVoiceSetMixFactor(&g_drv, i, 0.7f, 0, 1);
     }
+    /* memoria para la musica; si no se puede reservar, simplemente no habra musica */
+    g_music_pool = memalign(0x1000, MUSIC_BUFS * MUSIC_BUF_BYTES);
+    if (g_music_pool) {
+        memset(g_music_pool, 0, MUSIC_BUFS * MUSIC_BUF_BYTES);
+        int mid = audrvMemPoolAdd(&g_drv, g_music_pool, MUSIC_BUFS * MUSIC_BUF_BYTES);
+        audrvMemPoolAttach(&g_drv, mid);
+    }
     audrvUpdate(&g_drv);
     g_ok = true;
     return true;
@@ -85,15 +106,81 @@ void sfx_play(sfx_id id) {
     audrvVoiceStart(&g_drv, id);
 }
 
+/* Llena un trozo con lo que sigue de la cancion; al llegar al final vuelve a empezar. */
+static void music_fill(int i) {
+    s16 *buf = (s16 *)((u8 *)g_music_pool + (size_t)i * MUSIC_BUF_BYTES);
+    int want = MUSIC_BUF_BYTES / 2; /* samples, contando los dos canales */
+    int frames = stb_vorbis_get_samples_short_interleaved(g_ogg, g_ogg_channels, buf, want);
+    if (frames == 0) {
+        stb_vorbis_seek_start(g_ogg);
+        frames = stb_vorbis_get_samples_short_interleaved(g_ogg, g_ogg_channels, buf, want);
+        if (frames == 0) return; /* archivo vacio o dañado */
+    }
+    armDCacheFlush(buf, MUSIC_BUF_BYTES);
+    memset(&g_music_wave[i], 0, sizeof(g_music_wave[i]));
+    g_music_wave[i].data_raw = buf;
+    g_music_wave[i].size = (size_t)frames * (size_t)g_ogg_channels * 2;
+    g_music_wave[i].end_sample_offset = frames;
+    audrvVoiceAddWaveBuf(&g_drv, MUSIC_VOICE, &g_music_wave[i]);
+}
+
+void sfx_music_stop(void) {
+    if (!g_ogg) return;
+    audrvVoiceStop(&g_drv, MUSIC_VOICE);
+    audrvUpdate(&g_drv);
+    stb_vorbis_close(g_ogg);
+    g_ogg = NULL;
+    memset(g_music_wave, 0, sizeof(g_music_wave));
+}
+
+bool sfx_music_playing(void) { return g_ogg != NULL; }
+
+bool sfx_music_play(const char *path) {
+    if (!g_ok || !g_music_pool) return false;
+    sfx_music_stop();
+    int err = 0;
+    g_ogg = stb_vorbis_open_filename(path, &err, NULL);
+    if (!g_ogg) return false;
+    stb_vorbis_info info = stb_vorbis_get_info(g_ogg);
+    g_ogg_channels = info.channels >= 2 ? 2 : 1;
+    if (info.sample_rate < 8000 || info.sample_rate > 48000) { stb_vorbis_close(g_ogg); g_ogg = NULL; return false; }
+
+    audrvVoiceInit(&g_drv, MUSIC_VOICE, g_ogg_channels, PcmFormat_Int16, (int)info.sample_rate);
+    audrvVoiceSetDestinationMix(&g_drv, MUSIC_VOICE, AUDREN_FINAL_MIX_ID);
+    if (g_ogg_channels == 2) {
+        audrvVoiceSetMixFactor(&g_drv, MUSIC_VOICE, MUSIC_VOLUME, 0, 0);
+        audrvVoiceSetMixFactor(&g_drv, MUSIC_VOICE, 0.0f, 0, 1);
+        audrvVoiceSetMixFactor(&g_drv, MUSIC_VOICE, 0.0f, 1, 0);
+        audrvVoiceSetMixFactor(&g_drv, MUSIC_VOICE, MUSIC_VOLUME, 1, 1);
+    } else {
+        audrvVoiceSetMixFactor(&g_drv, MUSIC_VOICE, MUSIC_VOLUME, 0, 0);
+        audrvVoiceSetMixFactor(&g_drv, MUSIC_VOICE, MUSIC_VOLUME, 0, 1);
+    }
+    memset(g_music_wave, 0, sizeof(g_music_wave));
+    for (int i = 0; i < MUSIC_BUFS; i++) music_fill(i);
+    audrvVoiceStart(&g_drv, MUSIC_VOICE);
+    audrvUpdate(&g_drv);
+    return true;
+}
+
 void sfx_update(void) {
-    if (g_ok) audrvUpdate(&g_drv);
+    if (!g_ok) return;
+    if (g_ogg) {
+        for (int i = 0; i < MUSIC_BUFS; i++)
+            if (g_music_wave[i].state == AudioDriverWaveBufState_Free || g_music_wave[i].state == AudioDriverWaveBufState_Done)
+                music_fill(i);
+    }
+    audrvUpdate(&g_drv);
 }
 
 void sfx_exit(void) {
     if (!g_ok) return;
+    sfx_music_stop();
     g_ok = false;
     audrvClose(&g_drv);
     audrenExit();
     free(g_pool);
     g_pool = NULL;
+    free(g_music_pool);
+    g_music_pool = NULL;
 }

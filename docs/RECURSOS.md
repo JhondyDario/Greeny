@@ -40,13 +40,9 @@ Todo sale de `assets/` con `python3 scripts/assets.py`.
 | Iconos de estado del juego | `assets/estado/` | Buscador de la app, web |
 | Mascota en 8 poses | `assets/mascota/` | Pantallas vacías, errores, bienvenida, buscador |
 | Medallas del perfil (11 + bloqueada) | `assets/badges/` | Perfil |
-| Fotos de perfil (18) | `assets/avatars/` | Perfil; se elige una, no se suben fotos propias |
+| Fotos de perfil (36) | `assets/avatars/` | Perfil; se elige una, no se suben fotos propias |
 | Flecha, palancas de encendido y apagado | `assets/icons/` | Logro al detalle, Opciones |
 | Logos con el nombre | `assets/logo-greeny*.png` | Acerca de, portada de la web |
-
-De las 24 fotos de perfil recibidas se dejaron fuera 6 porque dibujan personajes u objetos de
-Nintendo (champiñón, estrella con ojos, fantasma, trifuerza, pokébola y bloque de interrogación).
-Hacen falta 6 dibujos propios para completar las 24.
 
 ### Medallas del perfil
 
@@ -70,7 +66,7 @@ Dibujos propios. No uses arte sacado del juego.
 |---|---|---|---|
 | Logro desbloqueado | WAV 48 kHz 16 bit | Suena dentro del juego. También se usa al completar un juego | Listo (`assets/sounds/logro.wav`) |
 | Logros cargados | WAV 48 kHz 16 bit | Al abrir un juego, con el aviso inicial | Listo (`assets/sounds/cargado.wav`) |
-| Música de fondo de la app | Bucle sin corte, WAV u OGG 48 kHz estéreo, 30 a 60 s, suave | Solo en la app, con opción de apagarla | Aplazado |
+| Música de fondo de la app | OGG Vorbis 48 kHz estéreo | Solo en la app; se baja desde Opciones → Música | Listo (`web/music/`, 4 canciones) |
 | Navegación: mover, aceptar (dos variantes), abrir pantalla, volver | WAV 48 kHz 16 bit, cortos | La app | Listo (`navegar.wav`, `aceptar_1.wav`, `aceptar_2.wav`, `abrir_menu.wav`, `regresar.wav`) |
 
 Los sonidos que suenan dentro del juego, mejor cortos y suaves: van encima del

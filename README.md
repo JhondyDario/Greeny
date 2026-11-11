@@ -43,6 +43,9 @@ switch/greeny.nro                       app
 config/greeny/games/                    archivos de logros, uno por juego
 config/greeny/unlocked/                 tu progreso
 config/greeny/sounds/                   sonidos que usa el sysmodule
+config/greeny/toast/                    dibujos del aviso dentro del juego
+config/greeny/music/                    canciones descargadas
+config/greeny/played/                   cuándo se abrió cada juego por última vez
 config/greeny/account.ini               llave de esta consola, si la vinculaste (no es tu contraseña)
 config/greeny/cache/                    iconos de logros ya descargados
 config/greeny/config.ini                opciones
@@ -141,7 +144,10 @@ make -C test
 | Buscador de juegos del catálogo en la app (L) | Lista probada contra el servidor real desde PC; falta probarlo en consola |
 | App: carátula del catálogo en vez del icono del juego | Descarga probada contra el servidor real desde PC; falta probarlo en consola |
 | Recursos nuevos en la app y la web (mascotas, medallas, iconos, palancas) | Revisado en PC y en navegador; falta probarlo en consola |
-| Menú dentro del juego (overlay de Tesla), música de fondo, nombres de juegos desde una base pública | Pendiente |
+| Música de fondo en la app (4 canciones que se bajan desde Opciones → Música) | Decodificación probada en PC; falta probarla en consola |
+| Aviso del juego con las medallas dibujadas (se leen de la SD) | Revisado en PC; falta probarlo en consola |
+| "Última vez jugado" en la lista de juegos | Falta probarlo en consola |
+| Menú dentro del juego (overlay de Tesla), nombres de juegos desde una base pública | Pendiente |
 | Iconos por logro, música y animaciones en la app | Pendiente ([docs/RECURSOS.md](docs/RECURSOS.md)) |
 
 ## Limitaciones que conviene saber
@@ -160,5 +166,5 @@ GPLv2 (ver [LICENSE](LICENSE)). Incluye código derivado de
 [Atmosphère](https://github.com/Atmosphere-NX/Atmosphere) (`dmntcht`) y sigue el
 procedimiento de capa de [libtesla](https://github.com/WerWolv/libtesla), ambos
 GPLv2. Letras del aviso dentro del juego: [Inter](https://github.com/rsms/inter)
-(SIL Open Font License). Carga de imágenes: [stb_image](https://github.com/nothings/stb)
+(SIL Open Font License). Carga de imágenes y música: [stb_image y stb_vorbis](https://github.com/nothings/stb)
 (dominio público). La mascota y el nombre Greeny son de Jhondy.

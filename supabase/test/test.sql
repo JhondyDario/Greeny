@@ -386,7 +386,7 @@ do $$
 declare lo int; hi int; total int; who uuid;
 begin
     select min(avatar), max(avatar), count(*) into lo, hi, total from public.profiles;
-    assert total > 0 and lo >= 1 and hi <= 18, 'fotos al crear la cuenta: ' || coalesce(lo, -1) || '..' || coalesce(hi, -1);
+    assert total > 0 and lo >= 1 and hi <= 36, 'fotos al crear la cuenta: ' || coalesce(lo, -1) || '..' || coalesce(hi, -1);
     select id into who from public.profiles limit 1;
     begin
         update public.profiles set avatar = 99 where id = who;

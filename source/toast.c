@@ -6,6 +6,7 @@
  */
 #include "toast.h"
 
+#include <stdio.h>
 #include <string.h>
 #include <switch.h>
 
@@ -162,7 +163,19 @@ static void present(const toast_msg *m) {
     if (!g_px) return;
 
     if (m) {
-        toast_view v = { m->kind, m->tier, m->points, m->dark, m->title, m->name, m->desc };
+        /* El dibujo de la medalla se lee de la SD en el momento; si no esta, sale el circulo sencillo. */
+        static unsigned char badge[TOAST_BADGE * TOAST_BADGE * 4];
+        const char *file = m->kind == TOAST_WARN ? "aviso" : m->kind == TOAST_INFO ? "ok"
+                         : m->tier == 3 ? "oro" : m->tier == 2 ? "plata" : "bronce";
+        char path[96];
+        snprintf(path, sizeof(path), "sdmc:/config/greeny/toast/%s.bin", file);
+        bool have = false;
+        FILE *f = fopen(path, "rb");
+        if (f) {
+            have = fread(badge, 1, sizeof(badge), f) == sizeof(badge);
+            fclose(f);
+        }
+        toast_view v = { m->kind, m->tier, m->points, m->dark, m->title, m->name, m->desc, have ? badge : NULL };
         toast_draw(&v, put_rgba8);
     } else {
         fill(0, 0, FB_W, FB_H, 0); /* transparente */

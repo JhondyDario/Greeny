@@ -360,6 +360,14 @@ int main(int argc, char *argv[]) {
                     memset(g_scan_prev, 0, sizeof(g_scan_prev));
                     for (int i = 0; i < LG_MAX_SCAN; i++) g_scan_prev_total[i] = -1;
 
+                    if (g_has_time) { /* para que la app muestre "ultima vez jugado" */
+                        char played[96];
+                        mkdir(DIR_ROOT "/played", 0777);
+                        snprintf(played, sizeof(played), DIR_ROOT "/played/%016lX.txt", cur_tid);
+                        FILE *pf = fopen(played, "w");
+                        if (pf) { fprintf(pf, "%llu\n", (unsigned long long)time(NULL)); fclose(pf); }
+                    }
+
                     bool en = use_english();
 
                     char msg[64];

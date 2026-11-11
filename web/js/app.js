@@ -104,6 +104,21 @@
     return h("span", { class: "pill pts", title: "Dificultad: " + TIER_LABEL[t] }, a.points + " pts");
   }
 
+  // Pestañas: recuerda la ultima abierta mientras dure la visita.
+  function tabbed(key, tabs) {
+    let current = tabs[0].id;
+    try { current = sessionStorage.getItem(key) || current; } catch (e) { /* sin almacenamiento: empieza en la primera */ }
+    if (!tabs.some((t) => t.id === current)) current = tabs[0].id;
+    const panels = tabs.map((t) => h("section", { class: "dev-panel", id: "tab-" + t.id, role: "tabpanel", hidden: t.id !== current }, t.body));
+    const buttons = tabs.map((t, i) => h("button", { type: "button", role: "tab", class: "tab" + (t.id === current ? " on" : ""),
+      "aria-selected": String(t.id === current), "aria-controls": "tab-" + t.id, onclick: () => {
+        buttons.forEach((b, k) => { b.classList.toggle("on", k === i); b.setAttribute("aria-selected", String(k === i)); });
+        panels.forEach((pn, k) => { pn.hidden = k !== i; });
+        try { sessionStorage.setItem(key, t.id); } catch (e) { /* da igual */ }
+      } }, t.label));
+    return h("div", {}, h("div", { class: "tabs", role: "tablist", "aria-label": "Secciones" }, buttons), h("div", { class: "dev" }, panels));
+  }
+
   function copyButton(text) {
     return h("button", { type: "button", class: "btn alt small", style: "vertical-align:middle", onclick: async (ev) => {
       const b = ev.currentTarget;
@@ -118,7 +133,7 @@
   }
 
   // La foto de perfil es una de las que trae Greeny, por numero (profiles.avatar).
-  const AVATARS = 18;
+  const AVATARS = 36;
   const avatarSrc = (n) => "img/avatars/" + String(n).padStart(2, "0") + ".png";
   function avatar(p, size) {
     const el = h("span", { class: "avatar " + (size || ""), "aria-hidden": "true" });
@@ -221,7 +236,7 @@
     if (session) {
       slot.replaceChildren(...[
         me ? h("a", { href: "#/u/" + encodeURIComponent(me.username) }, h("img", { src: "img/usuario.png", alt: "", width: 22, height: 22 }), "Mi perfil") : null,
-        h("a", { href: "#/cuenta", "data-nav": "cuenta" }, "Cuenta"),
+        h("a", { href: "#/cuenta", "data-nav": "cuenta" }, "Ajustes"),
         admin ? h("a", { href: "#/desarrollador", "data-nav": "desarrollador" }, "Desarrollador") : null,
         h("button", { type: "button", onclick: async () => { await sb.auth.signOut(); location.hash = "#/"; } },
           h("img", { src: "img/salir.png", alt: "", width: 22, height: 22 }), "Salir"),
@@ -438,10 +453,10 @@
       h("section", { class: "stats", style: "margin-top:14px" },
         h("div", { class: "card stat with-icon" }, h("img", { src: "img/stat_puntos.png", alt: "", width: 44, height: 44 }), h("div", {}, h("b", {}, fmtNum(stats.points)), h("span", {}, "puntos"))),
         h("div", { class: "card stat with-icon" }, h("img", { src: "img/stat_logros.png", alt: "", width: 44, height: 44 }), h("div", {}, h("b", {}, fmtNum(stats.achievements)), h("span", {}, "logros"))),
-        h("div", { class: "card stat with-icon" }, h("img", { src: "img/stat_juegos.png", alt: "", width: 44, height: 44 }), h("div", {}, h("b", {}, fmtNum(stats.games)), h("span", {}, "juegos jugados"))),
-        h("div", { class: "card stat with-icon" }, h("img", { src: "img/stat_completados.png", alt: "", width: 44, height: 44 }), h("div", {}, h("b", {}, fmtNum(stats.platinums)), h("span", {}, "juegos platinados"))),
+        h("div", { class: "card stat with-icon" }, h("img", { src: "img/stat_juegos.png", alt: "", width: 44, height: 44 }), h("div", {}, h("b", {}, fmtNum(stats.games)), h("span", {}, "mis juegos"))),
+        h("div", { class: "card stat with-icon" }, h("img", { src: "img/stat_completados.png", alt: "", width: 44, height: 44 }), h("div", {}, h("b", {}, fmtNum(stats.platinums)), h("span", {}, "platinados"))),
         h("div", { class: "card stat with-icon" }, h("img", { src: "img/stat_seguidores.png", alt: "", width: 44, height: 44 }), h("div", {}, h("b", {}, fmtNum(stats.followers)), h("span", {}, "seguidores"))),
-        h("div", { class: "card stat with-icon" }, h("img", { src: "img/stat_seguidores.png", alt: "", width: 44, height: 44 }), h("div", {}, h("b", {}, fmtNum(stats.following)), h("span", {}, "siguiendo")))),
+        h("div", { class: "card stat with-icon" }, h("img", { src: "img/stat_siguiendo.png", alt: "", width: 44, height: 44 }), h("div", {}, h("b", {}, fmtNum(stats.following)), h("span", {}, "siguiendo")))),
       h("h2", {}, "Medallas ", h("span", { class: "muted small" }, earned + " de " + badgeList.length)),
       h("div", { class: "badges" }, badgeList.map((b) =>
         h("div", { class: "card badge" + (b.earned ? " earned" : "") },
@@ -465,7 +480,7 @@
                 bar(mine.length, total)),
               mine.length === total ? h("span", { class: "pill ok" }, "Completado") : null);
           }))
-        : h("p", { class: "card muted" }, isMe ? "Todavía no has subido logros. Vincula tu consola en Cuenta." : "Este jugador todavía no ha subido logros."),
+        : h("p", { class: "card muted" }, isMe ? "Todavía no has subido logros. Vincula tu consola en Ajustes." : "Este jugador todavía no ha subido logros."),
       unlocks.length ? h("h2", {}, "Últimos logros") : null,
       unlocks.length
         ? h("div", { class: "stack" }, unlocks.slice(0, 12).map((u) =>
@@ -565,7 +580,7 @@
 
   async function viewAccount() {
     if (!session) { location.hash = "#/entrar"; return []; }
-    if (!me) return [h("h1", {}, "Cuenta"), h("p", { class: "msg err" }, "No se encontró tu perfil. Cierra sesión y vuelve a entrar.")];
+    if (!me) return [h("h1", {}, "Ajustes"), h("p", { class: "msg err" }, "No se encontró tu perfil. Cierra sesión y vuelve a entrar.")];
 
     const [presetRes, deviceRes, identRes] = await Promise.all([
       sb.from("caption_presets").select("text_es").order("sort"),
@@ -640,32 +655,31 @@
 
     const devices = deviceRes.data || [];
     return [
-      h("h1", {}, "Cuenta"),
+      h("h1", {}, "Ajustes"),
       h("p", { class: "muted" }, "Tu perfil público: ", h("a", { href: "#/u/" + encodeURIComponent(me.username) }, "@" + me.username)),
-      h("h2", {}, "Perfil"), h("div", { class: "card" }, photoRow, profileForm),
-      h("h2", {}, "Contraseña"),
-      h("div", { class: "card" }, form([passwordField("Contraseña nueva", "password", "new-password", "Mínimo 8 caracteres.")],
-        "Cambiar contraseña", async (fd, el) => {
-          must(await sb.auth.updateUser({ password: fd.get("password") }));
-          el.reset();
-          return "Contraseña cambiada.";
-        })),
-      h("h2", {}, "Vinculaciones"),
-      h("h3", {}, "Discord"),
-      discord
-        ? h("div", { class: "card row" },
-            h("div", { class: "grow" }, h("strong", {}, discordName || "Cuenta de Discord"),
-              h("div", { class: "muted small" }, "Puedes entrar a Greeny con Discord.")),
-            h("span", { class: "pill ok" }, "Vinculado"))
-        : h("div", { class: "card row" },
-            h("div", { class: "grow" }, h("strong", {}, "Sin vincular"),
-              h("div", { class: "muted small" }, "Vincúlalo para entrar con Discord a esta misma cuenta.")),
-            h("button", { class: "btn discord", type: "button", onclick: async (ev) => {
-              ev.target.disabled = true;
-              const { error } = await sb.auth.linkIdentity({ provider: "discord", options: { redirectTo: here } });
-              if (error) { alert(explain(error)); ev.target.disabled = false; }
-            } }, "Vincular Discord")),
-      h("h3", { style: "margin-top:22px" }, "Código de amigo"),
+      tabbed("greeny-ajustes-tab", [
+        { id: "perfil", label: "Perfil", body: [
+          h("div", { class: "card" }, photoRow, profileForm)] },
+        { id: "consola", label: "Consola", body: [
+          h("h2", {}, "Vincular una consola"),
+      h("div", { class: "card stack" },
+        h("p", { class: "muted", style: "margin:0" }, "En tu Switch, abre Greeny y elige vincular cuenta. Te mostrará un código de 6 caracteres que dura 10 minutos."),
+        linkForm),
+          h("h2", {}, "Consolas vinculadas"),
+      devices.length
+        ? h("div", { class: "stack" }, devices.map((d) =>
+            h("div", { class: "card row" },
+              h("div", { class: "grow" }, h("strong", {}, d.name),
+                h("div", { class: "muted small" }, "Vinculada el " + fmtDate(d.created_at),
+                  d.last_seen_at ? " · última vez " + fmtDate(d.last_seen_at) : " · todavía no ha subido nada")),
+              h("button", { class: "btn danger", type: "button", onclick: async (ev) => {
+                if (!confirm("¿Desvincular “" + d.name + "”? Tus logros ya subidos no se borran.")) return;
+                ev.target.disabled = true;
+                const { error } = await sb.from("devices").delete().eq("id", d.id);
+                if (error) { alert(explain(error)); ev.target.disabled = false; } else render();
+              } }, "Desvincular"))))
+        : h("p", { class: "card muted" }, "No tienes ninguna consola vinculada.")] },
+        { id: "amigos", label: "Amigos", body: [
       h("div", { class: "card stack" },
         me.friend_code
           ? h("p", { style: "margin:0" }, "Tu código: ", h("code", { style: "font-size:1.15rem" }, me.friend_code), " ",
@@ -679,25 +693,30 @@
           const who = must(await sb.rpc("follow_by_code", { code: fd.get("friend_code") }));
           el.reset();
           return "Ahora sigues a @" + who + ".";
+        }))] },
+        { id: "seguridad", label: "Seguridad", body: [
+          h("h2", {}, "Contraseña"),
+      h("div", { class: "card" }, form([passwordField("Contraseña nueva", "password", "new-password", "Mínimo 8 caracteres.")],
+        "Cambiar contraseña", async (fd, el) => {
+          must(await sb.auth.updateUser({ password: fd.get("password") }));
+          el.reset();
+          return "Contraseña cambiada.";
         })),
-      h("h3", { style: "margin-top:22px" }, "Consola"),
-      h("div", { class: "card stack" },
-        h("p", { class: "muted", style: "margin:0" }, "En tu Switch, abre Greeny y elige vincular cuenta. Te mostrará un código de 6 caracteres que dura 10 minutos."),
-        linkForm),
-      h("h3", { style: "margin-top:22px" }, "Consolas vinculadas"),
-      devices.length
-        ? h("div", { class: "stack" }, devices.map((d) =>
-            h("div", { class: "card row" },
-              h("div", { class: "grow" }, h("strong", {}, d.name),
-                h("div", { class: "muted small" }, "Vinculada el " + fmtDate(d.created_at),
-                  d.last_seen_at ? " · última vez " + fmtDate(d.last_seen_at) : " · todavía no ha subido nada")),
-              h("button", { class: "btn danger", type: "button", onclick: async (ev) => {
-                if (!confirm("¿Desvincular “" + d.name + "”? Tus logros ya subidos no se borran.")) return;
-                ev.target.disabled = true;
-                const { error } = await sb.from("devices").delete().eq("id", d.id);
-                if (error) { alert(explain(error)); ev.target.disabled = false; } else render();
-              } }, "Desvincular"))))
-        : h("p", { class: "card muted" }, "No tienes ninguna consola vinculada."),
+          h("h2", {}, "Discord"),
+      discord
+        ? h("div", { class: "card row" },
+            h("div", { class: "grow" }, h("strong", {}, discordName || "Cuenta de Discord"),
+              h("div", { class: "muted small" }, "Puedes entrar a Greeny con Discord.")),
+            h("span", { class: "pill ok" }, "Vinculado"))
+        : h("div", { class: "card row" },
+            h("div", { class: "grow" }, h("strong", {}, "Sin vincular"),
+              h("div", { class: "muted small" }, "Vincúlalo para entrar con Discord a esta misma cuenta.")),
+            h("button", { class: "btn discord", type: "button", onclick: async (ev) => {
+              ev.target.disabled = true;
+              const { error } = await sb.auth.linkIdentity({ provider: "discord", options: { redirectTo: here } });
+              if (error) { alert(explain(error)); ev.target.disabled = false; }
+            } }, "Vincular Discord"))] },
+      ])
     ];
   }
 
@@ -937,24 +956,13 @@
         h("h2", {}, "Carátula"), h("div", { class: "card" }, coverForm)]
         : [h("p", { class: "card muted" }, "Primero publica un juego.")] },
       { id: "frases", label: "Frases de perfil", body: [
-        h("p", { class: "muted" }, "Son las que salen en el desplegable de Cuenta. Tu propia frase la cambias en Cuenta → Perfil."),
+        h("p", { class: "muted" }, "Son las que salen en el desplegable de Ajustes. Tu propia frase la cambias en Ajustes → Perfil."),
         h("div", { class: "card stack" }, presetList, presetForm)] },
     ];
-    let current = "nuevo";
-    try { current = sessionStorage.getItem("greeny-dev-tab") || current; } catch (e) { /* sin almacenamiento: empieza en la primera */ }
-    if (!tabs.some((t) => t.id === current)) current = "nuevo";
-    const panels = tabs.map((t) => h("section", { class: "dev-panel", id: "dev-" + t.id, role: "tabpanel", hidden: t.id !== current }, t.body));
-    const buttons = tabs.map((t, i) => h("button", { type: "button", role: "tab", class: "tab" + (t.id === current ? " on" : ""),
-      "aria-selected": String(t.id === current), "aria-controls": "dev-" + t.id, onclick: () => {
-        buttons.forEach((b, k) => { b.classList.toggle("on", k === i); b.setAttribute("aria-selected", String(k === i)); });
-        panels.forEach((pn, k) => { pn.hidden = k !== i; });
-        try { sessionStorage.setItem("greeny-dev-tab", t.id); } catch (e) { /* da igual */ }
-      } }, t.label));
     return [
       h("h1", {}, "Desarrollador"),
       h("p", { class: "muted" }, "Publicar de nuevo un juego actualiza sus textos y puntos. No borra logros que ya no estén en el archivo, porque eso borraría el progreso de la gente."),
-      h("div", { class: "tabs", role: "tablist", "aria-label": "Secciones" }, buttons),
-      h("div", { class: "dev" }, panels),
+      tabbed("greeny-dev-tab", tabs),
     ];
   }
 

@@ -18,6 +18,8 @@ cp juegos/0100000000000000.txt dist/config/greeny/games/_PLANTILLA.txt
 # sonidos del sysmodule: se leen de la SD
 mkdir -p dist/config/greeny/sounds
 cp sd/config/greeny/sounds/*.pcm dist/config/greeny/sounds/
+mkdir -p dist/config/greeny/toast
+cp sd/config/greeny/toast/*.bin dist/config/greeny/toast/
 for f in juegos/*.txt; do
   [ "$(basename "$f")" = 0100000000000000.txt ] || cp "$f" dist/config/greeny/games/
 done
