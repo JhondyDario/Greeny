@@ -21,6 +21,9 @@ void gfx_clear(gfx_canvas *c, gfx_color col);
 void gfx_clear_transparent(gfx_canvas *c);
 /* Pinta `layer` encima de `dst` respetando su transparencia. Mismo tamaño los dos. */
 void gfx_compose(gfx_canvas *dst, const gfx_canvas *layer);
+/* Igual que gfx_compose, pero con la capa bajada `dy` pixeles y a media transparencia
+ * (alpha de 0 a 256). Para las transiciones entre pantallas. */
+void gfx_compose_fx(gfx_canvas *dst, const gfx_canvas *layer, int dy, unsigned alpha);
 /* Circulo translucido (alpha 0..255), para fondos. */
 void gfx_circle_alpha(gfx_canvas *c, int cx, int cy, int r, gfx_color col, unsigned alpha);
 void gfx_rect(gfx_canvas *c, int x, int y, int w, int h, gfx_color col);

@@ -136,6 +136,12 @@ void sfx_music_stop(void) {
 }
 
 bool sfx_music_playing(void) { return g_ogg != NULL; }
+
+void sfx_music_pause(bool paused) {
+    if (!g_ok || !g_ogg) return;
+    audrvVoiceSetPaused(&g_drv, MUSIC_VOICE, paused);
+    audrvUpdate(&g_drv);
+}
 bool sfx_music_finished(void) { return g_ogg != NULL && g_music_finished; }
 
 static char g_music_note[96] = "sin intentar";

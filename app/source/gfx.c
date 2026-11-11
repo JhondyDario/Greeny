@@ -75,6 +75,27 @@ void gfx_rect(gfx_canvas *c, int x, int y, int w, int h, gfx_color col) {
         for (int xx = x0; xx < x1; xx++) c->px[yy * c->stride + xx] = col | 0xFF000000u;
 }
 
+void gfx_compose_fx(gfx_canvas *dst, const gfx_canvas *layer, int dy, unsigned alpha) {
+    int w = dst->w < layer->w ? dst->w : layer->w, h = dst->h < layer->h ? dst->h : layer->h;
+    if (alpha > 256) alpha = 256;
+    for (int y = dy > 0 ? dy : 0; y < h; y++) {
+        int sy = y - dy;
+        if (sy < 0 || sy >= h) continue;
+        const uint32_t *s = &layer->px[sy * layer->stride];
+        uint32_t *d = &dst->px[y * dst->stride];
+        for (int x = 0; x < w; x++) {
+            uint32_t p = s[x];
+            unsigned a = ((p >> 24) * alpha) >> 8;
+            if (!a) continue;
+            uint32_t q = d[x];
+            unsigned r = ((p & 0xFF) * a + (q & 0xFF) * (255 - a)) / 255;
+            unsigned g = (((p >> 8) & 0xFF) * a + ((q >> 8) & 0xFF) * (255 - a)) / 255;
+            unsigned b = (((p >> 16) & 0xFF) * a + ((q >> 16) & 0xFF) * (255 - a)) / 255;
+            d[x] = r | (g << 8) | (b << 16) | 0xFF000000u;
+        }
+    }
+}
+
 void gfx_gradient(gfx_canvas *c, int x, int y, int w, int h, gfx_color left, gfx_color right) {
     int x0 = x < 0 ? 0 : x, y0 = y < 0 ? 0 : y;
     int x1 = x + w > c->w ? c->w : x + w, y1 = y + h > c->h ? c->h : y + h;

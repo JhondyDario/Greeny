@@ -285,7 +285,53 @@ static void warn_disabled(const char *reason_es, const char *reason_en) {
 typedef enum { ATTACH_OK, ATTACH_RETRY, ATTACH_GIVE_UP } attach_result;
 
 /* Se engancha al juego via dmnt:cht y valida que sea el proceso/version esperado. */
+/* Mira que programa es de verdad, sin engancharse a el. Sirve para no ponerle un depurador encima a
+ * algo que no es el juego: una app homebrew abierta "sobre" el juego (manteniendo R) tiene su mismo
+ * title id, y engancharse a ella puede dejar la consola congelada al pulsar HOME.
+ * Devuelve 1 si alguno de sus modulos es el build del archivo, 0 si ninguno, -1 si no se pudo saber.
+ * *modules = cuantos modulos tiene (una app homebrew tiene uno solo; un juego, varios). */
+static int build_matches(u64 pid, int *modules) {
+    static LoaderModuleInfo info[8];
+    s32 count = 0;
+    *modules = 0;
+    if (R_FAILED(smInitialize())) return -1;
+    Result rc = ldrDmntInitialize();
+    smExit();
+    if (R_FAILED(rc)) return -1;
+    rc = ldrDmntGetProcessModuleInfo(pid, info, 8, &count);
+    ldrDmntExit();
+    if (R_FAILED(rc) || count <= 0) return -1;
+    *modules = count;
+    for (s32 m = 0; m < count; m++) {
+        char build[65];
+        for (int i = 0; i < 0x20; i++) snprintf(build + i * 2, 3, "%02X", info[m].build_id[i]);
+        if (!strncmp(build, g_game.build, strlen(g_game.build))) return 1;
+    }
+    return 0;
+}
+
 static attach_result attach(u64 pid, u64 tid) {
+    if (g_game.build[0]) {
+        int modules = 0, match = build_matches(pid, &modules);
+        if (match == 0 && modules <= 1) {
+            log_line("%016lX: lo que esta abierto no es el juego (una app sobre su title id); no me engancho", tid);
+            return ATTACH_GIVE_UP;
+        }
+        if (match == 0) {
+            log_line("%016lX: el build del juego no es %s; logros desactivados (sin engancharse)", tid, g_game.build);
+            char es[96], en[96];
+            if (g_game.version[0]) {
+                snprintf(es, sizeof(es), "Son para la version %s del juego y tienes otra", g_game.version);
+                snprintf(en, sizeof(en), "They are for game version %s, you have another", g_game.version);
+            } else {
+                snprintf(es, sizeof(es), "Son para otra version del juego");
+                snprintf(en, sizeof(en), "They are for a different game version");
+            }
+            warn_disabled(es, en);
+            return ATTACH_GIVE_UP;
+        }
+    }
+
     Result rc = smInitialize();
     if (R_FAILED(rc)) return ATTACH_RETRY;
     rc = dmntchtInitialize();

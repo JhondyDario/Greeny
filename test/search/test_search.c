@@ -75,7 +75,7 @@ int main(void) {
     cmd("check 12");
     fail += show("comprobar tras reiniciar", "SIRVE  main+0x1C00->0x18->0x138->0x48 u32");
     cmd("check 99");
-    fail += show("comprobar con un valor que no es", "0 de");
+    fail += show("comprobar con un valor que no es", "0 de 1 dan");
     /* lo mismo, pero como se usa dentro del juego: un plan y la combinacion de botones */
     remove("sdmc:/config/greeny/search/state.txt");
     FILE *pf = fopen("sdmc:/config/greeny/search/plan.txt", "w");

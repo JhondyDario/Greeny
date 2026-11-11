@@ -1054,8 +1054,8 @@ void ui_settings(gfx_canvas *c, const ui_assets *a, const gr_config *cfg, int ta
                            T("Auto usa el tema claro u oscuro de la consola.", "Auto follows the console's light or dark theme."), theme, C_GREEN);
                 break;
             case UI_OPT_ANIM:
-                option_row(c, y, sel, T("Fondo animado", "Animated background"),
-                           T("Burbujas que se mueven despacio detrás de las pantallas.", "Slow-moving bubbles behind the screens."),
+                option_row(c, y, sel, T("Animaciones", "Animations"),
+                           T("El fondo se mueve despacio y las pantallas entran con una transición.", "The background drifts slowly and screens slide in."),
                            cfg->animated_bg ? on : off, cfg->animated_bg ? C_GREEN : C_NEUTRAL);
                 break;
             case UI_OPT_GAMES_VIEW:

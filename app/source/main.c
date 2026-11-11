@@ -946,9 +946,27 @@ int main(int argc, char *argv[]) {
     u64 link_started = 0, link_last_poll = 0;
     int link_shown_left = -1;
     bool dirty = true, plus_pressed = false;
+#define ANIM_FRAMES 9
+    int anim = 0;
+    screen_t shown_screen = SCREEN_HOME;
+    bool in_focus = true;
+    /* Que la app siga viva al pulsar HOME en vez de quedar suspendida: asi puede callar la musica,
+     * dejar de dibujar y anotar en el registro lo que pasa. */
+    if (!g_env.applet_mode) appletSetFocusHandlingMode(AppletFocusHandlingMode_NoSuspend);
     const u64 dirs = HidNpadButton_AnyUp | HidNpadButton_AnyDown | HidNpadButton_AnyLeft | HidNpadButton_AnyRight;
 
     while (appletMainLoop()) {
+        /* HOME: mientras la app esta en segundo plano no dibuja ni lee botones, y la musica se calla */
+        if (!g_env.applet_mode) {
+            bool focus = appletGetFocusState() == AppletFocusState_InFocus;
+            if (focus != in_focus) {
+                in_focus = focus;
+                trace(focus ? "de vuelta en primer plano" : "en segundo plano (HOME)");
+                sfx_music_pause(!focus);
+                dirty = true;
+            }
+            if (!in_focus) { sfx_update(); svcSleepThread(50000000ull); continue; }
+        }
         padUpdate(&pad);
         padRepeaterUpdate(&rep, padGetButtons(&pad) & dirs);
         u64 down = padGetButtonsDown(&pad);
@@ -1522,13 +1540,23 @@ int main(int argc, char *argv[]) {
             dirty = false;
         }
 
+        /* transicion al cambiar de pantalla: la nueva entra subiendo y aclarandose en unos pocos cuadros */
+        if (screen != shown_screen) {
+            shown_screen = screen;
+            if (g_config.animated_bg) anim = ANIM_FRAMES;
+        }
+
         u32 stride;
         u32 *px = (u32 *)framebufferBegin(&fb, &stride);
         if (redraw || g_config.animated_bg) {
             gfx_canvas c = { .px = px, .w = UI_W, .h = UI_H, .stride = (int)(stride / sizeof(u32)) };
             float t = g_config.animated_bg ? (float)(armTicksToNs(armGetSystemTick() - start_tick) / 1000000ull) / 1000.0f : 0.0f;
             ui_background(&c, t);
-            gfx_compose(&c, &layer);
+            if (anim > 0) {
+                int left = anim * anim; /* frena al llegar */
+                gfx_compose_fx(&c, &layer, left * 28 / (ANIM_FRAMES * ANIM_FRAMES), 256 - (unsigned)(left * 200 / (ANIM_FRAMES * ANIM_FRAMES)));
+                anim--;
+            } else gfx_compose(&c, &layer);
         }
         framebufferEnd(&fb);
     }

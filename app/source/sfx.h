@@ -17,6 +17,7 @@ void sfx_exit(void);
 bool sfx_music_play(const char *path);
 void sfx_music_stop(void);
 bool sfx_music_playing(void);
+void sfx_music_pause(bool paused); /* al salir al menu HOME y al volver */
 bool sfx_music_finished(void); /* la cancion ya sono entera */
 const char *sfx_music_note(void); /* que paso la ultima vez que se intento poner musica, para el registro */
 unsigned sfx_music_played(void);  /* samples que ya sonaron de la cancion actual */

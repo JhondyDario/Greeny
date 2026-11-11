@@ -22,7 +22,7 @@
 #define PTR_MAX_OFF 0x800  /* cuanto puede haber entre un puntero y el dato */
 #define PTR_DEPTH 7
 #define PTR_LEVEL_MAX 192  /* direcciones que se siguen por nivel */
-#define CHAINS_MAX 24
+#define CHAINS_MAX 28
 
 static u64 g_main, g_main_size, g_heap, g_end;
 static int g_width = 4; /* bytes del tipo de la busqueda en curso */
@@ -268,22 +268,28 @@ static void write_chains(const char *headline) {
 
 static void do_ptr(int which) {
     load_state();
-    FILE *c = fopen(CAND_PATH, "rb");
-    u64 target = 0;
-    bool ok = c && fseek(c, (long)which * 8, SEEK_SET) == 0 && fread(&target, 8, 1, c) == 1;
-    if (c) fclose(c);
-    if (!ok) { result_status("ERROR: esa candidata no existe."); return; }
-
     g_nchains = 0;
     memset(g_level_n, 0, sizeof(g_w->level_n));
-    if (target >= g_main && target < g_main + g_main_size) { /* ya esta en main: no hace falta puntero */
-        FILE *r;
-        result_begin(&r);
-        if (r) { fprintf(r, "Esa direccion es fija, no necesita punteros:\nmain+0x%lX u%d\n", target - g_main, g_width * 8); fclose(r); }
-        return;
+
+    /* which >= 0: solo esa candidata. which < 0: todas las que queden (hasta 8); una cadena sirve
+     * llegue a la que llegue, y asi no hay que adivinar cual de ellas es la buena. */
+    FILE *c = fopen(CAND_PATH, "rb");
+    u64 target = 0;
+    int idx = 0;
+    while (c && g_level_n[0] < 8 && fread(&target, 8, 1, c) == 1) {
+        if (which < 0 || idx == which) {
+            if (target >= g_main && target < g_main + g_main_size) {
+                /* esta en main: es fija y no necesita punteros */
+                if (g_nchains < CHAINS_MAX) { g_chains[g_nchains].base_off = target - g_main; g_chains[g_nchains].n = 0; g_nchains++; }
+            } else {
+                g_level[0][g_level_n[0]] = (node){ target, 0, -1 };
+                g_level_n[0]++;
+            }
+        }
+        idx++;
     }
-    g_level[0][0] = (node){ target, 0, -1 };
-    g_level_n[0] = 1;
+    if (c) fclose(c);
+    if (g_level_n[0] == 0 && g_nchains == 0) { result_status("ERROR: no hay candidatas. Busca y filtra primero."); return; }
 
     for (int level = 1; level <= PTR_DEPTH && g_nchains < CHAINS_MAX; level++) {
         char msg[96];
@@ -302,7 +308,7 @@ static void do_ptr(int which) {
         p.tmin = p.sorted[0];
         p.tmax = p.sorted[p.n - 1];
         walk_memory(ptr_chunk, &p);
-        if (g_nchains >= 6) break; /* con unas cuantas basta para comprobar */
+        if (g_nchains >= 12) break; /* con unas cuantas basta para comprobar */
     }
     g_last_count = (unsigned)g_nchains;
     write_chains(g_nchains ? "Cadenas de punteros encontradas:" : "No se encontro ninguna cadena desde main. Prueba con otra candidata.");
@@ -325,22 +331,27 @@ static void do_check(u64 value) {
     int good = 0;
     for (int i = 0; i < g_nchains; i++) {
         u64 addr = g_main + g_chains[i].base_off;
-        bool ok = true;
-        for (int k = 0; ok && k < g_chains[i].n; k++) {
+        int broke = -1;
+        for (int k = 0; broke < 0 && k < g_chains[i].n; k++) {
             u64 ptr = 0;
-            ok = R_SUCCEEDED(dmntchtReadCheatProcessMemory(addr, &ptr, 8)) && ptr != 0;
+            if (R_FAILED(dmntchtReadCheatProcessMemory(addr, &ptr, 8)) || ptr == 0) broke = k;
             addr = ptr + g_chains[i].off[k];
         }
         u8 raw[4] = { 0 };
-        ok = ok && R_SUCCEEDED(dmntchtReadCheatProcessMemory(addr, raw, (size_t)g_width)) && matches(raw, value);
-        if (!ok) continue;
-        good++;
-        fprintf(r, "SIRVE  main+0x%lX", g_chains[i].base_off);
+        if (broke < 0 && R_FAILED(dmntchtReadCheatProcessMemory(addr, raw, (size_t)g_width))) broke = g_chains[i].n;
+        u32 now = 0;
+        memcpy(&now, raw, (size_t)g_width);
+        bool ok = broke < 0 && matches(raw, value);
+        if (ok) good++;
+        fprintf(r, "%s  main+0x%lX", ok ? "SIRVE" : "no   ", g_chains[i].base_off);
         for (int k = 0; k < g_chains[i].n; k++) fprintf(r, "->0x%X", g_chains[i].off[k]);
-        fprintf(r, " u%d\n", g_width * 8);
+        if (broke >= 0) fprintf(r, " u%d   (puntero vacio en el paso %d)\n", g_width * 8, broke + 1);
+        else fprintf(r, " u%d   = %u\n", g_width * 8, now);
     }
     g_last_count = (unsigned)good;
-    fprintf(r, "%d de %d siguen dando el valor.%s\n", good, g_nchains, good ? " Esas lineas son las que van en el archivo de logros." : "");
+    fprintf(r, "%d de %d dan el valor.%s\n", good, g_nchains,
+            good ? " Las que dicen SIRVE van en el archivo de logros."
+                 : " Si acabas de abrir el juego, entra primero a la partida (donde se ve el numero) y comprueba otra vez.");
     fclose(r);
 }
 
@@ -417,13 +428,13 @@ void search_button(search_action action, uint64_t main_base, uint64_t main_size,
         else if (g_last_count <= SHOWN) snprintf(line2, cap2, "%u candidata(s). Ya puedes buscar punteros.", g_last_count);
         else snprintf(line2, cap2, "%u candidatas. Cambia el numero y repite.", g_last_count);
     } else if (action == SEARCH_PTR) {
-        do_ptr(0);
+        do_ptr(-1);
         snprintf(line1, cap1, "Punteros: %u cadena(s)", g_last_count);
         snprintf(line2, cap2, g_last_count ? "Cierra el juego, abrelo y comprueba." : "No salio ninguna desde main.");
     } else {
         do_check(g_last_value);
         snprintf(line1, cap1, "Comprobado con el %lu", g_last_value);
-        snprintf(line2, cap2, "%u cadena(s) sirven. Mira result.txt.", g_last_count);
+        snprintf(line2, cap2, g_last_count ? "%u cadena(s) sirven. Mira result.txt." : "%u sirven. Entra a la partida y repite.", g_last_count);
     }
     free(g_w);
     g_w = NULL;

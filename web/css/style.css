@@ -248,3 +248,27 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fo
 .rank-pos { font-weight: 800; font-size: 1.25rem; min-width: 3ch; text-align: center; font-variant-numeric: tabular-nums; color: var(--muted); }
 .rank-pos.top1 { color: #c79a00; } .rank-pos.top2 { color: #7d8894; } .rank-pos.top3 { color: #b56a2c; }
 .rank-pts { font-size: 1.3rem; font-variant-numeric: tabular-nums; }
+
+/* ---- animaciones: pocas y cortas; se apagan si el sistema pide menos movimiento ---- */
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+  @keyframes grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+  @keyframes pop { 0% { transform: scale(.6); opacity: 0; } 70% { transform: scale(1.08); } 100% { transform: scale(1); opacity: 1; } }
+  main.wrap > * { animation: rise .32s ease-out both; }
+  main.wrap > *:nth-child(2) { animation-delay: .04s; }
+  main.wrap > *:nth-child(3) { animation-delay: .08s; }
+  main.wrap > *:nth-child(4) { animation-delay: .12s; }
+  main.wrap > *:nth-child(n+5) { animation-delay: .16s; }
+  .dev-panel:not([hidden]) { animation: rise .22s ease-out both; }
+  .card { transition: transform .16s ease, box-shadow .16s ease; }
+  a.card:hover, .rank-row:hover { transform: translateY(-2px); }
+  .btn, .tab { transition: transform .1s ease, background-color .15s ease, box-shadow .15s ease, color .15s ease; }
+  .btn:active, .tab:active { transform: scale(.96); }
+  .bar > i { transform-origin: left center; animation: grow .7s cubic-bezier(.2, .8, .2, 1) both; animation-delay: .15s; }
+  .hero .hero-mascot { animation: pop .5s ease-out both; animation-delay: .1s; }
+  .medal-img, .icon, .avatar { transition: transform .16s ease; }
+  .badge.earned:hover .medal-img, .card:hover > .icon { transform: scale(1.08) rotate(-3deg); }
+  .avatar-option:hover img { transform: scale(1.06); }
+  .avatar-option img { transition: transform .12s ease, box-shadow .12s ease; }
+  .pill.ok, .rank-pos { transition: color .15s ease; }
+}
