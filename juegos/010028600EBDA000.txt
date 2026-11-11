@@ -29,6 +29,8 @@ desc = El sistema de logros lee la memoria del juego
 name.en = We're alive
 desc.en = The achievement system can read the game's memory
 points = 5
+# sale a los 2 minutos de partida, no nada mas abrir el juego
+hold    = 120000
 when = main+0x4 u32 != 0
 
 # ---------- monedas ----------

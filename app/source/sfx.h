@@ -10,8 +10,10 @@ void sfx_play(sfx_id id);
 void sfx_update(void); /* una vez por cuadro */
 void sfx_exit(void);
 
-/* Musica de fondo: un archivo OGG que suena en bucle, leido de la SD poco a poco.
+/* Musica de fondo: un archivo OGG leido de la SD poco a poco. Suena una vez; cuando termina,
+ * sfx_music_finished() pasa a true y quien llama decide que sigue (la misma u otra).
  * false si el archivo no esta o no se puede leer. Llamar otra vez cambia de cancion. */
 bool sfx_music_play(const char *path);
 void sfx_music_stop(void);
 bool sfx_music_playing(void);
+bool sfx_music_finished(void); /* la cancion ya sono entera */

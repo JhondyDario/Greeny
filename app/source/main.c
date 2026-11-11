@@ -641,6 +641,20 @@ static void music_apply(void) {
     }
 }
 
+/* Al terminar una cancion sigue la siguiente que este descargada (si solo hay una, se repite). */
+static void music_next(void) {
+    int now = -1;
+    for (int i = 0; i < NSONGS; i++)
+        if (!strcmp(g_config.music_track, g_songs[i].id)) now = i;
+    for (int step = 1; step <= NSONGS; step++) {
+        int i = (now + step + NSONGS) % NSONGS;
+        if (!g_songs[i].have) continue;
+        snprintf(g_config.music_track, sizeof(g_config.music_track), "%s", g_songs[i].id);
+        break;
+    }
+    music_apply();
+}
+
 static bool music_download(int i) {
     const size_t cap = 4 * 1024 * 1024;
     char url[200], path[160];
@@ -1252,6 +1266,10 @@ int main(int argc, char *argv[]) {
         if (icons_collect(screen == SCREEN_DETAIL || screen == SCREEN_ACH ? g_model.games[cursor].tid : NULL)) {
             load_icons(g_model.games[cursor].tid);
             dirty = true;
+        }
+        if (g_config.music && sfx_music_finished()) {
+            music_next();
+            if (screen == SCREEN_SETTINGS) dirty = true; /* para que "Sonando" pase a la cancion nueva */
         }
         sfx_update();
 

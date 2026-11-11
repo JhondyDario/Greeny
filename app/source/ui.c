@@ -884,8 +884,8 @@ void ui_settings(gfx_canvas *c, const ui_assets *a, const gr_config *cfg, int ta
         switch (ui_tab_option(tab, i, acc->linked)) {
             case UI_OPT_MUSIC:
                 option_row(c, y, sel, T("Música de fondo", "Background music"),
-                           T("Suena mientras usas la app. Elige abajo la canción; se descargan una sola vez.",
-                             "Plays while you use the app. Pick a song below; each one downloads only once."),
+                           T("Suena mientras usas la app. Al terminar una canción sigue la siguiente descargada.",
+                             "Plays while you use the app. When a song ends, the next downloaded one follows."),
                            cfg->music ? on : off, C_GREEN);
                 break;
             case UI_OPT_SONG: {
@@ -893,7 +893,7 @@ void ui_settings(gfx_canvas *c, const ui_assets *a, const gr_config *cfg, int ta
                 bool current = !strcmp(cfg->music_track, sg->id);
                 char help[96];
                 if (g_song_busy == i) snprintf(help, sizeof(help), "%s", T("Descargando, un momento…", "Downloading, one moment…"));
-                else if (sg->have) snprintf(help, sizeof(help), "%s", current ? T("Es la canción elegida. Y la borra de la SD.", "This is the chosen song. Y removes it from the SD card.")
+                else if (sg->have) snprintf(help, sizeof(help), "%s", current ? T("Es la que suena ahora. Y la borra de la SD.", "This one is playing now. Y removes it from the SD card.")
                                                                               : T("Descargada. A la pone; Y la borra de la SD.", "Downloaded. A plays it; Y removes it from the SD card."));
                 else snprintf(help, sizeof(help), T("Sin descargar · %d.%d MB", "Not downloaded · %d.%d MB"), sg->kb / 1024, sg->kb % 1024 * 10 / 1024);
                 option_row(c, y, sel, sg->title, help,

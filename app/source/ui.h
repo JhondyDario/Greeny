@@ -13,7 +13,7 @@
 #define UI_COVER_BIG  150  /* caratula en la cuadricula */
 
 #define UI_APP_NAME    "Greeny"
-#define UI_APP_VERSION "0.0.13"
+#define UI_APP_VERSION "0.0.14"
 
 /* opciones, agrupadas en pestañas que se cambian con L y R */
 enum {

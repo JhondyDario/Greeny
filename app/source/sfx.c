@@ -37,6 +37,7 @@ static void *g_pool;
 
 static stb_vorbis *g_ogg;
 static int g_ogg_channels;
+static bool g_music_eof, g_music_finished;
 static void *g_music_pool;
 static AudioDriverWaveBuf g_music_wave[MUSIC_BUFS];
 
@@ -106,16 +107,12 @@ void sfx_play(sfx_id id) {
     audrvVoiceStart(&g_drv, id);
 }
 
-/* Llena un trozo con lo que sigue de la cancion; al llegar al final vuelve a empezar. */
+/* Llena un trozo con lo que sigue de la cancion. Al llegar al final no pone nada mas. */
 static void music_fill(int i) {
     s16 *buf = (s16 *)((u8 *)g_music_pool + (size_t)i * MUSIC_BUF_BYTES);
     int want = MUSIC_BUF_BYTES / 2; /* samples, contando los dos canales */
     int frames = stb_vorbis_get_samples_short_interleaved(g_ogg, g_ogg_channels, buf, want);
-    if (frames == 0) {
-        stb_vorbis_seek_start(g_ogg);
-        frames = stb_vorbis_get_samples_short_interleaved(g_ogg, g_ogg_channels, buf, want);
-        if (frames == 0) return; /* archivo vacio o dañado */
-    }
+    if (frames == 0) { g_music_eof = true; return; }
     armDCacheFlush(buf, MUSIC_BUF_BYTES);
     memset(&g_music_wave[i], 0, sizeof(g_music_wave[i]));
     g_music_wave[i].data_raw = buf;
@@ -134,6 +131,7 @@ void sfx_music_stop(void) {
 }
 
 bool sfx_music_playing(void) { return g_ogg != NULL; }
+bool sfx_music_finished(void) { return g_ogg != NULL && g_music_finished; }
 
 bool sfx_music_play(const char *path) {
     if (!g_ok || !g_music_pool) return false;
@@ -157,6 +155,7 @@ bool sfx_music_play(const char *path) {
         audrvVoiceSetMixFactor(&g_drv, MUSIC_VOICE, MUSIC_VOLUME, 0, 1);
     }
     memset(g_music_wave, 0, sizeof(g_music_wave));
+    g_music_eof = g_music_finished = false;
     for (int i = 0; i < MUSIC_BUFS; i++) music_fill(i);
     audrvVoiceStart(&g_drv, MUSIC_VOICE);
     audrvUpdate(&g_drv);
@@ -166,9 +165,14 @@ bool sfx_music_play(const char *path) {
 void sfx_update(void) {
     if (!g_ok) return;
     if (g_ogg) {
-        for (int i = 0; i < MUSIC_BUFS; i++)
-            if (g_music_wave[i].state == AudioDriverWaveBufState_Free || g_music_wave[i].state == AudioDriverWaveBufState_Done)
-                music_fill(i);
+        int idle = 0;
+        for (int i = 0; i < MUSIC_BUFS; i++) {
+            if (g_music_wave[i].state != AudioDriverWaveBufState_Free && g_music_wave[i].state != AudioDriverWaveBufState_Done) continue;
+            if (g_music_eof) idle++;
+            else music_fill(i);
+        }
+        /* se acabo el archivo y ya sono hasta el ultimo trozo */
+        if (g_music_eof && idle == MUSIC_BUFS) g_music_finished = true;
     }
     audrvUpdate(&g_drv);
 }
