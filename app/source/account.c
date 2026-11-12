@@ -438,6 +438,65 @@ gr_net_result gr_review_like(gr_http_fn http, const gr_account *a, long long id,
     return call(http, "/rest/v1/rpc/device_review_like", NULL, body, resp, sizeof(resp), err, errlen);
 }
 
+int gr_parse_notifs(char *json, gr_notif *out, int max, int *unread) {
+    int n = 0;
+    *unread = 0;
+    gr_json_int(json, "unread", unread);
+    char *items = strstr(json, "\"items\"");
+    for (char *p = items ? strchr(items, '{') : NULL; p && n < max; ) {
+        char *end = object_end(p);
+        if (!end) break;
+        char saved = end[1];
+        end[1] = 0;
+        gr_notif *r = &out[n];
+        memset(r, 0, sizeof(*r));
+        const char *idv = find_value(p, "id");
+        if (idv) r->id = atoll(idv);
+        char kind[16] = "";
+        gr_json_string(p, "kind", kind, sizeof(kind));
+        r->kind = !strcmp(kind, "like") ? GR_NOTIF_LIKE : !strcmp(kind, "follow") ? GR_NOTIF_FOLLOW
+                : !strcmp(kind, "achievement") ? GR_NOTIF_ACH : !strcmp(kind, "badge") ? GR_NOTIF_BADGE : GR_NOTIF_OTHER;
+        gr_json_bool(p, "read", &r->read);
+        gr_json_string(p, "actor", r->actor, sizeof(r->actor));
+        gr_json_string(p, "actor_name", r->actor_name, sizeof(r->actor_name));
+        gr_json_int(p, "actor_avatar", &r->actor_avatar);
+        gr_json_string(p, "title_id", r->title_id, sizeof(r->title_id));
+        gr_json_string(p, "game", r->game, sizeof(r->game));
+        gr_json_string(p, "ach_name", r->ach_name, sizeof(r->ach_name));
+        gr_json_string(p, "ach_name_en", r->ach_name_en, sizeof(r->ach_name_en));
+        gr_json_string(p, "badge", r->badge, sizeof(r->badge));
+        char d[40] = "";
+        gr_json_string(p, "created_at", d, sizeof(d));
+        snprintf(r->date, sizeof(r->date), "%.10s", d);
+        if (r->id > 0 && r->kind != GR_NOTIF_OTHER) n++;
+        end[1] = saved;
+        p = strchr(end + 1, '{');
+    }
+    return n;
+}
+
+gr_net_result gr_notifications(gr_http_fn http, const gr_account *a, gr_notif *out, int max, int *count, int *unread) {
+    char body[160];
+    *count = 0;
+    *unread = 0;
+    if (!a->token[0] || !a->linked) return GR_NET_OK;
+    char *resp = malloc(48 * 1024);
+    if (!resp) return GR_NET_BAD;
+    snprintf(body, sizeof(body), "{\"device_token\":\"%s\"}", a->token);
+    gr_net_result r = call(http, "/rest/v1/rpc/device_notifications", NULL, body, resp, 48 * 1024, NULL, 0);
+    if (r == GR_NET_OK) *count = gr_parse_notifs(resp, out, max, unread);
+    free(resp);
+    return r;
+}
+
+gr_net_result gr_notifications_read(gr_http_fn http, const gr_account *a, long long id) {
+    char body[200], resp[RESP_MAX];
+    if (!a->token[0] || !a->linked) return GR_NET_REJECTED;
+    if (id < 0) snprintf(body, sizeof(body), "{\"device_token\":\"%s\",\"id\":null}", a->token);
+    else snprintf(body, sizeof(body), "{\"device_token\":\"%s\",\"id\":%lld}", a->token, id);
+    return call(http, "/rest/v1/rpc/device_notifications_read", NULL, body, resp, sizeof(resp), NULL, 0);
+}
+
 gr_net_result gr_set_avatar(gr_http_fn http, gr_account *a, int picture, char *err, size_t errlen) {
     char body[160], resp[RESP_MAX];
     if (!a->token[0] || !a->linked) { snprintf(err, errlen, "Esta consola no está vinculada."); return GR_NET_REJECTED; }

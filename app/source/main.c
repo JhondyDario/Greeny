@@ -58,7 +58,7 @@
 
 typedef enum {
     SCREEN_HOME, SCREEN_DETAIL, SCREEN_SETTINGS, SCREEN_DIAG, SCREEN_ABOUT, SCREEN_INTRO, SCREEN_LINK, SCREEN_MSG,
-    SCREEN_PROFILE, SCREEN_BADGES, SCREEN_ACH, SCREEN_AVATARS, SCREEN_BROWSE, SCREEN_BROWSE_GAME, SCREEN_SEARCH, SCREEN_RANKING, SCREEN_USER, SCREEN_COUNTRY, SCREEN_CAPTION, SCREEN_REVIEWS
+    SCREEN_PROFILE, SCREEN_BADGES, SCREEN_ACH, SCREEN_AVATARS, SCREEN_BROWSE, SCREEN_BROWSE_GAME, SCREEN_SEARCH, SCREEN_RANKING, SCREEN_USER, SCREEN_COUNTRY, SCREEN_CAPTION, SCREEN_REVIEWS, SCREEN_NOTIF
 } screen_t;
 
 static gr_model g_model;
@@ -527,12 +527,23 @@ static void sync_thread(void *arg) {
             gr_fetch_social(net_http, &g_sync_account); /* si falla, quedan los numeros de la ultima vez */
             r = gr_push_unlocks(net_http, &g_sync_account, ROOT, &g_sync_sent, &g_sync_added, g_sync_err, sizeof(g_sync_err));
             g_sync = r == GR_NET_OK ? SYNC_OK : r == GR_NET_OFFLINE ? SYNC_OFFLINE : SYNC_FAILED;
+            /* despues de subir, para que ya salgan los avisos de los logros recien subidos */
+            if (gr_notifications(net_http, &g_sync_account, g_sync_notifs, GR_NOTIFS_MAX, &g_sync_nnotif, &g_sync_unread) == GR_NET_OK)
+                g_sync_notifs_ok = true;
         }
     }
     g_bg_done = true;
 }
 
+/* ---------- avisos ---------- */
+static gr_notif g_notifs[GR_NOTIFS_MAX], g_sync_notifs[GR_NOTIFS_MAX];
+static int g_nnotif, g_unread, g_sync_nnotif, g_sync_unread;
+static bool g_sync_notifs_ok;
+static u64 g_last_sync_tick; /* para volver a sincronizar cada 5 minutos */
+
 static void sync_start(void) {
+    g_last_sync_tick = armGetSystemTick();
+    g_sync_notifs_ok = false;
     bool linked = g_account.token[0] && g_account.linked;
     if (g_sync_thread_live) return;
     if (!net_online()) { if (linked) g_sync = SYNC_OFFLINE; return; }
@@ -567,6 +578,12 @@ static bool sync_collect(void) {
         g_account = g_sync_account; /* trae el nombre y la frase al dia */
         gr_account_save(&g_account, ACCOUNT_PATH);
     }
+    if (g_sync_notifs_ok) {
+        memcpy(g_notifs, g_sync_notifs, sizeof(g_notifs));
+        g_nnotif = g_sync_nnotif;
+        g_unread = g_sync_unread;
+    }
+    ui_set_unread(g_account.token[0] && g_account.linked ? g_unread : -1);
     if (g_cat_downloaded > 0) rescan();  /* llegaron juegos nuevos: que aparezcan en la lista */
     else refresh_greeting();
     return true;
@@ -710,7 +727,7 @@ static int rank_load(int scope, int mode) {
 static gr_review g_reviews[GR_REVIEWS_MAX];
 static int g_nrev, g_rev_state;
 static char g_rev_tid[17], g_rev_name[LG_NAME_LEN];
-static int g_rev_return, g_user_return = 0; /* a donde vuelven Comentarios y el perfil de otro (0 = ranking) */
+static int g_rev_return, g_user_return = 0, g_badges_return = SCREEN_PROFILE; /* a donde vuelven Comentarios y el perfil de otro (0 = ranking) */
 
 /* 1 listo, 2 sin conexion */
 static int reviews_load(void) {
@@ -740,6 +757,15 @@ static void links_load(void) {
     if (gr_json_string(json, "discord", url, sizeof(url)) &&
         (!strncmp(url, "https://discord.gg/", 19) || !strncmp(url, "https://discord.com/invite/", 27)))
         snprintf(g_discord, sizeof(g_discord), "%s", url);
+}
+
+/* 1 listo, 2 sin conexion, 3 sin cuenta */
+static int notifs_load(void) {
+    if (!(g_account.token[0] && g_account.linked)) return 3;
+    if (!net_online()) return 2;
+    if (gr_notifications(net_http, &g_account, g_notifs, GR_NOTIFS_MAX, &g_nnotif, &g_unread) != GR_NET_OK) return 2;
+    ui_set_unread(g_unread);
+    return 1;
 }
 
 /* ---------- frases del perfil ---------- */
@@ -1014,7 +1040,8 @@ int main(int argc, char *argv[]) {
     trace("listo: %d juego(s), audio %s, caratulas %s, modo %s", g_model.ngames, sfx_ok ? "si" : "no",
           g_ns_ok ? "si" : "no", g_env.applet_mode ? "applet" : "aplicacion");
 
-    int cursor = 0, top = 0, dcursor = 0, dtop = 0, stab = 0, srow = 0, intro_page = 0, acursor = 0, bcursor = 0, btop = 0, browse_pending = 0, song_pending = 0, song_wait = 0, vcursor = 0, vtop = 0;
+    int cursor = 0, top = 0, dcursor = 0, dtop = 0, stab = 0, srow = 0, intro_page = 0, acursor = 0, bcursor = 0, btop = 0, browse_pending = 0, song_pending = 0, song_wait = 0, vcursor = 0, vtop = 0, ncursor = 0, ntop = 0, notif_state = 0;
+    screen_t notif_return = SCREEN_HOME;
     bool song_all = false;
     int ccursor = 0, rcursor = 0, rank_scope = 0, rank_mode = 0, rank_state = 0, kcursor = 0, ktop = 0;
     bool lang_changed = false;
@@ -1042,6 +1069,7 @@ int main(int argc, char *argv[]) {
         screen = SCREEN_PROFILE;
     }
     refresh_greeting();
+    ui_set_unread(g_account.token[0] && g_account.linked ? 0 : -1); /* la campana sale si hay cuenta */
     sync_start(); /* en segundo plano y solo si hay cuenta e internet; la app no espera por esto */
 
     /* tactil: un toque corto es una pulsacion; un arrastre vertical mueve la lista */
@@ -1107,7 +1135,72 @@ int main(int argc, char *argv[]) {
 
         bool moved = false, accepted = false, accepted_alt = false, opened = false, opened_rare = false, back = false;
 
-        if (screen == SCREEN_HOME) {
+        /* ZL o ZR abren los avisos desde cualquier pantalla; B vuelve a donde estabas */
+        if ((down & (HidNpadButton_ZL | HidNpadButton_ZR)) && screen != SCREEN_NOTIF && screen != SCREEN_INTRO && screen != SCREEN_MSG) {
+            notif_return = screen;
+            notif_state = notifs_load();
+            ncursor = ntop = 0;
+            screen = SCREEN_NOTIF;
+            opened = true;
+            down &= ~(u64)(HidNpadButton_ZL | HidNpadButton_ZR);
+        }
+        /* cada 5 minutos, sincronizar otra vez (sube logros nuevos y trae avisos) */
+        if (!g_sync_thread_live && g_account.linked && armTicksToNs(armGetSystemTick() - g_last_sync_tick) > 300000000000ULL) sync_start();
+
+        if (screen == SCREEN_NOTIF) {
+            if (ncursor >= g_nnotif) ncursor = g_nnotif ? g_nnotif - 1 : 0;
+            if (notif_state == 1 && g_nnotif > 0) { TAP_SELECT(ncursor, g_nnotif); moved = move_cursor(&ncursor, g_nnotif, 1, nav); }
+            if (ncursor < ntop) ntop = ncursor;
+            if (ncursor >= ntop + UI_NOTIF_ROWS) ntop = ncursor - UI_NOTIF_ROWS + 1;
+            if ((down & HidNpadButton_X) && notif_state == 1 && g_unread > 0) {
+                if (gr_notifications_read(net_http, &g_account, -1) == GR_NET_OK) {
+                    for (int i = 0; i < g_nnotif; i++) g_notifs[i].read = true;
+                    g_unread = 0;
+                    ui_set_unread(0);
+                }
+                accepted_alt = true;
+            }
+            if ((down & HidNpadButton_A) && notif_state == 1 && g_nnotif > 0) {
+                gr_notif *v = &g_notifs[ncursor];
+                if (!v->read && gr_notifications_read(net_http, &g_account, v->id) == GR_NET_OK) {
+                    v->read = true;
+                    if (g_unread > 0) g_unread--;
+                    ui_set_unread(g_unread);
+                }
+                /* llevar a lo que dice el aviso */
+                if (v->kind == GR_NOTIF_LIKE && v->title_id[0]) {
+                    snprintf(g_rev_tid, sizeof(g_rev_tid), "%s", v->title_id);
+                    snprintf(g_rev_name, sizeof(g_rev_name), "%s", v->game[0] ? v->game : v->title_id);
+                    g_rev_state = reviews_load();
+                    g_rev_return = SCREEN_NOTIF;
+                    vcursor = vtop = 0;
+                    screen = SCREEN_REVIEWS;
+                } else if (v->kind == GR_NOTIF_FOLLOW && v->actor[0]) {
+                    memset(&g_rank_view, 0, sizeof(g_rank_view));
+                    snprintf(g_rank_view.username, sizeof(g_rank_view.username), "%s", v->actor);
+                    snprintf(g_rank_view.display, sizeof(g_rank_view.display), "%s", v->actor_name);
+                    g_rank_view.avatar = v->actor_avatar;
+                    g_rank_view.position = -1; /* sin datos de ranking: ui_user no muestra numeros */
+                    g_user_return = SCREEN_NOTIF;
+                    screen = SCREEN_USER;
+                } else if (v->kind == GR_NOTIF_BADGE) {
+                    screen = SCREEN_BADGES;
+                    g_badges_return = SCREEN_NOTIF;
+                } else if (v->kind == GR_NOTIF_ACH && v->title_id[0]) {
+                    for (int i = 0; i < g_model.ngames; i++)
+                        if (!strcmp(g_model.games[i].tid, v->title_id)) {
+                            cursor = i;
+                            gr_open(&g_model, cursor, ROOT);
+                            load_icons(g_model.games[cursor].tid);
+                            icons_start(g_model.games[cursor].tid);
+                            dcursor = dtop = 0;
+                            screen = SCREEN_DETAIL;
+                        }
+                }
+                accepted = true;
+            }
+            if (down & HidNpadButton_B) { screen = notif_return; back = true; }
+        } else if (screen == SCREEN_HOME) {
             ui_layout l = ui_home_layout(&g_config);
             TAP_SELECT(cursor, g_model.ngames);
             if (g_model.ngames > 0) moved = move_cursor(&cursor, g_model.ngames, l.cols, nav);
@@ -1615,7 +1708,7 @@ int main(int argc, char *argv[]) {
             }
             if (down & HidNpadButton_B) { screen = g_user_return ? g_user_return : SCREEN_RANKING; g_user_return = 0; back = true; }
         } else if (screen == SCREEN_BADGES) {
-            if (down & HidNpadButton_B) { screen = SCREEN_PROFILE; back = true; }
+            if (down & HidNpadButton_B) { screen = g_badges_return; g_badges_return = SCREEN_PROFILE; back = true; }
         } else if (screen == SCREEN_MSG) {
             if (down & (HidNpadButton_A | HidNpadButton_B)) {
                 screen = g_msg_return;
@@ -1724,6 +1817,7 @@ int main(int argc, char *argv[]) {
                 const char *mode = rank_mode > 0 && rank_mode <= ngames ? g_model.games[gidx[rank_mode - 1]].name : (g_ui_en ? "Total points" : "Puntos totales");
                 ui_ranking(&layer, &g_assets, g_rank, g_nrank, &g_rank_me, g_rank_total, sc_es[rank_scope], sc_en[rank_scope], mode, rcursor, rank_state);
             }
+            else if (screen == SCREEN_NOTIF) ui_notifs(&layer, &g_assets, g_notifs, g_nnotif, g_unread, ncursor, ntop, notif_state);
             else if (screen == SCREEN_REVIEWS) ui_reviews(&layer, &g_assets, g_rev_name, g_reviews, g_nrev, vcursor, vtop, g_rev_state, g_account.linked);
             else if (screen == SCREEN_USER) ui_user(&layer, &g_assets, &g_rank_view, strcasecmp(g_rank_view.username, g_account.username) != 0);
             else if (screen == SCREEN_AVATARS) ui_avatars(&layer, &g_assets, &g_profile, acursor);

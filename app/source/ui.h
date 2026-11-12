@@ -173,6 +173,13 @@ void ui_ranking(gfx_canvas *c, const ui_assets *a, const gr_rank_row *rows, int 
                 const char *scope_es, const char *scope_en, const char *mode, int cursor, int state);
 /* El perfil de alguien del ranking, con la opcion de seguirlo. */
 void ui_user(gfx_canvas *c, const ui_assets *a, const gr_rank_row *who, bool can_follow);
+/* Avisos. state: 1 listo, 2 sin conexion, 3 sin cuenta vinculada. */
+#define UI_NOTIF_ROWS 7
+void ui_notifs(gfx_canvas *c, const ui_assets *a, const gr_notif *n, int count, int unread, int cursor, int top, int state);
+void ui_notif_text(const gr_notif *n, char *out, size_t cap);
+/* Avisos sin leer para la campana de la cabecera; -1 = no hay cuenta (sin campana). */
+void ui_set_unread(int n);
+
 /* Comentarios de un juego. state: 0 cargando, 1 listo, 2 sin conexion. */
 #define UI_REVIEW_ROWS 3
 void ui_reviews(gfx_canvas *c, const ui_assets *a, const char *game, const gr_review *r, int n, int cursor, int top, int state, bool linked);

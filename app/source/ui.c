@@ -199,6 +199,8 @@ void ui_background(gfx_canvas *c, float t) {
 /* ---------- piezas comunes ---------- */
 
 static void user_chip(gfx_canvas *c);
+static int badge_order(const gr_stats *st, int *out);
+static void heart(gfx_canvas *c, int cx, int cy, int size, gfx_color col);
 
 /* Fondo de la barra de arriba: verde oscuro a la izquierda que se aclara hacia la derecha, con
  * un brillo arriba y sombra abajo, y una linea clara al pie. Como en la web. */
@@ -266,6 +268,28 @@ static void avatar(gfx_canvas *c, int cx, int cy, int r, const char *name, int p
 }
 
 /* arriba a la derecha: icono del usuario, nombre y nivel */
+static int g_unread = -1; /* avisos sin leer; -1 = sin cuenta (no se dibuja la campana) */
+void ui_set_unread(int n) { g_unread = n; }
+
+/* Campana dibujada a mano, con el globito rojo de avisos sin leer. */
+static void bell(gfx_canvas *c, int cx, int cy, int unread) {
+    gfx_circle_alpha(c, cx, cy, 24, C_WHITE, 40);
+    gfx_circle(c, cx, cy - 6, 9, C_WHITE);                        /* cupula */
+    gfx_round_rect(c, cx - 9, cy - 6, 18, 12, 2, C_WHITE);        /* cuerpo */
+    gfx_round_rect(c, cx - 13, cy + 5, 26, 4, 2, C_WHITE);        /* borde */
+    gfx_circle(c, cx, cy + 12, 3, C_WHITE);                       /* badajo */
+    gfx_circle(c, cx, cy - 16, 2, C_WHITE);
+    if (unread > 0) {
+        char n[8];
+        snprintf(n, sizeof(n), unread > 99 ? "99+" : "%d", unread);
+        int w = gfx_text_width(15, n) + 12;
+        if (w < 22) w = 22;
+        gfx_round_rect(c, cx + 6, cy - 24, w, 22, 11, GFX_RGB(0xEF, 0x44, 0x44));
+        gfx_ring(c, cx + 6, cy - 24, w, 22, 11, 2, C_WHITE, 200);
+        gfx_text(c, cx + 6 + (w - gfx_text_width(15, n)) / 2, cy - 22, 15, C_WHITE, n);
+    }
+}
+
 static void user_chip(gfx_canvas *c) {
     if (!g_profile) return;
     const int cx = UI_W - MARGIN - 32, cy = 48;
@@ -278,6 +302,11 @@ static void user_chip(gfx_canvas *c) {
     int w = gfx_text_width(18, buf) + 24;
     gfx_round_rect(c, right - w, 52, w, 28, 14, C_YELLOW);
     gfx_text(c, right - w + 12, 56, 18, C_ON_YELLOW, buf);
+    if (g_unread >= 0) { /* la campana, a la izquierda del nombre: ZL o ZR abren los avisos */
+        int nw = gfx_text_width(25, g_profile->name);
+        if (nw < w) nw = w;
+        bell(c, right - nw - 40, 48, g_unread);
+    }
 }
 
 /* pista de boton: icono del boton (o circulo con la letra si no hay) + texto. Devuelve la x siguiente. */
@@ -934,6 +963,80 @@ void ui_browse_game(gfx_canvas *c, const ui_assets *a, const gr_cat_game *game, 
     detail_list(c, &bare, def, all, def->nach, cursor, top, 6);
     footer_bar(c);
     int hx = hint(c, MARGIN, "Y", T("Comentarios", "Comments"));
+    hx = hint(c, hx, "B", T("Volver", "Back"));
+    hint(c, hx, "+", T("Salir", "Exit"));
+}
+
+/* ---------- avisos ---------- */
+
+void ui_notif_text(const gr_notif *n, char *out, size_t cap) {
+    const char *who = n->actor_name[0] ? n->actor_name : n->actor;
+    switch (n->kind) {
+        case GR_NOTIF_LIKE:   snprintf(out, cap, T("A %s le gustó tu comentario en %s", "%s liked your comment on %s"), who, n->game[0] ? n->game : n->title_id); break;
+        case GR_NOTIF_FOLLOW: snprintf(out, cap, T("%s empezó a seguirte", "%s started following you"), who); break;
+        case GR_NOTIF_ACH:    snprintf(out, cap, T("Desbloqueaste “%s” en %s", "You unlocked “%s” in %s"),
+                                       g_en && n->ach_name_en[0] ? n->ach_name_en : n->ach_name, n->game[0] ? n->game : n->title_id); break;
+        case GR_NOTIF_BADGE: {
+            const char *name = n->badge;
+            for (int i = 0; i < gr_badge_count; i++)
+                if (!strcmp(gr_badges[i].id, n->badge)) name = T(gr_badges[i].name_es, gr_badges[i].name_en);
+            snprintf(out, cap, T("Nueva medalla: %s", "New badge: %s"), name);
+            break;
+        }
+        default: out[0] = 0;
+    }
+}
+
+void ui_notifs(gfx_canvas *c, const ui_assets *a, const gr_notif *n, int count, int unread, int cursor, int top, int state) {
+    begin(c);
+    char sub[96];
+    if (unread > 0) snprintf(sub, sizeof(sub), T("%d sin leer", "%d unread"), unread);
+    else snprintf(sub, sizeof(sub), "%s", T("Todo leído", "All caught up"));
+    header(c, a, NULL, T("Avisos", "Notifications"), sub);
+
+    if (state != 1 || count == 0) {
+        card(c, MARGIN, 180, CONTENT_W, 320, false);
+        img(c, a, state == 2 ? UI_IMG_m_triste : state == 3 ? UI_IMG_m_saludando : UI_IMG_m_durmiendo, MARGIN + 30, 210);
+        const char *t1, *t2;
+        if (state == 2) { t1 = T("No hay conexión", "No connection"); t2 = T("Conecta la consola a internet e inténtalo de nuevo.", "Connect the console to the internet and try again."); }
+        else if (state == 3) { t1 = T("Vincula tu cuenta", "Link your account"); t2 = T("Los avisos llegan a tu cuenta. Vincúlala en Opciones → Cuenta.", "Notifications go to your account. Link it in Options → Account."); }
+        else { t1 = T("No tienes avisos", "No notifications"); t2 = T("Aquí sale cuando alguien te sigue, le da me gusta a tu comentario o consigues algo nuevo.", "They show up when someone follows you, likes your comment or you earn something new."); }
+        gfx_text(c, MARGIN + 320, 280, 36, P->ink, t1);
+        gfx_text_fit(c, MARGIN + 320, 340, 22, P->gray, t2, CONTENT_W - 360);
+    } else {
+        for (int i = top; i < count && i < top + UI_NOTIF_ROWS; i++) {
+            const gr_notif *v = &n[i];
+            const int x = MARGIN, y = 112 + (i - top) * 76, w = CONTENT_W, h = 68;
+            card(c, x, y, w, h, i == cursor);
+            zone(x, y, w, h, UI_ZONE_ITEM, i);
+            if (!v->read) gfx_circle(c, x + 18, y + h / 2, 6, C_GREEN);
+            int ix = x + 34, iy = y + 8;
+            bool drawn = false;
+            if (v->kind == GR_NOTIF_FOLLOW && v->actor_avatar >= 1 && v->actor_avatar <= UI_AVATAR_COUNT)
+                drawn = img_fit(c, a, UI_IMG_avatar_01 + v->actor_avatar - 1, ix, iy, 52);
+            else if (v->kind == GR_NOTIF_BADGE)
+                for (int k = 0; k < gr_badge_count && !drawn; k++)
+                    if (!strcmp(gr_badges[k].id, v->badge)) drawn = img_fit(c, a, UI_IMG_badge_primer_logro + k, ix, iy, 52);
+            if (!drawn && v->kind == GR_NOTIF_LIKE) {
+                gfx_circle_alpha(c, ix + 26, iy + 26, 26, GFX_RGB(0xFF, 0x6B, 0x8A), 60);
+                heart(c, ix + 26, iy + 27, 28, GFX_RGB(0xFF, 0x6B, 0x8A));
+                drawn = true;
+            }
+            if (!drawn) img_fit(c, a, v->kind == GR_NOTIF_FOLLOW ? UI_IMG_stat_seguidores : UI_IMG_trophy, ix, iy, 52);
+            char text[200];
+            ui_notif_text(v, text, sizeof(text));
+            gfx_text_fit(c, x + 102, y + 9, 22, v->read ? P->gray : P->ink, text, w - 102 - 30);
+            char date[16];
+            snprintf(date, sizeof(date), "%.2s/%.2s/%.4s", T(v->date + 8, v->date + 5), T(v->date + 5, v->date + 8), v->date);
+            gfx_text(c, x + 102, y + 39, 17, P->gray, date);
+        }
+        if (count > top + UI_NOTIF_ROWS) text_center(c, UI_W / 2, 640, 16, P->gray, "▼", 40);
+    }
+
+    footer_bar(c);
+    int hx = MARGIN;
+    if (state == 1 && count > 0) hx = hint(c, hx, "A", T("Abrir", "Open"));
+    if (state == 1 && unread > 0) hx = hint(c, hx, "X", T("Marcar todo como leído", "Mark all as read"));
     hx = hint(c, hx, "B", T("Volver", "Back"));
     hint(c, hx, "+", T("Salir", "Exit"));
 }
@@ -1776,11 +1879,13 @@ void ui_profile_screen(gfx_canvas *c, const ui_assets *a, const ui_profile *p) {
     snprintf(buf, sizeof(buf), T("Medallas  ·  %d de %d", "Badges  ·  %d of %d"), gr_badges_earned(&p->stats), gr_badge_count);
     gfx_text(c, rx + 24, by + 16, 26, P->ink, buf);
     const int per_row = 6, r = 40, cell = (bw - 48) / per_row;
-    for (int i = 0; i < gr_badge_count; i++) {
+    int order[32], no = badge_order(&p->stats, order);
+    for (int i = 0; i < no; i++) {
+        const gr_badge *b = &gr_badges[order[i]];
         int mx = rx + 24 + (i % per_row) * cell + cell / 2, my = by + 104 + (i / per_row) * 116;
-        bool earned = gr_badge_earned(&gr_badges[i], &p->stats);
-        medal(c, mx, my, r, &gr_badges[i], earned);
-        text_center(c, mx, my + r + 6, 15, earned ? P->ink : P->gray, T(gr_badges[i].name_es, gr_badges[i].name_en), cell - 6);
+        bool earned = gr_badge_earned(b, &p->stats);
+        medal(c, mx, my, r, b, earned);
+        text_center(c, mx, my + r + 6, 15, earned ? P->ink : P->gray, T(b->name_es, b->name_en), cell - 6);
     }
     if (p->donor) { /* en el hueco que queda al final de la segunda fila */
         int i = gr_badge_count, mx = rx + 24 + (i % per_row) * cell + cell / 2, my = by + 104 + (i / per_row) * 116;
@@ -1949,8 +2054,10 @@ void ui_user(gfx_canvas *c, const ui_assets *a, const gr_rank_row *who, bool can
     /* desde un comentario no hay posicion: se muestran sus me gusta (van en points) */
     if (who->position > 0) snprintf(v[0], 16, "#%d", who->position);
     else snprintf(v[0], 16, "%d", who->points);
+    if (who->position < 0) { snprintf(v[0], 16, "—"); } /* desde un aviso: no se saben sus numeros */
     snprintf(v[1], 16, "%d", who->total_points);
     snprintf(v[2], 16, "%d", who->achievements);
+    if (who->position < 0) for (int i = 0; i < 3; i++) snprintf(v[i], 16, "—");
     const char *labels[3] = { who->position > 0 ? T("En este ranking", "In this ranking") : T("Me gusta", "Likes"), T("Puntos", "Points"), T("Logros", "Achievements") };
     for (int i = 0; i < 3; i++) {
         int sx = x + 60 + i * 200;
@@ -1965,6 +2072,15 @@ void ui_user(gfx_canvas *c, const ui_assets *a, const gr_rank_row *who, bool can
     hint(c, hx, "+", T("Salir", "Exit"));
 }
 
+/* Indices de las medallas: primero las conseguidas, luego las que faltan (cada grupo en su orden). */
+static int badge_order(const gr_stats *st, int *out) {
+    int n = 0;
+    for (int pass = 0; pass < 2; pass++)
+        for (int i = 0; i < gr_badge_count && n < 32; i++)
+            if (gr_badge_earned(&gr_badges[i], st) == (pass == 0)) out[n++] = i;
+    return n;
+}
+
 void ui_badges(gfx_canvas *c, const ui_assets *a, const ui_profile *p) {
     begin(c);
     char sub[96];
@@ -1972,8 +2088,9 @@ void ui_badges(gfx_canvas *c, const ui_assets *a, const ui_profile *p) {
     header(c, a, NULL, T("Medallas", "Badges"), sub);
 
     const int x = MARGIN, w = CONTENT_W, h = 44;
-    for (int i = 0; i < gr_badge_count; i++) {
-        const gr_badge *b = &gr_badges[i];
+    int order[32], no = badge_order(&p->stats, order);
+    for (int i = 0; i < no; i++) {
+        const gr_badge *b = &gr_badges[order[i]];
         int y = 112 + i * 49, value = gr_badge_value(b, &p->stats);
         bool earned = value >= b->goal;
         glass(c, x, y, w, h, 12, false);

@@ -118,6 +118,27 @@ gr_net_result gr_reviews(gr_http_fn http, const gr_account *a, const char *tid, 
 gr_net_result gr_review_save(gr_http_fn http, const gr_account *a, const char *tid, const char *text, char *err, size_t errlen);
 gr_net_result gr_review_like(gr_http_fn http, const gr_account *a, long long id, bool liked, char *err, size_t errlen);
 
+/* ---- avisos (notificaciones) ---- */
+#define GR_NOTIFS_MAX 50
+typedef enum { GR_NOTIF_LIKE, GR_NOTIF_FOLLOW, GR_NOTIF_ACH, GR_NOTIF_BADGE, GR_NOTIF_OTHER } gr_notif_kind;
+typedef struct {
+    long long id;
+    int  kind;            /* gr_notif_kind */
+    bool read;
+    char actor[24];       /* usuario de quien dio me gusta o te siguio */
+    char actor_name[36];
+    int  actor_avatar;
+    char title_id[17];
+    char game[64];
+    char ach_name[48], ach_name_en[48];
+    char badge[24];
+    char date[11];        /* AAAA-MM-DD */
+} gr_notif;
+int gr_parse_notifs(char *json, gr_notif *out, int max, int *unread);
+gr_net_result gr_notifications(gr_http_fn http, const gr_account *a, gr_notif *out, int max, int *count, int *unread);
+/* id < 0 = todas */
+gr_net_result gr_notifications_read(gr_http_fn http, const gr_account *a, long long id);
+
 /* Entra con correo y contraseña y registra la consola de una vez. */
 gr_net_result gr_login_password(gr_http_fn http, const char *email, const char *password, const char *device_name,
                                 gr_account *a, char *err, size_t errlen);
