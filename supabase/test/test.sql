@@ -423,4 +423,18 @@ begin
     end;
 end $$;
 
+-- donador: solo lo pone un administrador, y nadie a si mismo
+do $$
+declare who uuid; ok boolean := false;
+begin
+    select id into who from public.profiles limit 1;
+    assert not (select donor from public.profiles where id = who), 'nadie nace donador';
+    perform set_config('request.jwt.claims', json_build_object('sub', who, 'role', 'authenticated')::text, true);
+    perform set_config('role', 'authenticated', true);
+    begin update public.profiles set donor = true where id = who;
+    exception when insufficient_privilege then ok := true; end;
+    assert ok, 'un usuario no puede marcarse como donador';
+    reset role;
+end $$;
+
 select 'TODAS LAS PRUEBAS PASARON' as resultado;

@@ -63,6 +63,15 @@ gr_net_result gr_set_avatar(gr_http_fn http, gr_account *a, int picture, char *e
 /* Cambia el pais del perfil ("" lo quita). */
 gr_net_result gr_set_country(gr_http_fn http, gr_account *a, const char *code, char *err, size_t errlen);
 
+/* Cambia la frase del perfil ("" la quita). */
+gr_net_result gr_set_caption(gr_http_fn http, gr_account *a, const char *text, char *err, size_t errlen);
+
+/* Frases de la lista (las mismas del desplegable de la web), en los dos idiomas. */
+typedef struct { char es[64], en[64]; } gr_caption;
+#define GR_CAPTIONS_MAX 12
+/* `json` es la respuesta de /rest/v1/caption_presets?select=text_es,text_en&order=sort. Devuelve cuantas saco. */
+int gr_parse_captions(char *json, gr_caption *out, int max);
+
 /* Una fila del ranking. */
 typedef struct {
     int  position;

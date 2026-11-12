@@ -13,7 +13,7 @@
 #define UI_COVER_BIG  150  /* caratula en la cuadricula */
 
 #define UI_APP_NAME    "Greeny"
-#define UI_APP_VERSION "0.1.4"
+#define UI_APP_VERSION "0.1.5"
 
 /* opciones, agrupadas en pestañas que se cambian con L y R */
 enum {
@@ -160,6 +160,10 @@ int ui_country_index(const char *code);
 const char *ui_country_code(int index);
 #define UI_COUNTRY_COLS 10
 void ui_countries(gfx_canvas *c, const ui_assets *a, int cursor, const char *current);
+
+/* Elegir la frase del perfil. La ultima fila (indice n) es "Sin frase". */
+void ui_captions(gfx_canvas *c, const ui_assets *a, const gr_caption *list, int n, int cursor, int top, const char *current);
+#define UI_CAPTION_ROWS 6
 
 /* Ranking. `state`: 0 cargando, 1 listo, 2 sin conexion, 3 falta elegir pais. */
 void ui_ranking(gfx_canvas *c, const ui_assets *a, const gr_rank_row *rows, int n, const gr_rank_row *me, int total,

@@ -41,6 +41,10 @@ alter table public.profiles add column if not exists country text;
 alter table public.profiles drop constraint if exists profiles_country_format;
 alter table public.profiles add constraint profiles_country_format check (country is null or country ~ '^[A-Z]{2}$');
 
+-- Donador: lo marca un administrador a mano (la cuenta de PayPal no esta unida a la de Greeny).
+-- Se ve como una medalla en el perfil. Nadie puede ponerselo a si mismo.
+alter table public.profiles add column if not exists donor boolean not null default false;
+
 -- Codigo de amigo: GR-123456 (seis numeros). Sirve para seguir a
 -- alguien sin tener que buscar su nombre. Se genera solo al crear el perfil.
 -- Foto de perfil: una de las que trae Greeny (web/img/avatars/NN.png), por numero.
@@ -557,7 +561,7 @@ returns jsonb
 language sql stable security definer set search_path = ''
 as $$
     select jsonb_build_object(
-               'username', p.username, 'display_name', p.display_name, 'caption', p.caption, 'avatar', p.avatar, 'country', p.country,
+               'username', p.username, 'display_name', p.display_name, 'caption', p.caption, 'avatar', p.avatar, 'country', p.country, 'donor', p.donor,
                'caption_en', (select c.text_en from public.caption_presets c where c.text_es = p.caption limit 1),
                'friend_code', p.friend_code,
                'admin', exists (select 1 from public.admins a where a.user_id = p.id),
@@ -598,6 +602,23 @@ begin
     if v_uid is null then raise exception 'consola sin vincular'; end if;
     if v_code is not null and v_code !~ '^[A-Z]{2}$' then raise exception 'pais invalido'; end if;
     update public.profiles set country = v_code where id = v_uid;
+    return true;
+end;
+$$;
+
+-- (consola) Cambia la frase del perfil. '' o null la quita.
+create or replace function public.device_set_caption(device_token text, caption text)
+returns boolean
+language plpgsql security definer set search_path = ''
+as $$
+declare
+    v_uid uuid;
+    v_text text := nullif(trim(coalesce(caption, '')), '');
+begin
+    select d.user_id into v_uid from public.devices d where d.token_hash = public.hash_token(device_token);
+    if v_uid is null then raise exception 'consola sin vincular'; end if;
+    if char_length(v_text) > 60 then raise exception 'la frase es muy larga'; end if;
+    update public.profiles set caption = v_text where id = v_uid;
     return true;
 end;
 $$;
@@ -674,6 +695,22 @@ language sql stable security definer set search_path = ''
 as $$
     select public.ranking_for((select d.user_id from public.devices d where d.token_hash = public.hash_token(device_token)),
                               scope, country, title);
+$$;
+
+-- (administradores) Marca o desmarca a alguien como donador. Devuelve su nombre de usuario.
+create or replace function public.set_donor(who text, is_donor boolean)
+returns text
+language plpgsql security definer set search_path = ''
+as $$
+declare
+    target record;
+begin
+    if not public.is_admin() then raise exception 'solo administradores'; end if;
+    select p.id, p.username into target from public.profiles p where lower(p.username) = lower(trim(who));
+    if target.id is null then raise exception 'ese usuario no existe'; end if;
+    update public.profiles set donor = coalesce(is_donor, false) where id = target.id;
+    return target.username;
+end;
 $$;
 
 
@@ -768,6 +805,8 @@ grant execute on function public.device_whoami(text) to anon, authenticated;
 grant execute on function public.device_profile(text) to anon, authenticated;
 grant execute on function public.device_set_avatar(text, int) to anon, authenticated;
 grant execute on function public.device_set_country(text, text) to anon, authenticated;
+grant execute on function public.device_set_caption(text, text) to anon, authenticated;
+grant execute on function public.set_donor(text, boolean) to authenticated;
 grant execute on function public.device_follow_user(text, text) to anon, authenticated;
 revoke all on function public.ranking_for(uuid, text, text, text) from public, anon, authenticated;
 grant execute on function public.ranking(text, text, text) to anon, authenticated;

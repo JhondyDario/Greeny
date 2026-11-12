@@ -1044,8 +1044,8 @@ void ui_settings(gfx_canvas *c, const ui_assets *a, const gr_config *cfg, int ta
                              "Type your account details with the console keyboard."), open, C_GREEN);
                 break;
             case UI_OPT_ACC_INFO:
-                option_row(c, y, sel, who, acc->caption[0] ? acc->caption : T("Esta consola sube tus logros a esta cuenta.", "This console uploads your achievements to this account."),
-                           T("Vinculada", "Linked"), C_GREEN);
+                option_row(c, y, sel, who, acc->caption[0] ? acc->caption : T("Sin frase. Pulsa A para elegir una.", "No caption. Press A to pick one."),
+                           T("Cambiar frase", "Change caption"), C_GREEN);
                 break;
             case UI_OPT_APPSOUND:
                 option_row(c, y, sel, T("Sonidos de la app", "App sounds"),
@@ -1484,8 +1484,6 @@ void ui_profile_screen(gfx_canvas *c, const ui_assets *a, const ui_profile *p) {
     if (into > 0) gfx_round_rect(c, lx + 40, ly + 406, 18 + (lw - 98) * into / span, 18, 9, C_GREEN);
     snprintf(buf, sizeof(buf), T("%d / %d pts para el nivel %d", "%d / %d pts to level %d"), into, span, level + 1);
     text_center(c, cx, ly + 432, 18, P->gray, buf, lw - 40);
-    snprintf(buf, sizeof(buf), T("%d puntos en total", "%d points in total"), p->stats.points);
-    text_center(c, cx, ly + 470, 21, P->points, buf, lw - 40);
 
     /* numeros */
     const int rx = lx + lw + 30, tw = 240, gap = 20;
@@ -1539,6 +1537,27 @@ void ui_avatars(gfx_canvas *c, const ui_assets *a, const ui_profile *p, int curs
         img_fit(c, a, UI_IMG_avatar_01 + i, cx - size / 2, cy - size / 2, size);
         zone(cx - cell / 2, cy - cell / 2, cell, cell, UI_ZONE_ITEM, i);
     }
+    footer_bar(c);
+    int hx = hint(c, MARGIN, "A", T("Usar esta", "Use this one"));
+    hx = hint(c, hx, "B", T("Volver", "Back"));
+    hint(c, hx, "+", T("Salir", "Exit"));
+}
+
+void ui_captions(gfx_canvas *c, const ui_assets *a, const gr_caption *list, int n, int cursor, int top, const char *current) {
+    begin(c);
+    header(c, a, NULL, T("Frase del perfil", "Profile caption"), T("Se ve debajo de tu nombre, en la app y en la web", "Shown under your name, in the app and on the website"));
+    const int x = MARGIN, w = CONTENT_W - 24, h = 78;
+    for (int i = top; i <= n && i < top + UI_CAPTION_ROWS; i++) {
+        int y = 116 + (i - top) * (h + 10);
+        bool none = i == n;
+        const char *text = none ? T("Sin frase", "No caption") : T(list[i].es, list[i].en);
+        bool mine = none ? !current[0] : !strcmp(current, list[i].es);
+        card(c, x, y, w, h, i == cursor);
+        zone(x, y, w, h, UI_ZONE_ITEM, i);
+        gfx_text_fit(c, x + 28, y + 22, 27, none ? P->gray : P->ink, text, w - 56 - 200);
+        if (mine) pill(c, x + w - 22, y + h / 2 - 14, C_GREEN, C_WHITE, T("LA TUYA", "YOURS"));
+    }
+    scrollbar(c, 116, UI_CAPTION_ROWS * (h + 10) - 10, top, UI_CAPTION_ROWS, n + 1);
     footer_bar(c);
     int hx = hint(c, MARGIN, "A", T("Usar esta", "Use this one"));
     hx = hint(c, hx, "B", T("Volver", "Back"));

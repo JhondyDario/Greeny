@@ -256,6 +256,34 @@ gr_net_result gr_set_country(gr_http_fn http, gr_account *a, const char *code, c
     return r;
 }
 
+gr_net_result gr_set_caption(gr_http_fn http, gr_account *a, const char *text, char *err, size_t errlen) {
+    char t[160], body[320], resp[RESP_MAX];
+    if (!a->token[0] || !a->linked) { snprintf(err, errlen, "Esta consola no está vinculada."); return GR_NET_REJECTED; }
+    gr_json_escape(t, sizeof(t), text);
+    snprintf(body, sizeof(body), "{\"device_token\":\"%s\",\"caption\":\"%s\"}", a->token, t);
+    gr_net_result r = call(http, "/rest/v1/rpc/device_set_caption", NULL, body, resp, sizeof(resp), err, errlen);
+    if (r == GR_NET_OK) snprintf(a->caption, sizeof(a->caption), "%s", text);
+    return r;
+}
+
+int gr_parse_captions(char *json, gr_caption *out, int max) {
+    int n = 0;
+    for (char *p = strchr(json, '{'); p && n < max; ) {
+        char *end = strchr(p, '}');
+        if (!end) break;
+        char saved = end[1];
+        end[1] = 0;
+        memset(&out[n], 0, sizeof(out[n]));
+        if (gr_json_string(p, "text_es", out[n].es, sizeof(out[n].es)) && out[n].es[0]) {
+            if (!gr_json_string(p, "text_en", out[n].en, sizeof(out[n].en)) || !out[n].en[0]) memcpy(out[n].en, out[n].es, sizeof(out[n].en));
+            n++;
+        }
+        end[1] = saved;
+        p = strchr(end + 1, '{');
+    }
+    return n;
+}
+
 static void rank_row(const char *obj, gr_rank_row *r) {
     memset(r, 0, sizeof(*r));
     gr_json_int(obj, "position", &r->position);

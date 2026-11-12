@@ -162,7 +162,7 @@ web_copy("app-icon.png", "favicon.png", 192, 192)
 TOAST = os.path.join(ROOT, "sd", "config", "greeny", "toast")
 os.makedirs(TOAST, exist_ok=True)
 for name, file in (("bronce", "medals/bronce.png"), ("plata", "medals/plata.png"), ("oro", "medals/oro.png"),
-                   ("ok", "logro_desbloqueado.png"), ("aviso", "mascota/error.png")):
+                   ("ok", "mascota/saludando.png"), ("aviso", "mascota/error.png")):
     im = Image.open(os.path.join(A, file)).convert("RGBA")
     with open(os.path.join(TOAST, name + ".bin"), "wb") as f:
         f.write(fit(im.crop(im.getbbox()), 60, 60).tobytes())

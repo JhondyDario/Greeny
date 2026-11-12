@@ -40,7 +40,7 @@ bool sound_failed(void) { return g_failed; }
 uint32_t sound_fail_rc(void) { return g_fail_rc; }
 
 void sound_play(sound_id id) {
-    if (!g_failed && id >= 0 && id < SOUND_COUNT) g_queued[id] = true;
+    if (id >= 0 && id < SOUND_COUNT) g_queued[id] = true;
 }
 
 /* Lee el sonido de la SD a memoria alineada a pagina (lo que pide audren).
@@ -133,8 +133,6 @@ static void stop(void) {
 }
 
 void sound_update(uint64_t now_ms) {
-    if (g_failed) return;
-
     if (g_active) {
         if (now_ms < g_close_at) { audrvUpdate(&g_drv); return; }
         stop();
@@ -148,9 +146,11 @@ void sound_update(uint64_t now_ms) {
         u32 ms = 0;
         Result rc = start((sound_id)id, &ms);
         if (R_FAILED(rc)) {
+            /* Se anota (main.c lo pone en el registro una vez), pero no se da por perdido: el audio puede
+             * estar ocupado un momento y funcionar en el siguiente logro. */
             g_failed = true;
             g_fail_rc = rc;
-            return;
+            continue;
         }
         if (ms == 0) continue; /* sin archivo de sonido: se sigue en silencio */
         g_active = true;

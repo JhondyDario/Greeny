@@ -113,9 +113,9 @@ int gr_diag_run(gr_diag_item *out, int max, const gr_diag_env *env, const gr_mod
         else DETAIL(it, "Sin errores en el registro.", "No errors in the log.");
 
         bool sound_bad = strstr(session, "no se pudo abrir el audio") != NULL;
-        it = add(out, &n, max, sound_bad ? GR_DIAG_FAIL : GR_DIAG_OK, "Sonido de logro", "Achievement sound");
-        if (sound_bad) DETAIL(it, "La consola no dejó abrir el audio. Los logros se guardan igual.",
-                              "The console refused audio. Achievements are still saved.");
+        it = add(out, &n, max, sound_bad ? GR_DIAG_WARN : GR_DIAG_OK, "Sonido de logro", "Achievement sound");
+        if (sound_bad) DETAIL(it, "Una vez no se pudo abrir el audio; el logro se guardó igual y el sonido se reintenta en el próximo.",
+                              "Audio could not be opened once; the achievement was still saved and sound is retried next time.");
         else DETAIL(it, "Sin errores en el registro.", "No errors in the log.");
 
         bool mismatch = strstr(session, "no coincide") != NULL;
