@@ -23,6 +23,7 @@ bool gfx_font_from_file(const char *path) {
 
 /* mezcla `col` sobre el pixel con cobertura a (0..255). El destino puede ser
  * transparente (capa): se compone "encima" conservando el alfa resultante. */
+static inline unsigned disc_cov(float dx, float dy, float r);
 static inline void blend(gfx_canvas *c, int x, int y, gfx_color col, unsigned a) {
     if (x < 0 || y < 0 || x >= c->w || y >= c->h || a == 0) return;
     uint32_t *d = &c->px[y * c->stride + x];
@@ -117,10 +118,34 @@ void gfx_ring(gfx_canvas *c, int x, int y, int w, int h, int r, int thick, gfx_c
             if (cov > 1) cov = 1;
             unsigned a = (unsigned)(cov * alpha);
             if (a > 255) a = 255;
-            uint32_t *dp = &c->px[py * c->stride + px], q = *dp;
-            unsigned ia = 255 - a;
-            *dp = ((cr * a + (q & 0xFF) * ia + 128) >> 8) | (((cg * a + ((q >> 8) & 0xFF) * ia + 128) >> 8) << 8) |
-                  (((cb * a + ((q >> 16) & 0xFF) * ia + 128) >> 8) << 16) | 0xFF000000u;
+            blend(c, px, py, col, a); /* respeta el alfa: el aro puede caer sobre la capa transparente */
+        }
+    }
+    (void)cr; (void)cg; (void)cb;
+}
+
+void gfx_glass(gfx_canvas *c, int x, int y, int w, int h, int r, gfx_color top, gfx_color bottom, unsigned a_top, unsigned a_bottom) {
+    if (w <= 0 || h <= 0) return;
+    if (r * 2 > h) r = h / 2;
+    if (r * 2 > w) r = w / 2;
+    for (int yy = 0; yy < h; yy++) {
+        int py = y + yy;
+        if (py < 0 || py >= c->h) continue;
+        unsigned t = h > 1 ? (unsigned)(yy * 256 / (h - 1)) : 0;
+        gfx_color col = 0;
+        for (int k = 0; k < 24; k += 8) {
+            unsigned a = (top >> k) & 255, b = (bottom >> k) & 255;
+            col |= ((a * (256 - t) + b * t) >> 8) << k;
+        }
+        unsigned alpha = (a_top * (256 - t) + a_bottom * t) >> 8;
+        bool corner_row = yy < r || yy >= h - r;
+        for (int xx = 0; xx < w; xx++) {
+            unsigned cov = 255;
+            if (corner_row && (xx < r || xx >= w - r)) {
+                int cx = xx < r ? r - xx : xx - (w - 1 - r), cy = yy < r ? r - yy : yy - (h - 1 - r);
+                cov = disc_cov((float)cx - 0.5f, (float)cy - 0.5f, (float)r - 0.5f);
+            }
+            if (cov) blend(c, x + xx, py, col, cov * alpha / 255);
         }
     }
 }

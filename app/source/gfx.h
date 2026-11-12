@@ -32,6 +32,9 @@ void gfx_circle_alpha(gfx_canvas *c, int cx, int cy, int r, gfx_color col, unsig
 void gfx_rect(gfx_canvas *c, int x, int y, int w, int h, gfx_color col);
 /* Rectangulo con degradado horizontal de `left` a `right`. */
 void gfx_gradient(gfx_canvas *c, int x, int y, int w, int h, gfx_color left, gfx_color right);
+/* Rectangulo redondeado semitransparente con degradado vertical (efecto vidrio).
+ * Sobre la capa transparente deja el alfa puesto, asi se ve el fondo de atras. */
+void gfx_glass(gfx_canvas *c, int x, int y, int w, int h, int r, gfx_color top, gfx_color bottom, unsigned a_top, unsigned a_bottom);
 void gfx_round_rect(gfx_canvas *c, int x, int y, int w, int h, int r, gfx_color col);
 void gfx_circle(gfx_canvas *c, int cx, int cy, int r, gfx_color col);
 void gfx_line(gfx_canvas *c, int x0, int y0, int x1, int y1, int thick, gfx_color col);

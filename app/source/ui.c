@@ -327,17 +327,31 @@ static void progress(gfx_canvas *c, int x, int y, int w, int done, int total) {
     if (total > 0 && done > 0) gfx_round_rect(c, x, y, 14 + (w - 14) * done / total, 14, 7, C_GREEN);
 }
 
+/* Tarjeta de vidrio, como en la web: semitransparente con degradado de arriba abajo,
+ * un borde fino de luz y un brillo en el canto de arriba. El fondo se ve por detras. */
+static void glass(gfx_canvas *c, int x, int y, int w, int h, int r, bool selected) {
+    bool dark = P == &k_dark;
+    if (dark) {
+        if (selected) gfx_glass(c, x, y, w, h, r, GFX_RGB(0x4C, 0x8F, 0x55), GFX_RGB(0x1F, 0x4E, 0x29), 205, 215);
+        else gfx_glass(c, x, y, w, h, r, GFX_RGB(0x3A, 0x55, 0x40), GFX_RGB(0x14, 0x22, 0x18), 150, 175);
+        gfx_ring(c, x, y, w, h, r, 1, C_WHITE, selected ? 70 : 34);
+    } else {
+        if (selected) gfx_glass(c, x, y, w, h, r, GFX_RGB(0xF4, 0xFF, 0xEE), GFX_RGB(0xC9, 0xEC, 0xC0), 240, 225);
+        else gfx_glass(c, x, y, w, h, r, GFX_RGB(0xFF, 0xFF, 0xFF), GFX_RGB(0xEA, 0xF6, 0xE5), 195, 155);
+        gfx_ring(c, x, y, w, h, r, 1, GFX_RGB(0x9C, 0xC9, 0x92), selected ? 150 : 110);
+    }
+    /* brillo en el canto de arriba */
+    if (w > 2 * r + 4) gfx_glass(c, x + r, y + 1, w - 2 * r, 1, 0, C_WHITE, C_WHITE, dark ? 60 : 255, dark ? 60 : 255);
+}
+
 static void card(gfx_canvas *c, int x, int y, int w, int h, bool selected) {
     if (selected) {
         g_sel_set = true;
         g_sel_x = x - 5; g_sel_y = y - 5; g_sel_w = w + 10; g_sel_h = h + 10;
         /* con animaciones, el aro amarillo lo pone main.c y se desliza; sin ellas va fijo aqui */
-        if (!g_ext_cursor) gfx_round_rect(c, x - 5, y - 5, w + 10, h + 10, 19, C_YELLOW);
-        gfx_round_rect(c, x, y, w, h, 14, P->card_sel);
-    } else {
-        gfx_round_rect(c, x, y + 3, w, h, 14, P->shadow);
-        gfx_round_rect(c, x, y, w, h, 14, P->card);
+        if (!g_ext_cursor) gfx_ring(c, x - 5, y - 5, w + 10, h + 10, 19, 4, C_YELLOW, 256);
     }
+    glass(c, x, y, w, h, 14, selected);
 }
 
 /* etiqueta redondeada alineada a la derecha; devuelve su ancho */
@@ -1140,8 +1154,13 @@ static void option_row(gfx_canvas *c, int y, bool selected, const char *label, c
         value = value == k_on ? T("Activado", "On") : T("Desactivado", "Off");
     }
     int vw = gfx_text_width(21, value) + 42;
-    gfx_round_rect(c, x + w - 28 - vw, y + 23, vw, 42, 21, value_bg);
-    gfx_text(c, x + w - 28 - vw + 21, y + 31, 21, C_WHITE, value);
+    /* el valor, como los botones de la web: degradado de su color con brillo arriba */
+    int px = x + w - 28 - vw;
+    gfx_color lt = 0;
+    for (int k = 0; k < 24; k += 8) { unsigned v = (value_bg >> k) & 255; lt |= (v + (255 - v) * 2 / 7) << k; }
+    gfx_glass(c, px, y + 23, vw, 42, 21, lt, value_bg, 255, 255);
+    gfx_glass(c, px + 21, y + 24, vw - 42, 1, 0, C_WHITE, C_WHITE, 110, 110);
+    gfx_text(c, px + 21, y + 31, 21, C_WHITE, value);
 }
 
 /* boton L o R junto a las pestañas: el icono, o un recuadro con la letra si no hay */
@@ -1166,8 +1185,10 @@ void ui_settings(gfx_canvas *c, const ui_assets *a, const gr_config *cfg, int ta
     for (int i = 0; i < UI_TABS; i++) {
         const char *name = T(k_tabs[i].es, k_tabs[i].en);
         int w = gfx_text_width(23, name) + 44;
-        if (i == tab) gfx_round_rect(c, tx, 116, w, 44, 22, C_GREEN);
-        else gfx_round_rect(c, tx, 116, w, 44, 22, P->card);
+        if (i == tab) {
+            gfx_glass(c, tx, 116, w, 44, 22, GFX_RGB(0x5C, 0xC8, 0x5A), GFX_RGB(0x1D, 0x7A, 0x2A), 255, 255);
+            gfx_glass(c, tx + 22, 117, w - 44, 1, 0, C_WHITE, C_WHITE, 120, 120);
+        } else glass(c, tx, 116, w, 44, 22, false);
         zone(tx, 108, w, 60, UI_ZONE_TAB, i);
         gfx_text(c, tx + 22, 124, 23, i == tab ? C_WHITE : P->gray, name);
         tx += w + 10;
@@ -1364,7 +1385,7 @@ static void diag_icon(gfx_canvas *c, int cx, int cy, gr_diag_state st) {
 
 static void diag_row(gfx_canvas *c, int y, const gr_diag_item *it) {
     const int x = MARGIN, w = CONTENT_W, h = 44;
-    gfx_round_rect(c, x, y, w, h, 12, P->card);
+    glass(c, x, y, w, h, 12, false);
     diag_icon(c, x + 28, y + h / 2, it->state);
     gfx_text_fit(c, x + 58, y + 9, 21, P->ink, g_en ? it->title_en : it->title_es, 330);
     gfx_text_fit(c, x + 400, y + 11, 18, it->state == GR_DIAG_FAIL ? C_RED : P->gray,
@@ -1786,7 +1807,7 @@ void ui_countries(gfx_canvas *c, const ui_assets *a, int cursor, const char *cur
     for (int i = 0; i < UI_COUNTRY_COUNT; i++) {
         int x = x0 + (i % UI_COUNTRY_COLS) * cw, y = y0 + (i / UI_COUNTRY_COLS) * ch;
         if (i == cursor) gfx_round_rect(c, x + 3, y + 3, cw - 6, ch - 6, 14, C_YELLOW);
-        gfx_round_rect(c, x + 7, y + 7, cw - 14, ch - 14, 11, i == cur ? P->card_sel : P->card);
+        glass(c, x + 7, y + 7, cw - 14, ch - 14, 11, i == cur);
         img(c, a, UI_IMG_flag_do + i, x + cw / 2 - 20, y + 12);
         gfx_text(c, x + cw / 2 - gfx_text_width(17, k_countries[i].code) / 2, y + 53, 17, i == cur ? P->accent : P->gray, k_countries[i].code);
         zone(x, y, cw, ch, UI_ZONE_ITEM, i);
@@ -1801,7 +1822,7 @@ void ui_countries(gfx_canvas *c, const ui_assets *a, int cursor, const char *cur
 static void rank_line(gfx_canvas *c, const ui_assets *a, int y, const gr_rank_row *r, bool sel, bool me) {
     const int x = MARGIN, w = CONTENT_W, h = 44;
     if (sel) gfx_round_rect(c, x - 4, y - 4, w + 8, h + 8, 14, C_YELLOW);
-    gfx_round_rect(c, x, y, w, h, 10, me ? P->card_sel : P->card);
+    glass(c, x, y, w, h, 10, me);
     char buf[64];
     snprintf(buf, sizeof(buf), "#%d", r->position);
     gfx_color pc = r->position == 1 ? GFX_RGB(0xC7, 0x9A, 0x00) : r->position == 2 ? GFX_RGB(0x7D, 0x88, 0x94)
@@ -1918,7 +1939,7 @@ void ui_badges(gfx_canvas *c, const ui_assets *a, const ui_profile *p) {
         const gr_badge *b = &gr_badges[i];
         int y = 112 + i * 49, value = gr_badge_value(b, &p->stats);
         bool earned = value >= b->goal;
-        gfx_round_rect(c, x, y, w, h, 12, P->card);
+        glass(c, x, y, w, h, 12, false);
         medal(c, x + 28, y + h / 2, 17, b, earned);
         gfx_text_fit(c, x + 58, y + 9, 21, earned ? P->ink : P->gray, T(b->name_es, b->name_en), 250);
         gfx_text_fit(c, x + 320, y + 11, 18, P->gray, T(b->how_es, b->how_en), w - 320 - 250);
