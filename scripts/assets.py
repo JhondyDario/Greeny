@@ -82,6 +82,10 @@ BADGES = ["primer_logro", "logros_10", "logros_50", "logros_200", "primer_platin
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from paises import PAISES  # los paises que se pueden elegir, con su bandera en assets/flags/
 
+# iconos de las filas de Opciones (assets/opciones/), en el orden que usa ui.c
+OPCIONES = ["idioma", "tema", "inicio", "fondo_animado", "sonido_app", "vista_juegos", "vista_logros", "juegos_inicio", "mostrar",
+            "logros_juego", "sonido_juego", "avisos", "aviso_inicio", "musica", "foto", "pais", "sincronizar", "desvincular",
+            "diagnostico", "acerca"]
 AVATARS = sorted(f[:-4] for f in os.listdir(os.path.join(A, "avatars")) if f.endswith(".png"))
 app_images = [  # (nombre, archivo en assets/, ancho, alto, espejo)
     ("medal_bronce", "medals/bronce.png", 64, 64, False), ("medal_plata", "medals/plata.png", 64, 64, False),
@@ -102,7 +106,9 @@ app_images = [  # (nombre, archivo en assets/, ancho, alto, espejo)
      for m in ("buscando", "celebrando", "diagnostico", "durmiendo", "error", "saludando", "sorprendido", "triste")
 ] + [("badge_" + b, "badges/" + b + ".png", 96, 96, False) for b in BADGES + ["bloqueada", "donador"]
 ] + [("avatar_" + a, "avatars/" + a + ".png", 160, 160, False) for a in AVATARS
-] + [("flag_" + code.lower(), "flags/" + code.lower() + ".png", 40, 40, False) for code, _, _ in PAISES]
+] + [("flag_" + code.lower(), "flags/" + code.lower() + ".png", 40, 40, False) for code, _, _ in PAISES
+] + [("pill_" + c, "etiquetas/" + c + ".png", 240, 42, False) for c in ("verde", "amarilla", "gris", "roja")
+] + [("opt_" + o, "opciones/" + o + ".png", 48, 48, False) for o in OPCIONES]
 
 for old in os.listdir(os.path.join(ROOT, "app", "data")):
     if old.startswith("img_"):
@@ -156,6 +162,7 @@ with open(os.path.join(ROOT, "web", "js", "countries.js"), "w") as f:
 web_copy("relleno_caratula.png", "cover_fill.png", 256, 256)
 web_copy("relleno_logro.png", "ach_fill.png", 128, 128)
 web_copy("trofeo.png", "trophy.png", 96, 96)
+web_copy("icons/estrella.png", "estrella.png", 40, 40)
 web_copy("logo-greeny-detalles.png", "logo.png", 600, 304)
 web_copy("logo-greeny.png", "logo_simple.png", 360, 164)
 web_copy("icono-simple.png", "favicon.png", 64, 64)

@@ -1315,6 +1315,26 @@ int ui_tab_option(int tab, int row, bool linked) {
     return k_tabs[tab].opt[row];
 }
 
+/* Etiqueta de imagen (verde, amarilla, gris o roja) de cualquier ancho: las puntas tal cual
+ * y el medio estirado. Si la imagen no esta, el degradado dibujado de antes. */
+static bool pill_img(gfx_canvas *c, int id, int x, int y, int w) {
+    static uint8_t row[2048 * 4];
+    if (!g_a || !g_a->img[id] || w < 44 || w > 2048) return false;
+    const int iw = k_img[id].w, ih = k_img[id].h, cap = ih / 2 + 2; /* 42 de alto: puntas de 23 */
+    const uint8_t *src = g_a->img[id];
+    for (int yy = 0; yy < ih; yy++) {
+        const uint8_t *s = src + (size_t)yy * iw * 4;
+        for (int xx = 0; xx < w; xx++) {
+            int sx = xx < cap ? xx : xx >= w - cap ? iw - (w - xx) : cap + (xx - cap) * (iw - 2 * cap) / (w - 2 * cap);
+            memcpy(row + xx * 4, s + sx * 4, 4);
+        }
+        gfx_image(c, x, y + yy, row, w, 1);
+    }
+    return true;
+}
+
+static int g_opt_icon = -1; /* icono de la fila que se dibuja ahora (UI_IMG_opt_*), -1 = sin icono */
+
 /* valores especiales de option_row: dibujan la palanquita en vez de texto */
 static const char k_on[] = "on", k_off[] = "off";
 
@@ -1323,8 +1343,10 @@ static void option_row(gfx_canvas *c, int y, bool selected, const char *label, c
     const int x = MARGIN, w = CONTENT_W, h = 88;
     card(c, x, y, w, h, selected);
     zone(x, y, w, h, UI_ZONE_ITEM, g_row_index);
-    gfx_text(c, x + 28, y + 12, 27, P->ink, label);
-    gfx_text_fit(c, x + 28, y + 51, 19, P->gray, help, w - 56 - 300);
+    int lx = x + 28;
+    if (g_opt_icon >= 0 && img_fit(c, g_a, g_opt_icon, x + 22, y + (h - 48) / 2, 48)) lx = x + 88;
+    gfx_text(c, lx, y + 12, 27, P->ink, label);
+    gfx_text_fit(c, lx, y + 51, 19, P->gray, help, w - (lx - x) - 28 - 300);
     if (value == k_on || value == k_off) { /* encendido o apagado: la palanquita */
         if (img(c, g_a, value == k_on ? UI_IMG_toggle_on : UI_IMG_toggle_off, x + w - 28 - 92, y + 22)) return;
         value = value == k_on ? T("Activado", "On") : T("Desactivado", "Off");
@@ -1332,11 +1354,17 @@ static void option_row(gfx_canvas *c, int y, bool selected, const char *label, c
     int vw = gfx_text_width(21, value) + 42;
     /* el valor, como los botones de la web: degradado de su color con brillo arriba */
     int px = x + w - 28 - vw;
-    gfx_color lt = 0;
-    for (int k = 0; k < 24; k += 8) { unsigned v = (value_bg >> k) & 255; lt |= (v + (255 - v) * 2 / 7) << k; }
-    gfx_glass(c, px, y + 23, vw, 42, 21, lt, value_bg, 255, 255);
-    gfx_glass(c, px + 21, y + 24, vw - 42, 1, 0, C_WHITE, C_WHITE, 110, 110);
-    gfx_text(c, px + 21, y + 31, 21, C_WHITE, value);
+    /* la etiqueta de su color (imagenes de assets/etiquetas); el amarillo y el gris llevan letra oscura */
+    int pid = value_bg == C_YELLOW ? UI_IMG_pill_amarilla : value_bg == C_NEUTRAL ? UI_IMG_pill_gris : value_bg == C_RED ? UI_IMG_pill_roja : UI_IMG_pill_verde;
+    gfx_color fg = pid == UI_IMG_pill_amarilla || pid == UI_IMG_pill_gris ? C_ON_YELLOW : C_WHITE;
+    if (!pill_img(c, pid, px, y + 23, vw)) {
+        gfx_color lt = 0;
+        for (int k = 0; k < 24; k += 8) { unsigned v = (value_bg >> k) & 255; lt |= (v + (255 - v) * 2 / 7) << k; }
+        gfx_glass(c, px, y + 23, vw, 42, 21, lt, value_bg, 255, 255);
+        gfx_glass(c, px + 21, y + 24, vw - 42, 1, 0, C_WHITE, C_WHITE, 110, 110);
+        fg = C_WHITE;
+    }
+    gfx_text(c, px + 21, y + 31, 21, fg, value);
 }
 
 /* boton L o R junto a las pestañas: el icono, o un recuadro con la letra si no hay */
@@ -1348,6 +1376,35 @@ static void shoulder(gfx_canvas *c, int x, int y, int btn, const char *letter) {
     }
     gfx_round_rect(c, x, y, 46, 34, 10, P->ink);
     gfx_text(c, x + 23 - gfx_text_width(21, letter) / 2, y + 5, 21, P->footer, letter);
+}
+
+/* El icono de cada opcion (assets/opciones). Las canciones no llevan, para que se lean como lista. */
+static int opt_icon(int opt, int row) {
+    switch (opt) {
+        case UI_OPT_LANG: return UI_IMG_opt_idioma;
+        case UI_OPT_THEME: return UI_IMG_opt_tema;
+        case UI_OPT_START: return UI_IMG_opt_inicio;
+        case UI_OPT_ANIM: return UI_IMG_opt_fondo_animado;
+        case UI_OPT_APPSOUND: return UI_IMG_opt_sonido_app;
+        case UI_OPT_GAMES_VIEW: return UI_IMG_opt_vista_juegos;
+        case UI_OPT_ACH_VIEW: return UI_IMG_opt_vista_logros;
+        case UI_OPT_SCOPE: return UI_IMG_opt_juegos_inicio;
+        case UI_OPT_SHOW: return UI_IMG_opt_mostrar;
+        case UI_OPT_INGAME: return UI_IMG_opt_logros_juego;
+        case UI_OPT_SOUND: return UI_IMG_opt_sonido_juego;
+        case UI_OPT_POPUP: return UI_IMG_opt_avisos;
+        case UI_OPT_STARTPOP: return UI_IMG_opt_aviso_inicio;
+        case UI_OPT_OVERLAY: return UI_IMG_opt_mostrar; /* falta el suyo: el de Tesla era el logo de la empresa de carros */
+        case UI_OPT_MUSIC: return UI_IMG_opt_musica;
+        case UI_OPT_SONG: return -1;
+        case UI_OPT_ACC_INFO: case UI_OPT_ACC_PHOTO: case UI_OPT_ACC_LINK: case UI_OPT_ACC_LOGIN: return UI_IMG_opt_foto;
+        case UI_OPT_ACC_COUNTRY: return UI_IMG_opt_pais;
+        case UI_OPT_ACC_SYNC: case UI_OPT_UPDATE: return UI_IMG_opt_sincronizar;
+        case UI_OPT_ACC_UNLINK: return UI_IMG_opt_desvincular;
+        case UI_OPT_DIAG: case UI_OPT_SEARCH: return UI_IMG_opt_diagnostico;
+        case UI_OPT_ABOUT: return UI_IMG_opt_acerca;
+        default: (void)row; return -1;
+    }
 }
 
 void ui_settings(gfx_canvas *c, const ui_assets *a, const gr_config *cfg, int tab, int row, bool system_spanish,
@@ -1391,6 +1448,7 @@ void ui_settings(gfx_canvas *c, const ui_assets *a, const gr_config *cfg, int ta
         int y = count >= 5 ? 176 + i * 94 : 184 + i * 104; /* con cinco filas van mas juntas */
         bool sel = i == row;
         g_row_index = i;
+        g_opt_icon = opt_icon(ui_tab_option(tab, i, acc->linked), i);
         switch (ui_tab_option(tab, i, acc->linked)) {
             case UI_OPT_MUSIC:
                 option_row(c, y, sel, T("Música de fondo", "Background music"),
@@ -1937,7 +1995,7 @@ void ui_profile_screen(gfx_canvas *c, const ui_assets *a, const ui_profile *p) {
     else { snprintf(v[4], 16, "–"); snprintf(v[5], 16, "–"); }
     const char *labels[6] = { T("Mis juegos", "My games"), T("Logros", "Achievements"), T("Platinados", "Platinum"),
                               T("Puntos", "Points"), T("Seguidores", "Followers"), T("Siguiendo", "Following") };
-    static const int icons[6] = { UI_IMG_stat_juegos, UI_IMG_stat_logros, UI_IMG_stat_completados, UI_IMG_star,
+    static const int icons[6] = { UI_IMG_stat_juegos, UI_IMG_stat_logros, UI_IMG_stat_completados, UI_IMG_stat_puntos,
                                   UI_IMG_stat_seguidores, UI_IMG_stat_siguiendo };
     for (int i = 0; i < 6; i++) stat_tile(c, a, rx + (i % 3) * (tw + gap), ly + (i / 3) * 124, tw, icons[i], v[i], labels[i]);
     if (!p->linked)

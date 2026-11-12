@@ -662,3 +662,5 @@ a.card.notif { display: flex; }
 }
 .faq-more { margin: 14px 0 0; text-align: right; }
 .foot-brand img { border-radius: 50%; }
+.lvl-pts { display: inline-flex; align-items: center; gap: 6px; }
+.lvl-pts img { width: 18px; height: 18px; }

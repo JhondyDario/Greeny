@@ -702,7 +702,7 @@
           h("span", { class: "pill pts lvl" }, "Nivel " + lvl.level),
           h("div", { class: "grow" }, h("div", { class: "bar", role: "img", "aria-label": lvl.into + " de " + lvl.span + " puntos para el nivel " + (lvl.level + 1) },
             h("i", { style: "width:" + Math.round((lvl.into / lvl.span) * 100) + "%" }))),
-          h("span", { class: "muted small nowrap" }, lvl.into + " / " + lvl.span + " pts para el nivel " + (lvl.level + 1)))),
+          h("span", { class: "muted small nowrap lvl-pts" }, h("img", { src: "img/estrella.png", alt: "", width: 18, height: 18 }), lvl.into + " / " + lvl.span + " pts para el nivel " + (lvl.level + 1)))),
       h("section", { class: "stats", style: "margin-top:14px" },
         h("div", { class: "card stat with-icon" }, h("img", { src: "img/stat_puntos.png", alt: "", width: 44, height: 44 }), h("div", {}, h("b", {}, fmtNum(stats.points)), h("span", {}, "puntos"))),
         h("div", { class: "card stat with-icon" }, h("img", { src: "img/stat_logros.png", alt: "", width: 44, height: 44 }), h("div", {}, h("b", {}, fmtNum(stats.achievements)), h("span", {}, "logros"))),
