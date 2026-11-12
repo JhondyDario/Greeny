@@ -1,4 +1,5 @@
 #include "ui.h"
+#include "qrcodegen.h"
 
 #include "account.h"
 
@@ -1394,7 +1395,21 @@ void ui_diag(gfx_canvas *c, const ui_assets *a, const gr_diag_item *items, int c
 
 /* ---------- acerca de ---------- */
 
-void ui_about(gfx_canvas *c, const ui_assets *a) {
+/* Codigo QR de `text` en un cuadro blanco de `size` px (para escanearlo con el celular). */
+static bool qr_draw(gfx_canvas *c, int x, int y, int size, const char *text) {
+    static uint8_t qr[qrcodegen_BUFFER_LEN_FOR_VERSION(10)], tmp[qrcodegen_BUFFER_LEN_FOR_VERSION(10)];
+    if (!qrcodegen_encodeText(text, tmp, qr, qrcodegen_Ecc_MEDIUM, 1, 10, qrcodegen_Mask_AUTO, true)) return false;
+    int n = qrcodegen_getSize(qr), cell = size / (n + 4);
+    if (cell < 2) return false;
+    int side = cell * (n + 4), ox = x + (size - side) / 2, oy = y + (size - side) / 2;
+    gfx_round_rect(c, ox, oy, side, side, 12, C_WHITE);
+    for (int r = 0; r < n; r++)
+        for (int q = 0; q < n; q++)
+            if (qrcodegen_getModule(qr, q, r)) gfx_rect(c, ox + (q + 2) * cell, oy + (r + 2) * cell, cell, cell, GFX_RGB(0x10, 0x2A, 0x1A));
+    return true;
+}
+
+void ui_about(gfx_canvas *c, const ui_assets *a, const char *discord) {
     begin(c);
     header(c, a, NULL, T("Acerca de", "About"), UI_APP_NAME " " UI_APP_VERSION);
 
@@ -1415,16 +1430,24 @@ void ui_about(gfx_canvas *c, const ui_assets *a) {
              T("Reporta errores o propone logros abriendo un \"issue\" ahí.", "Report bugs or suggest achievements by opening an issue there."));
 
     gfx_text(c, tx, y + 322, 19, P->gray, T("LICENCIA Y CRÉDITOS", "LICENSE AND CREDITS"));
-    gfx_text_fit(c, tx, y + 346, 19, P->ink,
-                 T("Software libre, licencia GPLv2. Usa código de Atmosphère, libtesla, FreeType y stb.",
-                   "Free software, GPLv2 license. Uses code from Atmosphère, libtesla, FreeType and stb."), w - 72);
-    gfx_text_fit(c, tx, y + 400, 18, P->gray,
+    gfx_text_fit(c, tx, y + 346, 19, P->ink, T("Software libre, licencia GPLv2.", "Free software, GPLv2 license."), w - 72);
+    gfx_text_fit(c, tx, y + 372, 19, P->ink,
+                 T("Usa código de Atmosphère, libtesla, FreeType, stb y QR Code generator (Nayuki).",
+                   "Uses code from Atmosphère, libtesla, FreeType, stb and QR Code generator (Nayuki)."), w - 72);
+    gfx_text_fit(c, tx, y + 418, 18, P->gray,
                  T("Proyecto de fans. No está afiliado ni avalado por Nintendo.",
                    "Fan project. Not affiliated with or endorsed by Nintendo."), w - 72);
 
     int side = x + w + (UI_W - MARGIN - x - w) / 2 + 10; /* centro de la columna derecha */
     img(c, a, UI_IMG_logo, side - 150, 132);
-    if (a->mascot_big) gfx_image(c, side - a->big_w / 2, 320, a->mascot_big, a->big_w, a->big_h);
+    if (discord && discord[0]) {
+        /* la comunidad: un QR para abrir la invitacion en el celular */
+        const char *shown = strstr(discord, "://") ? strstr(discord, "://") + 3 : discord;
+        qr_draw(c, side - 105, 300, 210, discord);
+        text_center(c, side, 522, 22, P->ink, T("Únete al Discord", "Join the Discord"), 320);
+        text_center(c, side, 554, 19, P->accent, shown, 320);
+        text_center(c, side, 584, 16, P->gray, T("Escanéalo con el celular", "Scan it with your phone"), 320);
+    } else if (a->mascot_big) gfx_image(c, side - a->big_w / 2, 320, a->mascot_big, a->big_w, a->big_h);
 
     footer_bar(c);
     int hx = hint(c, MARGIN, "B", T("Volver", "Back"));

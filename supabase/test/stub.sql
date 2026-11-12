@@ -6,8 +6,14 @@ create table auth.users (
     id uuid primary key default gen_random_uuid(),
     email text,
     raw_user_meta_data jsonb,
-    raw_app_meta_data jsonb
+    raw_app_meta_data jsonb,
+    encrypted_password text,
+    email_confirmed_at timestamptz,
+    banned_until timestamptz,
+    deleted_at timestamptz
 );
+create schema extensions;
+create extension pgcrypto schema extensions;
 create function auth.uid() returns uuid language sql stable as $$
     select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid;
 $$;

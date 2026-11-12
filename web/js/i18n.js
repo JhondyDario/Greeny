@@ -165,6 +165,11 @@
     "No se pudieron cargar los comentarios.": "Comments could not be loaded.", "Escribe un poco más.": "Write a bit more.",
     "¿Borrar tu comentario?": "Delete your comment?", "Es tu comentario": "It's your comment", "Entra para dar me gusta": "Sign in to like",
     "¿Qué te parecen los logros de este juego?": "What do you think of this game's achievements?", "Menú": "Menu",
+    "Comunidad en Discord": "Discord community", "Entrar al Discord": "Join the Discord",
+    "Avisos de juegos nuevos, ayuda con la instalación, ideas de logros y encuestas.": "New game announcements, install help, achievement ideas and polls.",
+    "Marca la casilla de verificación (no soy un robot).": "Tick the verification box (I'm not a robot).",
+    "La verificación de \"no soy un robot\" falló o venció. Márcala de nuevo.": "The \"I'm not a robot\" check failed or expired. Tick it again.",
+    "No puedes darle me gusta a tu propio comentario.": "You can't like your own comment.",
   };
 
   // Textos con números: se traducen por partes. Solo se aplican si el texto trae algún número.

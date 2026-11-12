@@ -513,4 +513,33 @@ begin
            and not (j -> 0 ->> 'mine')::boolean and not (j -> 0 ? 'user_id'), 'lista de comentarios: ' || j::text;
 end $$;
 
+-- entrar desde la consola con contraseña, con freno de intentos
+do $$
+declare uid uuid := '00000000-0000-0000-0000-00000000000b'; r jsonb;
+begin
+    update auth.users set email = 'Prueba@Greeny.test', encrypted_password = extensions.crypt('secreto123', extensions.gen_salt('bf')),
+           email_confirmed_at = now() where id = uid;
+    set local role anon;
+    r := public.device_login_password(' prueba@greeny.test', 'secreto123', 'Switch de prueba');
+    reset role;
+    assert length(r ->> 'token') >= 32, 'debe devolver una llave: ' || r::text;
+    assert (select user_id from public.devices where token_hash = public.hash_token(r ->> 'token')) = uid, 'la consola queda a nombre del usuario';
+    for i in 1..5 loop
+        r := public.device_login_password('prueba@greeny.test', 'mala', 'x');
+        assert r ->> 'error' like 'Correo o contrase%' and not r ? 'token', 'contraseña mala rechazada';
+    end loop;
+    r := public.device_login_password('prueba@greeny.test', 'secreto123', 'x');
+    assert r ->> 'error' like 'Demasiados intentos%', 'tras 5 fallos frena aunque la contraseña sea buena: ' || r::text;
+    r := public.device_login_password('nadie@greeny.test', 'x', 'x');
+    assert r ->> 'error' like 'Correo o contrase%', 'correo que no existe: mismo mensaje';
+end $$;
+do $$
+declare ok boolean := false;
+begin
+    set local role anon;
+    begin perform count(*) from public.login_attempts; exception when insufficient_privilege then ok := true; end;
+    reset role;
+    assert ok, 'nadie lee los intentos';
+end $$;
+
 select 'TODAS LAS PRUEBAS PASARON' as resultado;

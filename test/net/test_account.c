@@ -160,11 +160,14 @@ static void test_flows_fake(const char *tmp) {
     CHECK(!strcmp(err, "Esta consola ya no está vinculada."));
     CHECK(gr_push_unlocks(http_fake, &empty, tmp, &sent, &added, err, sizeof(err)) == GR_NET_REJECTED && sent == 0);
 
-    /* entrar con correo: token -> registrar consola -> whoami */
-    g_reply = "{\"error_code\":\"invalid_credentials\",\"msg\":\"Invalid login credentials\"}";
+    /* entrar con correo: una sola funcion que devuelve la llave o el error (sin captcha) */
+    g_reply_status = 200;
+    g_reply = "{\"error\": \"Correo o contraseña incorrectos.\"}";
     CHECK(gr_login_password(http_fake, "a@b.c", "mala", "S", &b, err, sizeof(err)) == GR_NET_REJECTED);
     CHECK(!strcmp(err, "Correo o contraseña incorrectos."));
-    CHECK(!strcmp(g_last_body, "{\"email\":\"a@b.c\",\"password\":\"mala\"}") && strstr(g_last_url, "/auth/v1/token?grant_type=password"));
+    CHECK(!strcmp(g_last_body, "{\"email\":\"a@b.c\",\"password\":\"mala\",\"device_name\":\"S\"}") && strstr(g_last_url, "/rest/v1/rpc/device_login_password"));
+    g_reply = "{\"error\": \"Demasiados intentos. Espera 15 minutos.\"}";
+    CHECK(gr_login_password(http_fake, "a@b.c", "mala", "S", &b, err, sizeof(err)) == GR_NET_REJECTED && strstr(err, "15 minutos"));
 }
 
 static void test_real(const char *tmp) {

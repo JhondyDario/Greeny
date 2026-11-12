@@ -1073,3 +1073,62 @@ grant execute on function public.game_reviews(text) to anon, authenticated;
 grant execute on function public.device_reviews(text, text) to anon, authenticated;
 grant execute on function public.device_review_save(text, text, text) to anon, authenticated;
 grant execute on function public.device_review_like(text, bigint, boolean) to anon, authenticated;
+
+
+
+-- -----------------------------------------------------------------------------
+-- 12. ENTRAR DESDE LA CONSOLA CON CORREO Y CONTRASEÑA
+-- -----------------------------------------------------------------------------
+-- La web pide el captcha (Turnstile) al entrar; la consola no puede resolverlo, asi que
+-- no entra por Supabase Auth sino por esta funcion, que comprueba la contraseña igual que
+-- Auth (bcrypt) y frena a quien prueba muchas: 5 fallos por correo cada 15 minutos.
+drop function if exists public.device_login_password(text, text, text);
+create table if not exists public.login_attempts (
+    email_hash text not null,
+    at         timestamptz not null default now()
+);
+create index if not exists login_attempts_idx on public.login_attempts (email_hash, at);
+alter table public.login_attempts enable row level security; -- sin reglas: nadie la lee desde fuera
+
+create or replace function public.device_login_password(email text, password text, device_name text default 'Switch')
+returns jsonb  -- {"token": llave para la SD} o {"error": texto}. Sin excepcion: si no, el fallo no quedaria anotado
+language plpgsql security definer set search_path = ''
+as $$
+declare
+    v_mail text := lower(trim(coalesce(email, '')));
+    v_hash text := public.hash_token('login:' || lower(trim(coalesce(email, ''))));
+    v_uid uuid;
+    v_pass text;
+    v_ok boolean;
+    v_token text := replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', '');
+begin
+    delete from public.login_attempts a where a.at < now() - interval '1 day';
+    if (select count(*) from public.login_attempts a where a.email_hash = v_hash and a.at > now() - interval '15 minutes') >= 5 then
+        return jsonb_build_object('error', 'Demasiados intentos. Espera 15 minutos.');
+    end if;
+
+    select u.id, u.encrypted_password into v_uid, v_pass
+      from auth.users u
+     where lower(u.email) = v_mail and u.deleted_at is null
+       and u.email_confirmed_at is not null
+       and (u.banned_until is null or u.banned_until < now())
+     limit 1;
+    -- con o sin cuenta se hace el mismo trabajo, para no delatar que correos existen
+    v_ok := extensions.crypt(coalesce(password, ''), coalesce(v_pass, '$2a$10$abcdefghijklmnopqrstuuDdyOV5O1bNpqchvQ8zJfz9BH2yMGcH.')) = v_pass;
+    if v_uid is null or not coalesce(v_ok, false) then
+        insert into public.login_attempts (email_hash) values (v_hash);
+        return jsonb_build_object('error', 'Correo o contraseña incorrectos.');
+    end if;
+    if not exists (select 1 from public.profiles p where p.id = v_uid) then
+        return jsonb_build_object('error', 'Esa cuenta todavía no tiene perfil: entra una vez en la web.');
+    end if;
+
+    delete from public.login_attempts a where a.email_hash = v_hash;
+    insert into public.devices (token_hash, user_id, name)
+    values (public.hash_token(v_token), v_uid, left(coalesce(nullif(trim(device_name), ''), 'Switch'), 32));
+    return jsonb_build_object('token', v_token);
+end;
+$$;
+
+revoke all on function public.device_login_password(text, text, text) from public;
+grant execute on function public.device_login_password(text, text, text) to anon, authenticated;

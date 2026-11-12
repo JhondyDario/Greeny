@@ -460,48 +460,28 @@ gr_net_result gr_follow_code(gr_http_fn http, const gr_account *a, const char *c
 
 gr_net_result gr_login_password(gr_http_fn http, const char *email, const char *password, const char *device_name,
                                 gr_account *a, char *err, size_t errlen) {
-    char e[160], p[200], name[80], body[512];
-    char *resp = malloc(16 * 1024); /* la respuesta de inicio de sesion trae el usuario entero */
-    if (!resp) { snprintf(err, errlen, "Sin memoria."); return GR_NET_BAD; }
-
+    /* No pasa por Supabase Auth (alli la web pide captcha): device_login_password comprueba
+     * la contraseña en la base de datos, frena los intentos y devuelve la llave de la consola. */
+    char e[160], p[200], name[80], body[600], resp[RESP_MAX], token[sizeof(a->token)];
     gr_json_escape(e, sizeof(e), email);
     gr_json_escape(p, sizeof(p), password);
-    snprintf(body, sizeof(body), "{\"email\":\"%s\",\"password\":\"%s\"}", e, p);
-    gr_net_result r = call(http, "/auth/v1/token?grant_type=password", NULL, body, resp, 16 * 1024, err, errlen);
+    gr_json_escape(name, sizeof(name), device_name);
+    snprintf(body, sizeof(body), "{\"email\":\"%s\",\"password\":\"%s\",\"device_name\":\"%s\"}", e, p, name);
+    gr_net_result r = call(http, "/rest/v1/rpc/device_login_password", NULL, body, resp, sizeof(resp), err, errlen);
     memset(body, 0, sizeof(body)); /* la contraseña no se queda en memoria mas de lo necesario */
     memset(p, 0, sizeof(p));
-
-    char *access = NULL;
-    if (r == GR_NET_OK) {
-        access = malloc(4096);
-        if (!access || !gr_json_string(resp, "access_token", access, 4096) || strlen(access) < 20) {
-            snprintf(err, errlen, "Respuesta inesperada del servidor.");
-            r = GR_NET_BAD;
-        }
+    if (r != GR_NET_OK) return r;
+    if (gr_json_string(resp, "error", err, errlen) && err[0]) return GR_NET_REJECTED;
+    if (!gr_json_string(resp, "token", token, sizeof(token)) || strlen(token) < 32) {
+        snprintf(err, errlen, "Respuesta inesperada del servidor.");
+        return GR_NET_BAD;
     }
-    if (r == GR_NET_OK) {
-        gr_json_escape(name, sizeof(name), device_name);
-        snprintf(body, sizeof(body), "{\"device_name\":\"%s\"}", name);
-        r = call(http, "/rest/v1/rpc/device_register", access, body, resp, 16 * 1024, err, errlen);
-    }
-    if (r == GR_NET_OK) {
-        /* la funcion devuelve la llave como un texto JSON suelto: "abc..." */
-        size_t len = strlen(resp);
-        if (len >= 34 && len < sizeof(a->token) + 2 && resp[0] == '"' && resp[len - 1] == '"') {
-            memset(a, 0, sizeof(*a));
-            memcpy(a->token, resp + 1, len - 2);
-            bool exists;
-            gr_whoami(http, a, &exists); /* para traer el nombre; si falla, ya se sabra en la proxima */
-            if (!a->linked) a->linked = true;
-        } else {
-            snprintf(err, errlen, "Respuesta inesperada del servidor.");
-            r = GR_NET_BAD;
-        }
-    }
-    if (access) memset(access, 0, 4096);
-    free(access);
-    free(resp);
-    return r;
+    memset(a, 0, sizeof(*a));
+    memcpy(a->token, token, sizeof(a->token));
+    bool exists;
+    gr_whoami(http, a, &exists); /* para traer el nombre; si falla, ya se sabra en la proxima */
+    if (!a->linked) a->linked = true;
+    return GR_NET_OK;
 }
 
 static bool valid_title_file(const char *name) {

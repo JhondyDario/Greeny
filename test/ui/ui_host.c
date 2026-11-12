@@ -211,7 +211,7 @@ int main(int argc, char **argv) {
         save(&c, out, "msg_error", sfx);
         ui_diag(&c, &a, items, nitems);
         save(&c, out, "diag", sfx);
-        ui_about(&c, &a);
+        ui_about(&c, &a, "https://discord.gg/greeny");
         save(&c, out, "about", sfx);
         for (int p = 0; p < UI_INTRO_PAGES; p++) {
             char name[32];

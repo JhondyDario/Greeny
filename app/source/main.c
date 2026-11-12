@@ -687,6 +687,25 @@ static int reviews_load(void) {
     return 1;
 }
 
+/* ---------- enlaces de la comunidad ---------- */
+/* Se leen de la web (links.json) para cambiarlos sin sacar otra version de la app. */
+static char g_discord[160];
+static bool g_links_tried;
+
+static void links_load(void) {
+    if (g_links_tried || !net_online()) return;
+    g_links_tried = true;
+    char json[1024], url[160] = "";
+    size_t len = 0;
+    long status = 0;
+    if (net_get("https://jhondydario.github.io/Greeny/links.json", json, sizeof(json) - 1, &len, &status) != 0 || status != 200) return;
+    json[len] = 0;
+    /* solo invitaciones de Discord: nada de enlaces raros en la pantalla */
+    if (gr_json_string(json, "discord", url, sizeof(url)) &&
+        (!strncmp(url, "https://discord.gg/", 19) || !strncmp(url, "https://discord.com/invite/", 27)))
+        snprintf(g_discord, sizeof(g_discord), "%s", url);
+}
+
 /* ---------- frases del perfil ---------- */
 static gr_caption g_captions[GR_CAPTIONS_MAX];
 static int g_ncaptions;
@@ -1349,7 +1368,7 @@ int main(int argc, char *argv[]) {
                     case UI_OPT_SCOPE:      g_config.games_scope = (g_config.games_scope + 1) % GR_SCOPE_COUNT; rescan(); cursor = top = 0; break;
                     case UI_OPT_SHOW:       g_config.games_show = (g_config.games_show + 1) % GR_SHOW_COUNT; rescan(); cursor = top = 0; break;
                     case UI_OPT_START:      g_config.start_page = (g_config.start_page + 1) % GR_START_COUNT; break;
-                    case UI_OPT_ABOUT:      screen = SCREEN_ABOUT; opened_rare = true; break;
+                    case UI_OPT_ABOUT:      links_load(); screen = SCREEN_ABOUT; opened_rare = true; break;
                     case UI_OPT_DIAG:       run_diag(); screen = SCREEN_DIAG; break;
                     case UI_OPT_SEARCH:     run_diag(); search_read(); frow = 0; screen = SCREEN_SEARCH; break;
                     case UI_OPT_ACC_LINK: {
@@ -1675,7 +1694,7 @@ int main(int argc, char *argv[]) {
             else if (screen == SCREEN_LINK) ui_link(&layer, &g_assets, link_code, link_shown_left < 0 ? LINK_SECONDS : link_shown_left);
             else if (screen == SCREEN_MSG) ui_message(&layer, &g_assets, g_msg_title, g_msg_line1, g_msg_line2[0] ? g_msg_line2 : NULL, g_msg_ok);
             else if (screen == SCREEN_DIAG) ui_diag(&layer, &g_assets, g_diag, g_ndiag);
-            else if (screen == SCREEN_ABOUT) ui_about(&layer, &g_assets);
+            else if (screen == SCREEN_ABOUT) ui_about(&layer, &g_assets, g_discord);
             else if (screen == SCREEN_INTRO) ui_intro(&layer, &g_assets, intro_page, g_diag, g_ndiag, g_env.sysmodule_running);
             else ui_home(&layer, &g_assets, &g_model, &g_config, cursor, top);
             dirty = false;

@@ -458,3 +458,12 @@ h1 .flag { vertical-align: -3px; }
   .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .badges { grid-template-columns: 1fr; }
 }
+
+/* captcha y discord */
+.captcha { min-height: 65px; }
+.captcha:empty { min-height: 0; }
+.nav .nav-discord { color: #b9c0ff; }
+.discord-card { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.foot-links { display: inline-flex; gap: 16px; flex-wrap: wrap; }
+.foot-links [hidden] { display: none; }
+.nav [hidden], .foot [hidden] { display: none !important; }

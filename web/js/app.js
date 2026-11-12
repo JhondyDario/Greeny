@@ -64,6 +64,8 @@
       [/new password should be different/i, "La contraseña nueva tiene que ser distinta a la anterior."],
       [/manual linking is disabled/i, "Vincular Discord a una cuenta existente todavía no está activado en el servidor."],
       [/identity is already linked/i, "Esa cuenta de Discord ya está vinculada a otra cuenta de Greeny."],
+      [/captcha/i, "La verificación de \"no soy un robot\" falló o venció. Márcala de nuevo."],
+      [/propio comentario/i, "No puedes darle me gusta a tu propio comentario."],
       [/rate limit|too many/i, "Demasiados intentos. Espera un momento y prueba de nuevo."],
       [/failed to fetch|networkerror/i, "No se pudo conectar. Revisa tu conexión."],
       // mensajes de nuestras funciones de la base de datos (van sin acentos)
@@ -607,6 +609,40 @@
 
   // ---------- entrar y registrarse ----------
 
+  // ---------- captcha (Cloudflare Turnstile) ----------
+  // Solo si config.js trae la clave del sitio (es publica). La secreta va en Supabase,
+  // en Authentication → Attack Protection, nunca aqui. Sin clave, los formularios van sin captcha.
+  let turnstileLoad = null;
+  function loadTurnstile() {
+    if (!turnstileLoad) turnstileLoad = new Promise((ok, fail) => {
+      const sc = document.createElement("script");
+      sc.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+      sc.async = true;
+      sc.onload = () => ok(window.turnstile);
+      sc.onerror = () => { turnstileLoad = null; fail(new Error("No se pudo cargar la verificación. Revisa tu conexión.")); };
+      document.head.append(sc);
+    });
+    return turnstileLoad;
+  }
+  // Devuelve { el, token(), reset() }. token() espera a que la persona pase la verificacion.
+  function captcha() {
+    const key = cfg.turnstileSiteKey;
+    const el = h("div", { class: "captcha" });
+    if (!key) return { el: null, token: async () => undefined, reset: () => {} };
+    let id = null, current = null;
+    loadTurnstile().then((ts) => {
+      id = ts.render(el, { sitekey: key, theme: "dark", language: uiLang(), callback: (t) => { current = t; }, "expired-callback": () => { current = null; } });
+    }).catch((e) => el.replaceChildren(h("p", { class: "msg err" }, e.message)));
+    return {
+      el,
+      token: async () => {
+        if (!current) throw new Error("Marca la casilla de verificación (no soy un robot).");
+        return current;
+      },
+      reset: () => { current = null; if (id != null && window.turnstile) window.turnstile.reset(id); },
+    };
+  }
+
   function discordButton() {
     return h("button", { class: "btn discord", type: "button", onclick: async () => {
       const { error } = await sb.auth.signInWithOAuth({ provider: "discord", options: { redirectTo: here } });
@@ -630,13 +666,16 @@
     if (session) { location.hash = "#/cuenta"; return []; }
     return [authShell("Hola de nuevo", "Entra para ver tus logros, tu nivel y tu puesto en el ranking.", ["Entra a tu cuenta", "Vincula tu consola", "Juega y desbloquea logros"], [
       h("h1", {}, "Entrar"),
-      form([
+      (() => { const cap = captcha(); return form([
         h("label", {}, "Correo", h("input", { name: "email", type: "email", autocomplete: "email", required: true })),
         passwordField("Contraseña", "password", "current-password"),
+        cap.el,
       ], "Entrar", async (fd) => {
-        must(await sb.auth.signInWithPassword({ email: fd.get("email"), password: fd.get("password") }));
+        const captchaToken = await cap.token();
+        try { must(await sb.auth.signInWithPassword({ email: fd.get("email"), password: fd.get("password"), options: { captchaToken } })); }
+        finally { cap.reset(); } // cada verificacion sirve una sola vez
         location.hash = "#/cuenta";
-      }),
+      }); })(),
       h("p", { style: "margin-top:12px" }, h("a", { href: "#/recuperar" }, "¿Olvidaste tu contraseña?")),
       h("p", { class: "or", style: "margin:18px 0" }, "o"),
       discordButton(),
@@ -646,6 +685,7 @@
 
   function viewRegister() {
     if (session) { location.hash = "#/cuenta"; return []; }
+    const regCap = captcha();
     return [authShell("Únete a Greeny", "Crea tu cuenta gratis y lleva la cuenta de tus logros de Switch.", ["Crea tu cuenta", "Vincula tu consola", "Juega y desbloquea logros"], [
       h("h1", {}, "Crear cuenta"),
       form([
@@ -653,12 +693,17 @@
           h("input", { name: "username", required: true, minlength: 3, maxlength: 20, pattern: "[A-Za-z0-9_]{3,20}", autocomplete: "username", autocapitalize: "none", spellcheck: "false" })),
         h("label", {}, "Correo", h("input", { name: "email", type: "email", autocomplete: "email", required: true })),
         passwordField("Contraseña", "password", "new-password", "Mínimo 8 caracteres."),
+        regCap.el,
       ], "Crear cuenta", async (fd, el) => {
         await checkUsername(fd.get("username"), null); // no se crea la cuenta si el nombre ya existe
-        const data = must(await sb.auth.signUp({
-          email: fd.get("email"), password: fd.get("password"),
-          options: { data: { username: fd.get("username") }, emailRedirectTo: here },
-        }));
+        const captchaToken = await regCap.token();
+        let data;
+        try {
+          data = must(await sb.auth.signUp({
+            email: fd.get("email"), password: fd.get("password"),
+            options: { data: { username: fd.get("username") }, emailRedirectTo: here, captchaToken },
+          }));
+        } finally { regCap.reset(); }
         if (data.session) { location.hash = "#/cuenta"; return null; }
         el.reset();
         return "Te enviamos un correo para confirmar tu cuenta. Ábrelo y sigue el enlace.";
@@ -671,13 +716,17 @@
 
   // Paso 1: pedir el correo con el enlace para cambiar la contraseña.
   function viewForgot() {
+    const forgotCap = captcha();
     return [
       h("h1", {}, "Recuperar contraseña"),
       h("p", { class: "muted" }, "Escribe el correo de tu cuenta y te enviamos un enlace para poner una contraseña nueva."),
       form([
         h("label", {}, "Correo", h("input", { name: "email", type: "email", autocomplete: "email", required: true })),
+        forgotCap.el,
       ], "Enviar enlace", async (fd, el) => {
-        must(await sb.auth.resetPasswordForEmail(fd.get("email"), { redirectTo: here }));
+        const captchaToken = await forgotCap.token();
+        try { must(await sb.auth.resetPasswordForEmail(fd.get("email"), { redirectTo: here, captchaToken })); }
+        finally { forgotCap.reset(); }
         el.reset();
         // el mismo mensaje exista o no la cuenta, para no revelar quien esta registrado
         return "Si hay una cuenta con ese correo, te llegará un enlace en unos minutos. Revisa también el correo no deseado.";
@@ -1210,6 +1259,11 @@
               h("span", { class: "pill " + (m.status === "aceptada" ? "ok" : "no") }, STATUS_APP[m.status] || m.status)))) : null,
           h("h3", { style: "margin-top:18px" }, "Postúlate"),
           apply)),
+      discordUrl ? h("section", { class: "card discord-card", style: "margin-top:18px" },
+        h("img", { src: "img/m_saludando.png", alt: "", width: 72, height: 72 }),
+        h("div", { class: "grow" }, h("h2", { style: "margin:0" }, "Comunidad en Discord"),
+          h("p", { class: "muted", style: "margin:4px 0 0" }, "Avisos de juegos nuevos, ayuda con la instalación, ideas de logros y encuestas.")),
+        h("a", { class: "btn discord", href: discordUrl, target: "_blank", rel: "noopener" }, "Entrar al Discord")) : null,
     ];
   }
 
@@ -1317,6 +1371,17 @@
   });
 
   document.getElementById("repo-link").href = cfg.repoUrl;
+  // Invitacion de Discord: sale de links.json (la app de la consola lee el mismo archivo).
+  let discordUrl = "";
+  fetch("links.json", { cache: "no-cache" }).then((r) => (r.ok ? r.json() : {})).then((j) => {
+    const u = String((j && j.discord) || "");
+    if (!/^https:\/\/(discord\.gg|discord\.com\/invite)\//.test(u)) return;
+    discordUrl = u;
+    const nav = document.getElementById("nav-discord"), foot = document.getElementById("foot-discord");
+    nav.href = foot.href = u;
+    nav.hidden = foot.hidden = false;
+    if (/^#\/contribuir/.test(location.hash)) render();
+  }).catch(() => {});
   const top = document.querySelector(".top"), menuBtn = document.getElementById("menu-toggle");
   const closeMenu = () => { top.classList.remove("open"); menuBtn.setAttribute("aria-expanded", "false"); };
   menuBtn.addEventListener("click", () => {

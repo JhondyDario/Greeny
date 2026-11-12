@@ -13,7 +13,7 @@
 #define UI_COVER_BIG  150  /* caratula en la cuadricula */
 
 #define UI_APP_NAME    "Greeny"
-#define UI_APP_VERSION "0.1.8"
+#define UI_APP_VERSION "0.1.9"
 
 /* opciones, agrupadas en pestañas que se cambian con L y R */
 enum {
@@ -184,7 +184,8 @@ void ui_link(gfx_canvas *c, const ui_assets *a, const char *code, int seconds_le
 /* Mensaje simple: un titulo y hasta dos lineas. `ok` elige el icono. */
 void ui_message(gfx_canvas *c, const ui_assets *a, const char *title, const char *line1, const char *line2, bool ok);
 void ui_diag(gfx_canvas *c, const ui_assets *a, const gr_diag_item *items, int count);
-void ui_about(gfx_canvas *c, const ui_assets *a);
+/* discord: invitacion a la comunidad ("" = no se muestra); sale de links.json en la web */
+void ui_about(gfx_canvas *c, const ui_assets *a, const char *discord);
 /* Perfil a pantalla completa (sin la barra de arriba) y detalle de las medallas. */
 void ui_profile_screen(gfx_canvas *c, const ui_assets *a, const ui_profile *p);
 /* Elegir foto de perfil: cuadricula con todas; `cursor` es la que esta marcada (0..UI_AVATAR_COUNT-1). */
