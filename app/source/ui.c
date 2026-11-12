@@ -288,21 +288,37 @@ static int hint(gfx_canvas *c, int x, const char *btn, const char *label) {
     if (g_buttons && icon >= 0) {
         gfx_image(c, x, cy - UI_BTN_SIZE / 2, g_buttons + (size_t)icon * UI_BTN_SIZE * UI_BTN_SIZE * 4, UI_BTN_SIZE, UI_BTN_SIZE);
     } else {
-        gfx_circle(c, x + 17, cy, 17, P->ink);
-        gfx_text(c, x + 17 - gfx_text_width(22, btn) / 2, cy - 14, 22, P->footer, btn);
+        gfx_circle(c, x + 17, cy, 17, C_WHITE);
+        gfx_text(c, x + 17 - gfx_text_width(22, btn) / 2, cy - 14, 22, C_GREEN_DK, btn);
     }
-    gfx_text(c, x + 46, cy - 14, 22, P->ink, label);
+    gfx_text(c, x + 46, cy - 14, 22, C_WHITE, label);
     int next = x + 46 + gfx_text_width(22, label) + 28;
     if (icon >= 0) zone(x - 8, FOOTER_Y, next - x - 4, UI_H - FOOTER_Y, UI_ZONE_BUTTON, icon);
     /* "+" es siempre la ultima pista: la version va a la derecha solo si queda sitio */
     if (icon == UI_BTN_PLUS && next + gfx_text_width(18, UI_APP_NAME " " UI_APP_VERSION) < UI_W - MARGIN)
-        gfx_text_right(c, UI_W - MARGIN, FOOTER_Y + 20, 18, P->gray, UI_APP_NAME " " UI_APP_VERSION);
+        gfx_text_right(c, UI_W - MARGIN, FOOTER_Y + 20, 18, C_GREEN_LT, UI_APP_NAME " " UI_APP_VERSION);
     return next;
 }
 
+/* Barra de abajo: el mismo verde que la de arriba, pero al reves (claro a la izquierda,
+ * oscuro a la derecha) y con la luz desde abajo, para que las dos enmarquen la pantalla. */
 static void footer_bar(gfx_canvas *c) {
-    gfx_rect(c, 0, FOOTER_Y, UI_W, UI_H - FOOTER_Y, P->footer);
-    gfx_rect(c, 0, FOOTER_Y, UI_W, 2, P->gray_lt);
+    static const int stops[3][3] = { { 0x7C, 0xD3, 0x58 }, { 0x25, 0xA2, 0x3C }, { 0x0E, 0x5A, 0x2C } };
+    const int h = UI_H - FOOTER_Y;
+    for (int x = 0; x < UI_W && x < c->w; x++) {
+        int t = x * 512 / (UI_W - 1), k = t < 256 ? 0 : 1, f = t < 256 ? t : t - 256;
+        int base[3];
+        for (int i = 0; i < 3; i++) base[i] = (stops[k][i] * (256 - f) + stops[k + 1][i] * f) >> 8;
+        for (int y = 0; y < h && FOOTER_Y + y < c->h; y++) {
+            int col[3];
+            if (y < 3) { for (int i = 0; i < 3; i++) col[i] = base[i] + (255 - base[i]) * 22 / 100; } /* linea clara arriba */
+            else {
+                int shade = -12 + (y - 3) * 24 / (h - 3); /* oscuro arriba, mas claro abajo */
+                for (int i = 0; i < 3; i++) col[i] = shade >= 0 ? base[i] + (255 - base[i]) * shade / 100 : base[i] * (100 + shade) / 100;
+            }
+            c->px[(FOOTER_Y + y) * c->stride + x] = GFX_RGB(col[0], col[1], col[2]);
+        }
+    }
 }
 
 static void progress(gfx_canvas *c, int x, int y, int w, int done, int total) {

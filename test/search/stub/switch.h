@@ -9,4 +9,5 @@ typedef u32 Result;
 #define R_SUCCEEDED(rc) ((rc) == 0)
 typedef struct { u64 addr; u64 size; u32 type; u32 attr; u32 perm; u32 ipc_refcount; u32 device_refcount; u32 padding; } MemoryInfo;
 enum { Perm_R = 1, Perm_W = 2, Perm_X = 4, Perm_Rw = 3 };
+enum { MemType_ModuleCodeMutable = 9, MemType_CodeWritable = 0x15 };
 enum { MemType_Unmapped = 0, MemType_Io = 1, MemType_CodeMutable = 4, MemType_Heap = 5, MemType_Reserved = 0x10 };

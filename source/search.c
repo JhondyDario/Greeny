@@ -96,6 +96,16 @@ static void load_state(void) {
 /* Recorre la memoria del juego que se puede leer y escribir (sus datos), trozo a trozo. */
 typedef bool (*chunk_fn)(u64 addr, const u8 *data, size_t size, void *ctx);
 
+/* Solo los datos del juego (heap y variables de su codigo): asi la foto de "no se el numero" no
+ * se pasa media hora copiando memoria de graficos y audio, que no guarda nada de la partida. */
+static bool g_only_game_data;
+static u64 g_walk_total; /* bytes recorridos en esta pasada */
+
+static bool game_data(u32 type) {
+    type &= 0xFF;
+    return type == MemType_Heap || type == MemType_CodeMutable || type == MemType_ModuleCodeMutable || type == MemType_CodeWritable;
+}
+
 static void walk_memory(chunk_fn fn, void *ctx) {
     u64 addr = 0;
     while (addr < g_end) {
@@ -105,8 +115,10 @@ static void walk_memory(chunk_fn fn, void *ctx) {
         if (next <= addr) break;
         bool data = (info.perm & Perm_Rw) == Perm_Rw && (info.type & 0xFF) != MemType_Unmapped && (info.type & 0xFF) != MemType_Io &&
                     (info.type & 0xFF) != MemType_Reserved;
+        if (data && g_only_game_data && !game_data(info.type)) data = false;
         if (data) {
             for (u64 a = info.addr; a < next; a += CHUNK) {
+                g_walk_total += CHUNK;
                 size_t n = next - a < CHUNK ? (size_t)(next - a) : CHUNK;
                 if (R_FAILED(dmntchtReadCheatProcessMemory(a, g_buf, n))) continue;
                 if (!fn(a, g_buf, n, ctx)) return;
@@ -421,10 +433,18 @@ void search_poll(uint64_t main_base, uint64_t main_size, uint64_t heap_base, uin
 typedef struct { u64 addr; u32 val; } __attribute__((packed)) val_entry;
 typedef struct { u64 addr; u32 size; } __attribute__((packed)) snap_head;
 
-typedef struct { FILE *out; bool failed; u64 bytes; } snap_ctx;
+typedef struct { FILE *out; bool failed, too_big; u64 bytes; } snap_ctx;
+
+#define SNAP_MAX (1536ull << 20) /* si pasa de 1,5 GB, la busqueda no termina nunca: mejor parar */
 
 static bool snap_chunk(u64 addr, const u8 *data, size_t size, void *vctx) {
     snap_ctx *c = vctx;
+    if (c->bytes + size > SNAP_MAX) { c->too_big = true; return false; }
+    if ((c->bytes >> 27) != ((c->bytes + size) >> 27)) { /* cada 128 MB, para que se vea que avanza */
+        char msg[96];
+        snprintf(msg, sizeof(msg), "Guardando la foto de la memoria... %llu MB", (unsigned long long)((c->bytes + size) >> 20));
+        result_status(msg);
+    }
     snap_head h = { addr, (u32)size };
     if (fwrite(&h, sizeof(h), 1, c->out) != 1 || fwrite(data, 1, size, c->out) != size) { c->failed = true; return false; }
     c->bytes += size;
@@ -435,9 +455,17 @@ static bool do_snap(void) {
     result_status("Guardando una foto de la memoria en la SD... tarda varios minutos.");
     remove(VALS_PATH);
     remove(CAND_PATH);
-    snap_ctx c = { fopen(SNAP_PATH, "wb"), false, 0 };
+    snap_ctx c = { fopen(SNAP_PATH, "wb"), false, false, 0 };
     if (!c.out) { result_status("ERROR: no se pudo escribir en la SD."); return false; }
+    g_only_game_data = true;
     walk_memory(snap_chunk, &c);
+    g_only_game_data = false;
+    if (c.too_big) {
+        fclose(c.out);
+        remove(SNAP_PATH);
+        result_status("ERROR: este juego tiene demasiada memoria para el modo \"no se el numero\". Usa un numero (mira la guia).");
+        return false;
+    }
     if (fclose(c.out) != 0) c.failed = true;
     if (c.failed) {
         remove(SNAP_PATH);
