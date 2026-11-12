@@ -116,6 +116,17 @@ Solo aparece si la cuenta vinculada a la consola es de un administrador.
 7. El resultado queda en `config/greeny/search/result.txt` y se ve en la misma pantalla
    de Greeny. Las líneas marcadas con `SIRVE` son las que van en el `when` del logro.
 
+**Busca el número donde el juego lo guarda de verdad.** Muchos juegos llevan un contador
+temporal mientras juegas y solo pasan el valor al total de la partida al terminar el nivel o
+al guardar. En Super Mario 3D World, las estrellas verdes se suman al total al tocar el
+banderín, no al cogerlas. Si buscas dentro del nivel encuentras el contador temporal, que
+desaparece al cerrar el juego, y la comprobación da cero. Lo que funcionó:
+
+- Haz cada búsqueda en el mapa del mundo, viendo el número.
+- Para cambiarlo, entra a un nivel, coge **una sola** estrella, termina el nivel y vuelve al mapa.
+- Busca los punteros también desde el mapa.
+- Tras reiniciar el juego, entra a la partida hasta el mapa antes de comprobar.
+
 Mientras el buscador trabaja, Greeny no revisa logros. Cuando termines, borra el plan
 (X en esa pantalla): mientras exista, el sistema de logros lee los botones del mando.
 
