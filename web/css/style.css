@@ -467,3 +467,66 @@ h1 .flag { vertical-align: -3px; }
 .foot-links { display: inline-flex; gap: 16px; flex-wrap: wrap; }
 .foot-links [hidden] { display: none; }
 .nav [hidden], .foot [hidden] { display: none !important; }
+
+/* ---------- celular: menu alineado y portada centrada ---------- */
+@media (max-width: 760px) {
+  /* todas las filas del menu empiezan en la misma linea y ocupan el ancho */
+  .top .nav { gap: 4px; padding: 10px 0 12px; }
+  .top .nav > a, .top .nav > button, .top .nav #nav-user > a, .top .nav .user-menu summary {
+    display: flex; width: 100%; box-sizing: border-box; padding: 12px 14px; border-radius: 12px; margin: 0;
+    font-size: 1.05rem; text-align: left; justify-content: flex-start; }
+  .top .nav .lang-toggle { align-self: stretch; border: 0 !important; background: rgba(255, 255, 255, .06);
+    font-size: 1.05rem !important; padding: 12px 14px !important; letter-spacing: 0; }
+  .lang-toggle .long { display: inline !important; }
+  .lang-toggle .short { display: none; }
+  .top .nav .cta { justify-content: center; margin-top: 6px; }
+  .top .nav .user-menu { width: 100%; }
+  .top .nav .user-menu summary { background: rgba(255, 255, 255, .08); }
+  .top .nav .user-menu .caret { margin-left: auto; }
+  .top .nav .user-menu-list { position: static; border: 0; background: none; padding: 2px 0 0 12px; margin: 0; min-width: 0; }
+  .top .nav .user-menu-list a, .top .nav .user-menu-list button { padding: 11px 14px; }
+  /* el menu abierto no tapa la pantalla entera: si es largo, se desplaza */
+  .top.open .nav { max-height: calc(100vh - 72px); overflow-y: auto; }
+
+  /* portada: todo centrado y sin la mascota repetida (el logo ya la lleva) */
+  .hero { text-align: center; gap: 8px; }
+  .hero .hero-mascot { display: none; }
+  .hero-logo { display: block; margin: 0 auto 8px; width: min(280px, 80vw); }
+  .hero .lead { margin-left: auto; margin-right: auto; font-size: 1.05rem; }
+  .hero .actions { justify-content: center; }
+  .hero .actions .btn { flex: 1 1 100%; justify-content: center; text-align: center; }
+  h1 { font-size: clamp(1.7rem, 7vw, 2.2rem); }
+}
+.lang-toggle .long { display: none; }
+
+/* ---------- celular: cada pagina ---------- */
+@media (max-width: 760px) {
+  .top .nav #nav-user > a.cta { justify-content: center; }
+  /* juegos: dos columnas con la caratula arriba, mas compactas */
+  .grid.games { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .grid.games .card { padding: 10px; }
+  .grid.games .cover { margin-bottom: 8px; border-radius: 10px; }
+  .grid.games .pill { font-size: .72rem; }
+  /* numeros de la portada: tres en una fila */
+  .stats.three { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .stats.three .stat { padding: 12px 8px; text-align: center; }
+  .stats.three .stat b { font-size: 1.35rem; }
+  .stats.three .stat span { font-size: .75rem; }
+  /* cabecera de un juego: caratula y titulo juntos */
+  .game-head { flex-wrap: nowrap; align-items: flex-start; gap: 14px; }
+  .game-head .cover.small { width: 72px; }
+  .game-head h1 { font-size: 1.5rem; line-height: 1.15; }
+  .game-head .grow { flex: 1 1 0; min-width: 0; }
+  /* logros: el estado y el porcentaje pasan a una linea propia debajo del texto */
+  .ach-row { flex-wrap: wrap; }
+  .ach-row > .grow { flex: 1 1 0; min-width: 0; }
+  .ach-row > .right { flex: 1 1 100%; display: flex; justify-content: space-between; align-items: center; gap: 8px;
+    margin: 2px 0 0 0; padding-left: 74px; text-align: left; }
+  /* perfil: todo centrado y el boton a lo ancho */
+  .profile-head { flex-direction: column; text-align: center; gap: 10px; }
+  .profile-head .grow { width: 100%; }
+  .profile-head > .btn { width: 100%; justify-content: center; text-align: center; box-sizing: border-box; }
+  /* recientes: la fecha mas pequena para dejar sitio al nombre */
+  .card.row > .nowrap { font-size: .72rem; }
+}
+@media (max-width: 760px) { .game-head p > .muted.small { display: none; } }

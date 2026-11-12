@@ -320,7 +320,7 @@
           h("a", { class: "btn alt", href: cfg.repoUrl, rel: "noopener" }, "Descargar en GitHub"))),
       h("img", { class: "hero-mascot", src: "img/m_saludando.png", alt: "Greeny, la mascota: una plantita verde saludando", width: 260, height: 260 }));
 
-    const stats = h("section", { class: "stats", "aria-label": "Números de Greeny" },
+    const stats = h("section", { class: "stats three", "aria-label": "Números de Greeny" },
       h("div", { class: "card stat" }, h("b", {}, fmtNum(players.count)), h("span", {}, "jugadores")),
       h("div", { class: "card stat" }, h("b", {}, fmtNum(unlocks.count)), h("span", {}, "logros desbloqueados")),
       h("div", { class: "card stat" }, h("b", {}, fmtNum(games.count)), h("span", {}, "juegos con logros")));
@@ -398,7 +398,7 @@
     const players = (statRes.data && statRes.data[0] && statRes.data[0].players) || 0;
 
     return [
-      h("section", { class: "row" }, cover(game, true),
+      h("section", { class: "row game-head" }, cover(game, true),
         h("div", { class: "grow" },
           h("h1", { style: "margin-bottom:4px" }, game.name),
           STATUS[game.status] ? h("p", { style: "margin:0 0 4px" }, statusPill(game.status), " ", h("span", { class: "muted small" }, STATUS[game.status].help)) : null,
@@ -417,7 +417,7 @@
         const st = stats[a.ach_id] || { unlocked_by: 0, players: 0 };
         const pct = st.players > 0 ? Math.round((st.unlocked_by / st.players) * 100) : null;
         const done = !!mine[a.ach_id];
-        return h("div", { class: "card row" + (session && !done ? " locked" : "") },
+        return h("div", { class: "card row ach-row" + (session && !done ? " locked" : "") },
           achIcon(a, done),
           h("div", { class: "grow" },
             h("div", {}, h("strong", { class: "ach-name" }, a.name_es), " ", ptsPill(a)),
@@ -546,7 +546,7 @@
     }
 
     return [
-      h("section", { class: "card row" }, avatar(profile, "big"),
+      h("section", { class: "card row profile-head" }, avatar(profile, "big"),
         h("div", { class: "grow" },
           h("h1", { style: "margin-bottom:2px" }, shownName(profile), " ", flag(profile.country, 36)),
           h("div", { class: "muted" }, "@" + profile.username, profile.discord_username ? " · Discord: " + profile.discord_username : ""),
@@ -1394,7 +1394,8 @@
   if (langBtn && window.GreenyI18n) {
     const paint = () => {
       const en = window.GreenyI18n.lang === "en";
-      langBtn.textContent = en ? "ES" : "EN";
+      // corto en la barra de la computadora; en el menu del celular, el nombre del idioma
+      langBtn.replaceChildren(h("span", { class: "short" }, en ? "ES" : "EN"), h("span", { class: "long" }, en ? "Ver en español" : "View in English"));
       langBtn.setAttribute("aria-label", en ? "Ver en español" : "View in English");
     };
     paint();
