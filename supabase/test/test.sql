@@ -485,4 +485,32 @@ begin
     assert ok, 'un correo sin cuenta da error';
 end $$;
 
+-- comentarios y me gusta: los me gusta dan puntos al autor, con tope
+do $$
+declare a uuid := '00000000-0000-0000-0000-00000000000b'; b uuid := '00000000-0000-0000-0000-00000000000d';
+        rid bigint; ok boolean := false; before int; after int; j jsonb;
+begin
+    select points into before from public.profile_stats where id = a;
+    perform set_config('request.jwt.claim.sub', a::text, true);
+    set local role authenticated;
+    insert into public.reviews (title_id, user_id, body) values ('010028600EBDA000', a, 'Muy buen juego') returning id into rid;
+    begin insert into public.review_likes (review_id, user_id) values (rid, a);
+    exception when insufficient_privilege then ok := true; end;
+    assert ok, 'no te das me gusta a ti mismo';
+    ok := false;
+    begin insert into public.reviews (title_id, user_id, body) values ('010028600EBDA000', b, 'suplantar');
+    exception when insufficient_privilege then ok := true; end;
+    assert ok, 'no comentas en nombre de otro';
+    reset role;
+    perform set_config('request.jwt.claim.sub', b::text, true);
+    set local role authenticated;
+    insert into public.review_likes (review_id, user_id) values (rid, b);
+    reset role;
+    select points into after from public.profile_stats where id = a;
+    assert after = before + 2, 'un me gusta da 2 puntos: ' || before || ' -> ' || after;
+    j := public.reviews_for(b, '010028600EBDA000');
+    assert jsonb_array_length(j) = 1 and (j -> 0 ->> 'likes')::int = 1 and (j -> 0 ->> 'liked')::boolean
+           and not (j -> 0 ->> 'mine')::boolean and not (j -> 0 ? 'user_id'), 'lista de comentarios: ' || j::text;
+end $$;
+
 select 'TODAS LAS PRUEBAS PASARON' as resultado;

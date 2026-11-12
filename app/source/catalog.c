@@ -174,7 +174,7 @@ int gr_catalog_list(gr_get_fn get, gr_cat_game *out, int max, int *count) {
     if (!list) return -1;
     size_t len = 0;
     long status = 0;
-    int rc = get(GR_BACKEND_URL "/rest/v1/games?select=title_id,name,version,status&published=eq.true&order=name&limit=300",
+    int rc = get(GR_BACKEND_URL "/rest/v1/games?select=title_id,name,version,status,updated_at&published=eq.true&order=name&limit=300",
                  list, cap - 1, &len, &status);
     if (rc != 0) { free(list); return -1; }
     list[len] = 0;
@@ -192,6 +192,8 @@ int gr_catalog_list(gr_get_fn get, gr_cat_game *out, int max, int *count) {
                 if (!gr_json_string(p, "name", g->name, sizeof(g->name)) || !g->name[0]) memcpy(g->name, tid, 17);
                 gr_json_string(p, "version", g->version, sizeof(g->version));
                 gr_json_string(p, "status", g->status, sizeof(g->status));
+                char up[40] = "";
+                if (gr_json_string(p, "updated_at", up, sizeof(up))) snprintf(g->updated, sizeof(g->updated), "%.10s", up);
                 (*count)++;
             }
             end[1] = saved;

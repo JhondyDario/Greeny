@@ -57,7 +57,7 @@
 
 typedef enum {
     SCREEN_HOME, SCREEN_DETAIL, SCREEN_SETTINGS, SCREEN_DIAG, SCREEN_ABOUT, SCREEN_INTRO, SCREEN_LINK, SCREEN_MSG,
-    SCREEN_PROFILE, SCREEN_BADGES, SCREEN_ACH, SCREEN_AVATARS, SCREEN_BROWSE, SCREEN_BROWSE_GAME, SCREEN_SEARCH, SCREEN_RANKING, SCREEN_USER, SCREEN_COUNTRY, SCREEN_CAPTION
+    SCREEN_PROFILE, SCREEN_BADGES, SCREEN_ACH, SCREEN_AVATARS, SCREEN_BROWSE, SCREEN_BROWSE_GAME, SCREEN_SEARCH, SCREEN_RANKING, SCREEN_USER, SCREEN_COUNTRY, SCREEN_CAPTION, SCREEN_REVIEWS
 } screen_t;
 
 static gr_model g_model;
@@ -670,6 +670,23 @@ static int rank_load(int scope, int mode) {
     return 1;
 }
 
+/* ---------- comentarios de un juego ---------- */
+static gr_review g_reviews[GR_REVIEWS_MAX];
+static int g_nrev, g_rev_state;
+static char g_rev_tid[17], g_rev_name[LG_NAME_LEN];
+static int g_rev_return, g_user_return = 0; /* a donde vuelven Comentarios y el perfil de otro (0 = ranking) */
+
+/* 1 listo, 2 sin conexion */
+static int reviews_load(void) {
+    g_nrev = 0;
+    if (!net_online()) return 2;
+    if (gr_reviews(net_http, &g_account, g_rev_tid, g_reviews, GR_REVIEWS_MAX, &g_nrev) != GR_NET_OK) {
+        trace("comentarios: fallo %s", net_last_error());
+        return 2;
+    }
+    return 1;
+}
+
 /* ---------- frases del perfil ---------- */
 static gr_caption g_captions[GR_CAPTIONS_MAX];
 static int g_ncaptions;
@@ -940,7 +957,7 @@ int main(int argc, char *argv[]) {
     trace("listo: %d juego(s), audio %s, caratulas %s, modo %s", g_model.ngames, sfx_ok ? "si" : "no",
           g_ns_ok ? "si" : "no", g_env.applet_mode ? "applet" : "aplicacion");
 
-    int cursor = 0, top = 0, dcursor = 0, dtop = 0, stab = 0, srow = 0, intro_page = 0, acursor = 0, bcursor = 0, btop = 0, browse_pending = 0, song_pending = 0, song_wait = 0;
+    int cursor = 0, top = 0, dcursor = 0, dtop = 0, stab = 0, srow = 0, intro_page = 0, acursor = 0, bcursor = 0, btop = 0, browse_pending = 0, song_pending = 0, song_wait = 0, vcursor = 0, vtop = 0;
     bool song_all = false;
     int ccursor = 0, rcursor = 0, rank_scope = 0, rank_mode = 0, rank_state = 0, kcursor = 0, ktop = 0;
     bool lang_changed = false;
@@ -1114,6 +1131,74 @@ int main(int argc, char *argv[]) {
             if (dcursor < dtop) dtop = dcursor;
             if (dcursor >= dtop + 6) dtop = dcursor - 5;
             if (down & HidNpadButton_B) { screen = SCREEN_BROWSE; back = true; }
+            if (down & HidNpadButton_Y) {
+                snprintf(g_rev_tid, sizeof(g_rev_tid), "%s", g_cat[g_cat_open].tid);
+                snprintf(g_rev_name, sizeof(g_rev_name), "%s", g_cat[g_cat_open].name);
+                g_rev_state = reviews_load();
+                g_rev_return = SCREEN_BROWSE_GAME;
+                vcursor = vtop = 0;
+                screen = SCREEN_REVIEWS;
+                accepted_alt = true;
+            }
+        } else if (screen == SCREEN_REVIEWS) {
+            if (vcursor >= g_nrev) vcursor = g_nrev ? g_nrev - 1 : 0;
+            if (g_rev_state == 1 && g_nrev > 0) { TAP_SELECT(vcursor, g_nrev); moved = move_cursor(&vcursor, g_nrev, 1, nav); }
+            if (vcursor < vtop) vtop = vcursor;
+            if (vcursor >= vtop + UI_REVIEW_ROWS) vtop = vcursor - UI_REVIEW_ROWS + 1;
+            bool have = g_rev_state == 1 && g_nrev > 0;
+            if ((down & HidNpadButton_A) && have && g_account.linked && !g_reviews[vcursor].mine) {
+                gr_review *v = &g_reviews[vcursor];
+                char err[160] = "";
+                gr_net_result r = net_online() ? gr_review_like(net_http, &g_account, v->id, !v->liked, err, sizeof(err)) : GR_NET_OFFLINE;
+                if (r == GR_NET_OK) { v->liked = !v->liked; v->likes += v->liked ? 1 : -1; }
+                else {
+                    show_message(false, "No se pudo", r == GR_NET_OFFLINE ? "No hay conexión a internet." : err, NULL);
+                    g_msg_return = SCREEN_REVIEWS;
+                    screen = SCREEN_MSG;
+                }
+                accepted = true;
+            }
+            if ((down & HidNpadButton_X) && have) {
+                gr_review *v = &g_reviews[vcursor];
+                memset(&g_rank_view, 0, sizeof(g_rank_view));
+                snprintf(g_rank_view.username, sizeof(g_rank_view.username), "%s", v->username);
+                snprintf(g_rank_view.display, sizeof(g_rank_view.display), "%s", v->display);
+                snprintf(g_rank_view.country, sizeof(g_rank_view.country), "%s", v->country);
+                g_rank_view.avatar = v->avatar;
+                g_rank_view.total_points = v->total_points;
+                g_rank_view.achievements = v->achievements;
+                g_rank_view.points = v->likes; /* sin posicion: ui_user muestra los me gusta */
+                g_user_return = SCREEN_REVIEWS;
+                screen = SCREEN_USER;
+                accepted = true;
+            }
+            if ((down & HidNpadButton_Y) && g_account.linked) {
+                char text[504] = "", err[160] = "";
+                bool had = false;
+                for (int i = 0; i < g_nrev; i++) had = had || g_reviews[i].mine;
+                /* vacio y aceptado = borrar el tuyo; cancelar no cambia nada */
+                SwkbdConfig kbd;
+                bool ok = false;
+                if (R_SUCCEEDED(swkbdCreate(&kbd, 0))) {
+                    swkbdConfigMakePresetDefault(&kbd);
+                    swkbdConfigSetGuideText(&kbd, had ? "Tu comentario (déjalo vacío para borrarlo)" : "¿Qué te parecen los logros de este juego?");
+                    swkbdConfigSetStringLenMax(&kbd, 500);
+                    for (int i = 0; i < g_nrev; i++) if (g_reviews[i].mine) swkbdConfigSetInitialText(&kbd, g_reviews[i].body);
+                    ok = R_SUCCEEDED(swkbdShow(&kbd, text, sizeof(text)));
+                    swkbdClose(&kbd);
+                }
+                if (ok && (text[0] || had)) {
+                    gr_net_result r = net_online() ? gr_review_save(net_http, &g_account, g_rev_tid, text, err, sizeof(err)) : GR_NET_OFFLINE;
+                    if (r == GR_NET_OK) { g_rev_state = reviews_load(); vcursor = vtop = 0; }
+                    else {
+                        show_message(false, "No se pudo guardar", r == GR_NET_OFFLINE ? "No hay conexión a internet." : err, NULL);
+                        g_msg_return = SCREEN_REVIEWS;
+                        screen = SCREEN_MSG;
+                    }
+                }
+                accepted_alt = true;
+            }
+            if (down & HidNpadButton_B) { screen = g_rev_return; back = true; }
         } else if (screen == SCREEN_DETAIL) {
             ui_layout l = ui_detail_layout(&g_config);
             int n = g_model.games[cursor].broken ? 0 : ui_ach_visible(&g_model.cur, ach_filter, ach_map);
@@ -1137,6 +1222,15 @@ int main(int argc, char *argv[]) {
             follow(dcursor, &dtop, l);
             if ((down & HidNpadButton_A) && n > 0) { screen = SCREEN_ACH; opened = true; }
             if (down & HidNpadButton_B) { screen = SCREEN_HOME; back = true; }
+            if (down & HidNpadButton_Y) {
+                snprintf(g_rev_tid, sizeof(g_rev_tid), "%s", g_model.games[cursor].tid);
+                snprintf(g_rev_name, sizeof(g_rev_name), "%s", g_model.games[cursor].name);
+                g_rev_state = reviews_load();
+                g_rev_return = SCREEN_DETAIL;
+                vcursor = vtop = 0;
+                screen = SCREEN_REVIEWS;
+                accepted_alt = true;
+            }
         } else if (screen == SCREEN_ACH) {
             int n = ui_ach_visible(&g_model.cur, ach_filter, ach_map), step = 0; /* L y R recorren lo que deja ver el filtro */
             if (dcursor >= n) dcursor = n ? n - 1 : 0;
@@ -1452,11 +1546,12 @@ int main(int argc, char *argv[]) {
                 snprintf(line, sizeof(line), "Ahora sigues a @%s.", g_rank_view.username);
                 if (r == GR_NET_OK) { show_message(true, "¡Listo!", line, NULL); sync_start(); }
                 else show_message(false, "No se pudo seguir", r == GR_NET_OFFLINE ? "No hay conexión a internet." : err, NULL);
-                g_msg_return = SCREEN_RANKING;
+                g_msg_return = g_user_return ? g_user_return : SCREEN_RANKING;
+                g_user_return = 0;
                 screen = SCREEN_MSG;
                 accepted = true;
             }
-            if (down & HidNpadButton_B) { screen = SCREEN_RANKING; back = true; }
+            if (down & HidNpadButton_B) { screen = g_user_return ? g_user_return : SCREEN_RANKING; g_user_return = 0; back = true; }
         } else if (screen == SCREEN_BADGES) {
             if (down & HidNpadButton_B) { screen = SCREEN_PROFILE; back = true; }
         } else if (screen == SCREEN_MSG) {
@@ -1567,6 +1662,7 @@ int main(int argc, char *argv[]) {
                 const char *mode = rank_mode > 0 && rank_mode <= ngames ? g_model.games[gidx[rank_mode - 1]].name : (g_ui_en ? "Total points" : "Puntos totales");
                 ui_ranking(&layer, &g_assets, g_rank, g_nrank, &g_rank_me, g_rank_total, sc_es[rank_scope], sc_en[rank_scope], mode, rcursor, rank_state);
             }
+            else if (screen == SCREEN_REVIEWS) ui_reviews(&layer, &g_assets, g_rev_name, g_reviews, g_nrev, vcursor, vtop, g_rev_state, g_account.linked);
             else if (screen == SCREEN_USER) ui_user(&layer, &g_assets, &g_rank_view, strcasecmp(g_rank_view.username, g_account.username) != 0);
             else if (screen == SCREEN_AVATARS) ui_avatars(&layer, &g_assets, &g_profile, acursor);
             else if (screen == SCREEN_BROWSE) ui_browse(&layer, &g_assets, g_cat, g_cat_shown, g_cat_nshown, g_cat_n, g_cat_have, g_cat_query, g_cat_state, bcursor, btop);

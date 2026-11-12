@@ -92,6 +92,31 @@ gr_net_result gr_ranking(gr_http_fn http, const gr_account *a, const char *scope
 /* Sigue a alguien por su nombre de usuario. */
 gr_net_result gr_follow_user(gr_http_fn http, const gr_account *a, const char *username, char *err, size_t errlen);
 
+/* ---- comentarios de un juego ---- */
+#define GR_REVIEWS_MAX 40
+typedef struct {
+    long long id;
+    char body[504];
+    char username[24];
+    char display[36];
+    int  avatar;
+    char country[4];
+    bool donor;
+    int  total_points;
+    int  achievements;
+    int  likes;
+    bool liked;   /* le diste me gusta */
+    bool mine;    /* es tu comentario */
+    char date[11]; /* AAAA-MM-DD */
+} gr_review;
+/* Lee la lista que devuelve device_reviews. El texto del comentario se lee primero y
+ * se tapa, para que lo que alguien escriba ahi no se confunda con los otros campos. */
+int gr_parse_reviews(char *json, gr_review *out, int max);
+gr_net_result gr_reviews(gr_http_fn http, const gr_account *a, const char *tid, gr_review *out, int max, int *count);
+/* Escribe o cambia tu comentario; vacio lo borra. */
+gr_net_result gr_review_save(gr_http_fn http, const gr_account *a, const char *tid, const char *text, char *err, size_t errlen);
+gr_net_result gr_review_like(gr_http_fn http, const gr_account *a, long long id, bool liked, char *err, size_t errlen);
+
 /* Entra con correo y contraseña y registra la consola de una vez. */
 gr_net_result gr_login_password(gr_http_fn http, const char *email, const char *password, const char *device_name,
                                 gr_account *a, char *err, size_t errlen);

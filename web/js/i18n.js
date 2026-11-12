@@ -159,6 +159,12 @@
       "Everyone who donates gets this badge on their profile. So we know who to give it to, write your Greeny username in the donation note.",
     "La medalla se pone a mano, así que puede tardar un poco en aparecer.": "The badge is added by hand, so it may take a little while to show up.",
     "Donar es opcional: no desbloquea logros ni da ventajas.": "Donating is optional: it does not unlock achievements or give any advantage.",
+    "Comentarios": "Comments", "Tu comentario": "Your comment", "Escribe un comentario": "Write a comment", "Publicar": "Post",
+    "Guardar": "Save", "Borrar": "Delete", "Listo.": "Done.", "Entra": "Sign in", " para comentar y dar me gusta.": " to comment and like.",
+    "Nadie ha comentado este juego todavía. ¡Sé el primero!": "Nobody has commented on this game yet. Be the first!",
+    "No se pudieron cargar los comentarios.": "Comments could not be loaded.", "Escribe un poco más.": "Write a bit more.",
+    "¿Borrar tu comentario?": "Delete your comment?", "Es tu comentario": "It's your comment", "Entra para dar me gusta": "Sign in to like",
+    "¿Qué te parecen los logros de este juego?": "What do you think of this game's achievements?", "Menú": "Menu",
   };
 
   // Textos con números: se traducen por partes. Solo se aplican si el texto trae algún número.
@@ -167,7 +173,8 @@
     [/(\d+) \/ (\d+) pts para el nivel (\d+)/g, "$1 / $2 pts to level $3"], [/^(\d+) de (\d+)$/g, "$1 of $2"], [/(\d+) de (\d+) · /g, "$1 of $2 · "],
     [/ logros · /g, " achievements · "], [/ logros$/g, " achievements"], [/ jugador\(es\) en esta clasificación\./g, " player(s) in this ranking."],
     [/ jugadores/g, " players"], [/ jugador\b/g, " player"], [/Nivel (\d+)/g, "Level $1"], [/(\d+)% lo tiene/g, "$1% have it"],
-    [/^Foto (\d+)$/g, "Picture $1"],
+    [/^Foto (\d+)$/g, "Picture $1"], [/^Ver todos \((\d+)\)$/g, "See all ($1)"], [/^Logros actualizados el /g, "Achievements updated on "],
+    [/ pts · /g, " pts · "], [/ · editado$/g, " · edited"],
   ];
 
   let lang = "es";

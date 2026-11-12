@@ -184,6 +184,17 @@
     return el;
   }
 
+  // Muestra los primeros `n` y un boton para ver el resto (todo de una vez).
+  function more(items, n, cls) {
+    const list = items.filter(Boolean);
+    const box = h("div", { class: cls });
+    box.append(...list.slice(0, n));
+    if (list.length <= n) return box;
+    const btn = h("button", { class: "btn alt more-btn", type: "button" }, "Ver todos (" + list.length + ")");
+    btn.addEventListener("click", () => { box.append(...list.slice(n)); btn.remove(); });
+    return h("div", {}, box, btn);
+  }
+
   function bar(done, total) {
     const pct = total > 0 ? Math.round((done / total) * 100) : 0;
     return h("div", { class: "bar", role: "img", "aria-label": pct + "% completado" }, h("i", { style: "width:" + pct + "%" }));
@@ -391,7 +402,8 @@
           STATUS[game.status] ? h("p", { style: "margin:0 0 4px" }, statusPill(game.status), " ", h("span", { class: "muted small" }, STATUS[game.status].help)) : null,
           h("p", { class: "muted", style: "margin:0" },
             game.version ? "Logros para la versión " + game.version + " del juego" : "Versión sin indicar",
-            " · " + achs.length + " logros · " + totalPts + " pts · " + fmtNum(players) + (players === 1 ? " jugador" : " jugadores")))),
+            " · " + achs.length + " logros · " + totalPts + " pts · " + fmtNum(players) + (players === 1 ? " jugador" : " jugadores")),
+          game.updated_at ? h("p", { class: "muted small", style: "margin:4px 0 0" }, "Logros actualizados el " + fmtDate(game.updated_at)) : null)),
       session
         ? h("div", { class: "card", style: "margin-top:18px" },
             h("div", { class: "row" }, h("strong", { class: "grow" }, "Tu progreso"),
@@ -399,7 +411,7 @@
             h("div", { style: "margin-top:8px" }, bar(got.length, achs.length)))
         : null,
       h("h2", {}, "Logros"),
-      h("div", { class: "stack" }, achs.map((a) => {
+      more(achs.map((a) => {
         const st = stats[a.ach_id] || { unlocked_by: 0, players: 0 };
         const pct = st.players > 0 ? Math.round((st.unlocked_by / st.players) * 100) : null;
         const done = !!mine[a.ach_id];
@@ -412,8 +424,74 @@
             session ? h("div", {}, done ? h("span", { class: "pill ok" }, "Desbloqueado") : h("span", { class: "pill no" }, "Bloqueado")) : null,
             h("div", { class: "muted", title: "Porcentaje de jugadores de este juego que lo tienen" },
               pct == null ? "Nadie lo tiene aún" : pct + "% lo tiene")));
-      })),
+      }), 6, "stack"),
+      h("h2", {}, "Comentarios"),
+      await reviewsBox(tid),
     ];
+  }
+
+  // Comentarios de un juego: uno por persona, y "me gusta" que dan 2 puntos al autor.
+  async function reviewsBox(tid) {
+    const box = h("div", { class: "reviews" });
+    async function draw() {
+      const res = await sb.rpc("game_reviews", { title: tid });
+      if (res.error) { box.replaceChildren(h("p", { class: "card muted" }, "No se pudieron cargar los comentarios.")); return; }
+      const list = res.data || [];
+      const mine = list.find((r) => r.mine);
+      box.replaceChildren(
+        session ? writer(mine) : h("p", { class: "card muted" }, h("a", { href: "#/entrar" }, "Entra"), " para comentar y dar me gusta."),
+        list.length ? more(list.map(card), 5, "reviews") : h("p", { class: "muted" }, "Nadie ha comentado este juego todavía. ¡Sé el primero!"));
+    }
+    function writer(mine) {
+      const ta = h("textarea", { name: "body", maxlength: 500, required: true, placeholder: "¿Qué te parecen los logros de este juego?" });
+      ta.value = mine ? mine.body : "";
+      const f = form([h("label", { class: "field" }, h("span", {}, mine ? "Tu comentario" : "Escribe un comentario"), ta)],
+        mine ? "Guardar" : "Publicar", async (fd) => {
+          const body = String(fd.get("body") || "").trim();
+          if (body.length < 2) throw new Error("Escribe un poco más.");
+          const res = mine
+            ? await sb.from("reviews").update({ body, updated_at: new Date().toISOString() }).eq("id", mine.id)
+            : await sb.from("reviews").insert({ title_id: tid, user_id: session.user.id, body });
+          if (res.error) throw res.error;
+          setTimeout(draw, 0);
+          return "Listo.";
+        });
+      f.classList.add("card", "review-form");
+      if (mine) f.lastElementChild.append(" ", h("button", { type: "button", class: "btn danger mini", onclick: async () => {
+        if (!confirm("¿Borrar tu comentario?")) return;
+        const res = await sb.from("reviews").delete().eq("id", mine.id);
+        if (res.error) alert(explain(res.error)); else draw();
+      } }, "Borrar"));
+      return f;
+    }
+    function card(r) {
+      let liked = !!r.liked, likes = Number(r.likes || 0);
+      const btn = h("button", { type: "button", class: "like", "aria-pressed": String(liked), disabled: !session || r.mine,
+        title: r.mine ? "Es tu comentario" : !session ? "Entra para dar me gusta" : null });
+      const paint = () => { btn.setAttribute("aria-pressed", String(liked)); btn.replaceChildren(liked ? "♥" : "♡", " " + likes); };
+      paint();
+      btn.addEventListener("click", async () => {
+        btn.disabled = true;
+        const res = liked
+          ? await sb.from("review_likes").delete().eq("review_id", r.id).eq("user_id", session.user.id)
+          : await sb.from("review_likes").insert({ review_id: r.id, user_id: session.user.id });
+        btn.disabled = false;
+        if (res.error) { alert(explain(res.error)); return; }
+        liked = !liked; likes += liked ? 1 : -1; paint();
+      });
+      const edited = r.updated_at && new Date(r.updated_at) - new Date(r.created_at) > 60000;
+      return h("div", { class: "card review" }, avatar(r),
+        h("div", {},
+          h("a", { class: "who", href: "#/u/" + encodeURIComponent(r.username) },
+            h("strong", {}, shownName(r)), flag(r.country, 20),
+            r.donor ? h("img", { class: "donor-mini", src: "img/badges/donador.png", alt: "Donador", title: "Donador" }) : null,
+            h("span", { class: "muted small" }, "@" + r.username + " · " + fmtNum(r.total_points) + " pts · " + fmtNum(r.achievements) + " logros")),
+          h("p", { class: "body" }, r.body),
+          h("div", { class: "acts" }, btn,
+            h("span", { class: "muted small" }, fmtDate(r.created_at) + (edited ? " · editado" : "")))));
+    }
+    await draw();
+    return box;
   }
 
   // ---------- perfil ----------
@@ -488,7 +566,7 @@
         h("div", { class: "card stat with-icon" }, h("img", { src: "img/stat_seguidores.png", alt: "", width: 44, height: 44 }), h("div", {}, h("b", {}, fmtNum(stats.followers)), h("span", {}, "seguidores"))),
         h("div", { class: "card stat with-icon" }, h("img", { src: "img/stat_siguiendo.png", alt: "", width: 44, height: 44 }), h("div", {}, h("b", {}, fmtNum(stats.following)), h("span", {}, "siguiendo")))),
       h("h2", {}, "Medallas ", h("span", { class: "muted small" }, earned + " de " + badgeList.length)),
-      h("div", { class: "badges" }, profile.donor ? h("div", { class: "card badge earned donor" },
+      more([profile.donor ? h("div", { class: "card badge earned donor" },
           h("img", { class: "medal-img", src: "img/badges/donador.png", alt: "", width: 64, height: 64, loading: "lazy" }),
           h("div", {}, h("strong", {}, "Donador"), h("div", { class: "muted small" }, "Apoya a Greeny con una donación."),
             h("span", { class: "pill ok" }, "Conseguida"))) : null,
@@ -499,10 +577,10 @@
             h("strong", {}, b.name),
             h("div", { class: "muted small" }, b.how),
             b.earned ? h("span", { class: "pill ok" }, "Conseguida")
-                     : h("span", { class: "muted small" }, Math.min(b.value, b.goal) + " / " + b.goal))))),
+                     : h("span", { class: "muted small" }, Math.min(b.value, b.goal) + " / " + b.goal))))].flat(), 6, "badges"),
       h("h2", {}, "Juegos"),
       titles.length
-        ? h("div", { class: "stack" }, titles.map((tid) => {
+        ? more(titles.map((tid) => {
             const g = games[tid] || { name: tid };
             const mine = unlocks.filter((u) => u.title_id === tid);
             const total = totals[tid] || mine.length;
@@ -513,16 +591,16 @@
                   mine.length + " de " + total + " logros · " + mine.reduce((s, u) => s + u.achievements.points, 0) + " pts"),
                 bar(mine.length, total)),
               mine.length === total ? h("span", { class: "pill ok" }, "Completado") : null);
-          }))
+          }), 5, "stack")
         : h("p", { class: "card muted" }, isMe ? "Todavía no has subido logros. Vincula tu consola en Ajustes." : "Este jugador todavía no ha subido logros."),
       unlocks.length ? h("h2", {}, "Últimos logros") : null,
       unlocks.length
-        ? h("div", { class: "stack" }, unlocks.slice(0, 12).map((u) =>
+        ? more(unlocks.slice(0, 30).map((u) =>
             h("div", { class: "card row" }, achIcon(u.achievements, true),
               h("div", { class: "grow" },
                 h("div", { class: "clip" }, h("strong", {}, u.achievements.name_es), " ", ptsPill(u.achievements)),
                 h("div", { class: "muted small clip" }, (games[u.title_id] || {}).name || u.title_id)),
-              h("span", { class: "muted small nowrap" }, fmtDate(u.unlocked_at)))))
+              h("span", { class: "muted small nowrap" }, fmtDate(u.unlocked_at)))), 5, "stack")
         : null,
     ];
   }
@@ -1239,6 +1317,14 @@
   });
 
   document.getElementById("repo-link").href = cfg.repoUrl;
+  const top = document.querySelector(".top"), menuBtn = document.getElementById("menu-toggle");
+  const closeMenu = () => { top.classList.remove("open"); menuBtn.setAttribute("aria-expanded", "false"); };
+  menuBtn.addEventListener("click", () => {
+    const open = top.classList.toggle("open");
+    menuBtn.setAttribute("aria-expanded", String(open));
+  });
+  window.addEventListener("hashchange", closeMenu);
+  document.addEventListener("click", (ev) => { if (!top.contains(ev.target)) closeMenu(); });
   const langBtn = document.getElementById("lang-toggle");
   if (langBtn && window.GreenyI18n) {
     const paint = () => {

@@ -353,6 +353,87 @@ gr_net_result gr_follow_user(gr_http_fn http, const gr_account *a, const char *u
     return call(http, "/rest/v1/rpc/device_follow_user", NULL, body, resp, sizeof(resp), err, errlen);
 }
 
+/* Fin del objeto JSON que empieza en `p` ('{'), sin hacer caso a llaves dentro de textos. */
+static char *object_end(char *p) {
+    int depth = 0;
+    bool str = false;
+    for (; *p; p++) {
+        if (str) {
+            if (*p == '\\' && p[1]) p++;
+            else if (*p == '"') str = false;
+        } else if (*p == '"') str = true;
+        else if (*p == '{') depth++;
+        else if (*p == '}' && --depth == 0) return p;
+    }
+    return NULL;
+}
+
+int gr_parse_reviews(char *json, gr_review *out, int max) {
+    int n = 0;
+    for (char *p = strchr(json, '{'); p && n < max; ) {
+        char *end = object_end(p);
+        if (!end) break;
+        char saved = end[1];
+        end[1] = 0;
+        gr_review *r = &out[n];
+        memset(r, 0, sizeof(*r));
+        /* el texto primero; luego se tapa con espacios */
+        char *b = strstr(p, "\"body\":");
+        if (b && gr_json_string(p, "body", r->body, sizeof(r->body))) {
+            char *v = strchr(b + 6, '"');
+            if (v) for (v++; *v && *v != '"'; v++) { if (*v == '\\' && v[1]) *v++ = ' '; *v = ' '; }
+        }
+        const char *idv = find_value(p, "id");
+        if (idv) r->id = atoll(idv);
+        gr_json_string(p, "username", r->username, sizeof(r->username));
+        gr_json_string(p, "display_name", r->display, sizeof(r->display));
+        gr_json_int(p, "avatar", &r->avatar);
+        char c[8] = "";
+        gr_json_string(p, "country", c, sizeof(c));
+        snprintf(r->country, sizeof(r->country), "%.2s", c);
+        gr_json_bool(p, "donor", &r->donor);
+        gr_json_int(p, "total_points", &r->total_points);
+        gr_json_int(p, "achievements", &r->achievements);
+        gr_json_int(p, "likes", &r->likes);
+        gr_json_bool(p, "liked", &r->liked);
+        gr_json_bool(p, "mine", &r->mine);
+        char d[40] = "";
+        gr_json_string(p, "created_at", d, sizeof(d));
+        snprintf(r->date, sizeof(r->date), "%.10s", d);
+        if (r->id > 0 && r->username[0] && r->body[0]) n++;
+        end[1] = saved;
+        p = strchr(end + 1, '{');
+    }
+    return n;
+}
+
+gr_net_result gr_reviews(gr_http_fn http, const gr_account *a, const char *tid, gr_review *out, int max, int *count) {
+    char body[200];
+    *count = 0;
+    char *resp = malloc(64 * 1024);
+    if (!resp) return GR_NET_BAD;
+    snprintf(body, sizeof(body), "{\"device_token\":\"%s\",\"title\":\"%.16s\"}", a->token, tid);
+    gr_net_result r = call(http, "/rest/v1/rpc/device_reviews", NULL, body, resp, 64 * 1024, NULL, 0);
+    if (r == GR_NET_OK) *count = gr_parse_reviews(resp, out, max);
+    free(resp);
+    return r;
+}
+
+gr_net_result gr_review_save(gr_http_fn http, const gr_account *a, const char *tid, const char *text, char *err, size_t errlen) {
+    char t[1600], body[1800], resp[RESP_MAX];
+    if (!a->token[0] || !a->linked) { snprintf(err, errlen, "Esta consola no está vinculada."); return GR_NET_REJECTED; }
+    gr_json_escape(t, sizeof(t), text);
+    snprintf(body, sizeof(body), "{\"device_token\":\"%s\",\"title\":\"%.16s\",\"body\":\"%s\"}", a->token, tid, t);
+    return call(http, "/rest/v1/rpc/device_review_save", NULL, body, resp, sizeof(resp), err, errlen);
+}
+
+gr_net_result gr_review_like(gr_http_fn http, const gr_account *a, long long id, bool liked, char *err, size_t errlen) {
+    char body[200], resp[RESP_MAX];
+    if (!a->token[0] || !a->linked) { snprintf(err, errlen, "Esta consola no está vinculada."); return GR_NET_REJECTED; }
+    snprintf(body, sizeof(body), "{\"device_token\":\"%s\",\"review\":%lld,\"liked\":%s}", a->token, id, liked ? "true" : "false");
+    return call(http, "/rest/v1/rpc/device_review_like", NULL, body, resp, sizeof(resp), err, errlen);
+}
+
 gr_net_result gr_set_avatar(gr_http_fn http, gr_account *a, int picture, char *err, size_t errlen) {
     char body[160], resp[RESP_MAX];
     if (!a->token[0] || !a->linked) { snprintf(err, errlen, "Esta consola no está vinculada."); return GR_NET_REJECTED; }

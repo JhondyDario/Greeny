@@ -810,6 +810,7 @@ void ui_detail(gfx_canvas *c, const ui_assets *a, const gr_model *m, const gr_co
     if (!g->broken && m->cur.nach > 0)
         hx = hint(c, hx, "X", g_ach_filter == UI_ACH_GOT ? T("Viendo: obtenidos", "Showing: earned")
                               : g_ach_filter == UI_ACH_MISSING ? T("Viendo: por obtener", "Showing: not earned") : T("Viendo: todos", "Showing: all"));
+    hx = hint(c, hx, "Y", T("Comentarios", "Comments"));
     hx = hint(c, hx, "B", T("Volver", "Back"));
     if (!g->broken) hx = hint(c, hx, "−", cfg->ach_view == GR_VIEW_GRID ? T("Lista", "List") : T("Cuadrícula", "Grid"));
     hint(c, hx, "+", T("Salir", "Exit"));
@@ -901,8 +902,11 @@ void ui_browse_game(gfx_canvas *c, const ui_assets *a, const gr_cat_game *game, 
     int points = 0;
     for (int i = 0; i < def->nach; i++) points += def->ach[i].points;
     char sub[160];
-    snprintf(sub, sizeof(sub), T("%s  ·  %d logros  ·  %d pts  ·  no está en tu consola", "%s  ·  %d achievements  ·  %d pts  ·  not on your console"),
-             status_name(game->status), def->nach, points);
+    int k = snprintf(sub, sizeof(sub), T("%s  ·  %d logros  ·  %d pts", "%s  ·  %d achievements  ·  %d pts"),
+                     status_name(game->status), def->nach, points);
+    if (game->updated[0])
+        snprintf(sub + k, sizeof(sub) - (size_t)k, T("  ·  Actualizado el %.2s/%.2s/%.4s", "  ·  Updated %.2s/%.2s/%.4s"),
+                 T(game->updated + 8, game->updated + 5), T(game->updated + 5, game->updated + 8), game->updated);
     header(c, a, NULL, game->name, sub);
     prepare_fill(a);
     static ui_assets bare; /* sin iconos propios: todos con el de relleno */
@@ -913,7 +917,113 @@ void ui_browse_game(gfx_canvas *c, const ui_assets *a, const gr_cat_game *game, 
     for (int i = 0; i < def->nach; i++) all[i] = i;
     detail_list(c, &bare, def, all, def->nach, cursor, top, 6);
     footer_bar(c);
-    int hx = hint(c, MARGIN, "B", T("Volver", "Back"));
+    int hx = hint(c, MARGIN, "Y", T("Comentarios", "Comments"));
+    hx = hint(c, hx, "B", T("Volver", "Back"));
+    hint(c, hx, "+", T("Salir", "Exit"));
+}
+
+/* ---------- comentarios de un juego ---------- */
+
+/* Un corazon de `size` px centrado en (cx, cy), hecho con dos circulos y un triangulo. */
+static void heart(gfx_canvas *c, int cx, int cy, int size, gfx_color col) {
+    int r = size / 4 + 1;
+    gfx_circle(c, cx - r + 1, cy - r / 2, r, col);
+    gfx_circle(c, cx + r - 1, cy - r / 2, r, col);
+    int top = cy - r / 2, bottom = cy + size / 2, half = 2 * r;
+    for (int y = top; y <= bottom; y++) {
+        int hw = half * (bottom - y) / (bottom - top);
+        gfx_rect(c, cx - hw, y, hw * 2 + 1, 1, col);
+    }
+}
+
+/* Escribe `s` partiendo en palabras para que quepa en `max_w`; hasta `max_lines` lineas. */
+static void text_wrap(gfx_canvas *c, int x, int y, int size, int line_h, gfx_color col, const char *s, int max_w, int max_lines) {
+    char line[512];
+    int lines = 0;
+    while (*s && lines < max_lines) {
+        while (*s == ' ' || *s == '\n') s++;
+        size_t best = 0, i = 0;
+        for (;;) {
+            size_t j = i;
+            while (s[j] && s[j] != ' ' && s[j] != '\n') j++;
+            if (j >= sizeof(line)) break;
+            memcpy(line, s, j);
+            line[j] = 0;
+            if (gfx_text_width(size, line) > max_w && best) break;
+            best = j;
+            if (!s[j] || s[j] == '\n') break;
+            i = j + 1;
+        }
+        if (!best) break;
+        memcpy(line, s, best);
+        line[best] = 0;
+        bool last = ++lines == max_lines && s[best] && s[best + 1];
+        if (last) gfx_text_fit(c, x, y, size, col, line, max_w - gfx_text_width(size, "…"));
+        else gfx_text_fit(c, x, y, size, col, line, max_w);
+        if (last) gfx_text(c, x + (gfx_text_width(size, line) < max_w - 20 ? gfx_text_width(size, line) : max_w - 20), y, size, col, "…");
+        y += line_h;
+        s += best;
+    }
+}
+
+void ui_reviews(gfx_canvas *c, const ui_assets *a, const char *game, const gr_review *r, int n, int cursor, int top, int state, bool linked) {
+    begin(c);
+    char sub[160];
+    bool wrote = false;
+    for (int i = 0; i < n; i++) wrote = wrote || r[i].mine;
+    snprintf(sub, sizeof(sub), T("Comentarios  ·  %d  ·  cada me gusta le da 2 puntos al autor", "Comments  ·  %d  ·  each like gives the author 2 points"), n);
+    header(c, a, NULL, game, sub);
+
+    if (state != 1 || n == 0) {
+        card(c, MARGIN, 180, CONTENT_W, 320, false);
+        img(c, a, state == 2 ? UI_IMG_m_triste : UI_IMG_m_buscando, MARGIN + 30, 210);
+        const char *t1, *t2;
+        if (state == 2) { t1 = T("No hay conexión", "No connection"); t2 = T("Conecta la consola a internet e inténtalo de nuevo.", "Connect the console to the internet and try again."); }
+        else { t1 = T("Nadie ha comentado todavía", "No comments yet");
+               t2 = linked ? T("Pulsa Y para escribir el primero.", "Press Y to write the first one.")
+                           : T("Vincula la consola en Opciones → Cuenta para comentar.", "Link the console in Options → Account to comment."); }
+        gfx_text(c, MARGIN + 320, 290, 36, P->ink, t1);
+        gfx_text_fit(c, MARGIN + 320, 350, 23, P->gray, t2, CONTENT_W - 360);
+    } else {
+        for (int i = top; i < n && i < top + UI_REVIEW_ROWS; i++) {
+            const gr_review *v = &r[i];
+            const int x = MARGIN, y = 116 + (i - top) * 172, w = CONTENT_W, h = 160;
+            card(c, x, y, w, h, i == cursor);
+            zone(x, y, w, h, UI_ZONE_ITEM, i);
+            if (!(v->avatar >= 1 && v->avatar <= UI_AVATAR_COUNT && img_fit(c, a, UI_IMG_avatar_01 + v->avatar - 1, x + 20, y + 18, 64)))
+                gfx_circle(c, x + 52, y + 50, 32, C_GREEN_DK);
+            const char *name = v->display[0] ? v->display : v->username;
+            int nw = gfx_text_width(24, name);
+            if (nw > 380) nw = 380;
+            gfx_text_fit(c, x + 104, y + 14, 24, P->ink, name, 380);
+            int fx = x + 104 + nw + 10;
+            int ci = ui_country_index(v->country);
+            if (ci >= 0 && img_fit(c, a, UI_IMG_flag_do + ci, fx, y + 14, 28)) fx += 36;
+            if (v->donor && img_fit(c, a, UI_IMG_badge_donador, fx, y + 12, 30)) fx += 36;
+            char info[96];
+            snprintf(info, sizeof(info), "@%s  ·  %d pts  ·  %.2s/%.2s/%.4s%s", v->username, v->total_points,
+                     T(v->date + 8, v->date + 5), T(v->date + 5, v->date + 8), v->date, v->mine ? T("  ·  tuyo", "  ·  yours") : "");
+            gfx_text_fit(c, fx + 6, y + 19, 18, P->gray, info, x + w - 200 - fx);
+            text_wrap(c, x + 104, y + 52, 21, 30, P->ink, v->body, w - 104 - 190, 3);
+            /* me gusta */
+            char likes[16];
+            snprintf(likes, sizeof(likes), "%d", v->likes);
+            int lw = gfx_text_width(24, likes) + 74;
+            int lx = x + w - 24 - lw, ly = y + h / 2 - 24;
+            gfx_round_rect(c, lx, ly, lw, 48, 24, v->liked ? C_GREEN : P->card_sel);
+            heart(c, lx + 30, ly + 24, 20, v->liked ? C_WHITE : P->gray);
+            gfx_text(c, lx + 52, ly + 9, 24, v->liked ? C_WHITE : P->ink, likes);
+        }
+        if (n > top + UI_REVIEW_ROWS) text_center(c, UI_W / 2, 632, 18, P->gray, "▼", 40);
+    }
+
+    footer_bar(c);
+    int hx = MARGIN;
+    bool sel = state == 1 && n > 0 && cursor < n;
+    if (sel && linked && !r[cursor].mine) hx = hint(c, hx, "A", r[cursor].liked ? T("Quitar me gusta", "Unlike") : T("Me gusta", "Like"));
+    if (sel) hx = hint(c, hx, "X", T("Ver perfil", "View profile"));
+    if (linked) hx = hint(c, hx, "Y", wrote ? T("Editar el tuyo", "Edit yours") : T("Escribir", "Write"));
+    hx = hint(c, hx, "B", T("Volver", "Back"));
     hint(c, hx, "+", T("Salir", "Exit"));
 }
 
@@ -991,7 +1101,7 @@ void ui_search(gfx_canvas *c, const ui_assets *a, unsigned value, int type_bits,
 /* ---------- opciones ---------- */
 
 static const struct { const char *es, *en; int n; int opt[5]; } k_tabs[UI_TABS] = {
-    { "General",     "General",  5, { UI_OPT_LANG, UI_OPT_THEME, UI_OPT_ANIM, UI_OPT_START, UI_OPT_APPSOUND } },
+    { "General",     "General",  5, { UI_OPT_LANG, UI_OPT_THEME, UI_OPT_START, UI_OPT_ANIM, UI_OPT_APPSOUND } },
     { "Vista",       "View",     4, { UI_OPT_SCOPE, UI_OPT_SHOW, UI_OPT_GAMES_VIEW, UI_OPT_ACH_VIEW } },
     { "En el juego", "In-game",  3, { UI_OPT_INGAME, UI_OPT_SOUND, UI_OPT_POPUP } },
     { "Música",      "Music",    0, { 0 } },  /* una fila para encender y una por cancion */
@@ -1755,10 +1865,12 @@ void ui_user(gfx_canvas *c, const ui_assets *a, const gr_rank_row *who, bool can
     gfx_text(c, cx - pw / 2 + 22, y + 290, 26, C_ON_YELLOW, buf);
 
     char v[3][16];
-    snprintf(v[0], 16, "#%d", who->position);
+    /* desde un comentario no hay posicion: se muestran sus me gusta (van en points) */
+    if (who->position > 0) snprintf(v[0], 16, "#%d", who->position);
+    else snprintf(v[0], 16, "%d", who->points);
     snprintf(v[1], 16, "%d", who->total_points);
     snprintf(v[2], 16, "%d", who->achievements);
-    const char *labels[3] = { T("En este ranking", "In this ranking"), T("Puntos", "Points"), T("Logros", "Achievements") };
+    const char *labels[3] = { who->position > 0 ? T("En este ranking", "In this ranking") : T("Me gusta", "Likes"), T("Puntos", "Points"), T("Logros", "Achievements") };
     for (int i = 0; i < 3; i++) {
         int sx = x + 60 + i * 200;
         gfx_text(c, sx + 100 - gfx_text_width(36, v[i]) / 2, y + 356, 36, P->ink, v[i]);

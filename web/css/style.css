@@ -418,3 +418,43 @@ h1 .flag { vertical-align: -3px; }
 .flag-drop[open] summary { border-color: var(--green); }
 .flag-drop-list { position: absolute; z-index: 40; top: calc(100% + 8px); left: 0; width: min(640px, 92vw); max-height: 360px; overflow: auto; padding: 12px; border-radius: 16px; background: #10231a; border: 1px solid var(--line); box-shadow: 0 16px 40px rgba(0, 0, 0, .45); }
 .flag-drop-list .flag-grid { margin: 0; }
+
+/* ver mas */
+.more-btn { display: block; margin: 12px auto 0; }
+
+/* comentarios */
+.reviews { display: grid; gap: 10px; }
+.review { display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: start; }
+.review .who { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; text-decoration: none; color: var(--ink); }
+.review .who:hover strong { text-decoration: underline; }
+.review .body { margin: 6px 0 8px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.review .acts { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.like { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 999px; border: 1px solid var(--line);
+  background: rgba(255, 255, 255, .06); color: var(--ink); font: inherit; font-weight: 700; cursor: pointer; }
+.like[aria-pressed="true"] { background: rgba(67, 208, 88, .22); border-color: #43d058; }
+.like:disabled { cursor: default; opacity: .75; }
+.review-form textarea { width: 100%; min-height: 90px; resize: vertical; }
+.donor-mini { width: 20px; height: 20px; vertical-align: middle; }
+
+/* celular: barra solida pegada arriba y menu desplegable */
+.menu-toggle { display: none; }
+@media (max-width: 760px) {
+  .top { padding-top: 0; }
+  .top > .top-row { border-radius: 0; border-width: 0 0 1px; max-width: none; margin: 0; padding: 8px 16px; min-height: 56px;
+    background: #0b2114; -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: 0 6px 20px rgba(0, 0, 0, .45);
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+  .brand-badge, .brand-badge img { width: 36px; height: 36px; }
+  .menu-toggle { display: inline-flex; flex-direction: column; justify-content: center; gap: 5px; width: 44px; height: 44px; padding: 10px;
+    border: 1px solid var(--line); border-radius: 12px; background: rgba(255, 255, 255, .06); cursor: pointer; }
+  .menu-toggle span { display: block; height: 2px; background: var(--ink); border-radius: 2px; }
+  .top .nav { display: none; flex-basis: 100%; flex-direction: column; align-items: stretch; gap: 2px; padding: 8px 0 6px; }
+  .top.open .nav { display: flex; }
+  .top .nav a, .top .nav button, .top .nav .user-menu summary { justify-content: flex-start; padding: 12px 14px; border-radius: 12px; }
+  .top .nav .lang-toggle { align-self: flex-start; }
+  .user-menu-list { position: static; margin-top: 4px; box-shadow: none; }
+  main.wrap { padding-top: 18px; }
+  .row { flex-wrap: wrap; }
+  .row > .right { margin-left: auto; }
+  .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .badges { grid-template-columns: 1fr; }
+}

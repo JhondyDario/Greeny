@@ -480,11 +480,34 @@ create index if not exists follows_followed_idx on public.follows (followed_id);
 -- Totales de cada usuario: logros, puntos, juegos, platinos (juegos con todos sus
 -- logros), seguidores y siguiendo. El nivel y las medallas se calculan a partir
 -- de estos numeros con las mismas reglas en la app y en la web.
+-- COMENTARIOS DE LOS JUEGOS ----------------------------------------------------
+-- Uno por persona y juego (se puede editar o borrar). Los "me gusta" dan puntos al autor:
+-- 2 por cada uno, con un tope de 10 por comentario para que no se pueda inflar.
+create table if not exists public.reviews (
+    id         bigint generated always as identity primary key,
+    title_id   text not null references public.games (title_id) on delete cascade,
+    user_id    uuid not null references public.profiles (id) on delete cascade,
+    body       text not null,
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now(),
+    unique (title_id, user_id),
+    constraint reviews_body_len check (char_length(body) between 2 and 500)
+);
+create table if not exists public.review_likes (
+    review_id  bigint not null references public.reviews (id) on delete cascade,
+    user_id    uuid not null references public.profiles (id) on delete cascade,
+    created_at timestamptz not null default now(),
+    primary key (review_id, user_id)
+);
+create index if not exists reviews_title_idx on public.reviews (title_id);
+
 drop view if exists public.profile_stats;
 create view public.profile_stats with (security_invoker = true) as
 select p.id, p.username,
        coalesce(s.achievements, 0)::int as achievements,
-       coalesce(s.points, 0)::int       as points,
+       (coalesce(s.points, 0) + coalesce(r.review_points, 0))::int as points,
+       coalesce(s.points, 0)::int       as achievement_points,
+       coalesce(r.review_points, 0)::int as review_points,
        coalesce(s.games, 0)::int        as games,
        coalesce(s.platinums, 0)::int    as platinums,
        (select count(*) from public.follows f where f.followed_id = p.id)::int as followers,
@@ -500,7 +523,12 @@ select p.id, p.username,
                  group by u.title_id) g
           join (select title_id, count(*) as total from public.achievements group by title_id) t
             on t.title_id = g.title_id
-       ) s on true;
+       ) s on true
+  left join lateral (
+        select sum(least(l.n, 10) * 2) as review_points
+          from (select (select count(*) from public.review_likes k where k.review_id = v.id) as n
+                  from public.reviews v where v.user_id = p.id) l
+       ) r on true;
 
 -- Seguir a alguien por su codigo de amigo. Acepta el codigo con o sin "GR", guiones o espacios.
 -- Devuelve el nombre de usuario de la persona seguida.
@@ -563,7 +591,7 @@ as $$
     select jsonb_build_object(
                'username', p.username, 'display_name', p.display_name, 'caption', p.caption, 'avatar', p.avatar, 'country', p.country, 'donor', p.donor,
                'caption_en', (select c.text_en from public.caption_presets c where c.text_es = p.caption limit 1),
-               'friend_code', p.friend_code,
+               'friend_code', p.friend_code, 'review_points', s.review_points,
                'admin', exists (select 1 from public.admins a where a.user_id = p.id),
                'achievements', s.achievements, 'points', s.points, 'games', s.games, 'platinums', s.platinums,
                'followers', s.followers, 'following', s.following)
@@ -928,3 +956,120 @@ create policy applications_delete on public.applications for delete
 
 grant select, insert, delete on public.applications to authenticated;
 grant update (status) on public.applications to authenticated;
+
+
+
+-- -----------------------------------------------------------------------------
+-- 11. COMENTARIOS: reglas y funciones para la consola
+-- -----------------------------------------------------------------------------
+alter table public.reviews enable row level security;
+alter table public.review_likes enable row level security;
+
+drop policy if exists reviews_read on public.reviews;
+create policy reviews_read on public.reviews for select using (true);
+drop policy if exists reviews_insert_own on public.reviews;
+create policy reviews_insert_own on public.reviews for insert with check ((select auth.uid()) = user_id);
+drop policy if exists reviews_update_own on public.reviews;
+create policy reviews_update_own on public.reviews for update
+    using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
+drop policy if exists reviews_delete on public.reviews;
+create policy reviews_delete on public.reviews for delete using ((select auth.uid()) = user_id or public.is_admin());
+
+drop policy if exists review_likes_read on public.review_likes;
+create policy review_likes_read on public.review_likes for select using (true);
+-- un "me gusta" es tuyo y nunca a tu propio comentario
+drop policy if exists review_likes_insert_own on public.review_likes;
+create policy review_likes_insert_own on public.review_likes for insert
+    with check ((select auth.uid()) = user_id
+                and not exists (select 1 from public.reviews v where v.id = review_id and v.user_id = (select auth.uid())));
+drop policy if exists review_likes_delete_own on public.review_likes;
+create policy review_likes_delete_own on public.review_likes for delete using ((select auth.uid()) = user_id);
+
+grant select on public.reviews, public.review_likes to anon, authenticated;
+grant insert, delete on public.reviews, public.review_likes to authenticated;
+grant update (body, updated_at) on public.reviews to authenticated;
+
+-- Los comentarios de un juego, los mas queridos primero. `viewer` puede ser null.
+create or replace function public.reviews_for(viewer uuid, title text)
+returns jsonb
+language sql stable security definer set search_path = ''
+as $$
+    select coalesce(jsonb_agg(x order by x.likes desc, x.created_at desc), '[]'::jsonb)
+      from (select v.id, v.body, v.created_at, v.updated_at,
+                   p.username, p.display_name, p.avatar, p.country, p.donor,
+                   s.points as total_points, s.achievements,
+                   (select count(*) from public.review_likes k where k.review_id = v.id)::int as likes,
+                   exists (select 1 from public.review_likes k where k.review_id = v.id and k.user_id = viewer) as liked,
+                   v.user_id = viewer as mine
+              from public.reviews v
+              join public.profiles p on p.id = v.user_id
+              join public.profile_stats s on s.id = p.id
+             where v.title_id = title
+             order by 12 desc, v.created_at desc
+             limit 40) x;
+$$;
+
+create or replace function public.device_reviews(device_token text, title text)
+returns jsonb
+language sql stable security definer set search_path = ''
+as $$
+    select public.reviews_for((select d.user_id from public.devices d where d.token_hash = public.hash_token(device_token)), title);
+$$;
+
+-- Escribe o cambia tu comentario de un juego; vacio lo borra.
+create or replace function public.device_review_save(device_token text, title text, body text)
+returns boolean
+language plpgsql security definer set search_path = ''
+as $$
+declare
+    v_uid uuid;
+    v_body text := nullif(trim(coalesce(body, '')), '');
+begin
+    select d.user_id into v_uid from public.devices d where d.token_hash = public.hash_token(device_token);
+    if v_uid is null then raise exception 'consola sin vincular'; end if;
+    if v_body is null then
+        delete from public.reviews where title_id = title and user_id = v_uid;
+        return true;
+    end if;
+    if char_length(v_body) > 500 then raise exception 'el comentario es muy largo'; end if;
+    insert into public.reviews (title_id, user_id, body) values (title, v_uid, v_body)
+        on conflict (title_id, user_id) do update set body = excluded.body, updated_at = now();
+    return true;
+end;
+$$;
+
+-- Da o quita un "me gusta". Devuelve true si quedo dado.
+create or replace function public.device_review_like(device_token text, review bigint, liked boolean)
+returns boolean
+language plpgsql security definer set search_path = ''
+as $$
+declare
+    v_uid uuid;
+begin
+    select d.user_id into v_uid from public.devices d where d.token_hash = public.hash_token(device_token);
+    if v_uid is null then raise exception 'consola sin vincular'; end if;
+    if not liked then
+        delete from public.review_likes where review_id = review and user_id = v_uid;
+        return false;
+    end if;
+    if exists (select 1 from public.reviews v where v.id = review and v.user_id = v_uid) then
+        raise exception 'no puedes darle me gusta a tu propio comentario';
+    end if;
+    insert into public.review_likes (review_id, user_id) values (review, v_uid) on conflict do nothing;
+    return true;
+end;
+$$;
+
+-- La misma lista para la web: quien mira sale de la sesion.
+create or replace function public.game_reviews(title text)
+returns jsonb
+language sql stable security definer set search_path = ''
+as $$
+    select public.reviews_for((select auth.uid()), title);
+$$;
+
+revoke all on function public.reviews_for(uuid, text) from public, anon, authenticated;
+grant execute on function public.game_reviews(text) to anon, authenticated;
+grant execute on function public.device_reviews(text, text) to anon, authenticated;
+grant execute on function public.device_review_save(text, text, text) to anon, authenticated;
+grant execute on function public.device_review_like(text, bigint, boolean) to anon, authenticated;

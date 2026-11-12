@@ -20,6 +20,7 @@ typedef struct {
     char name[64];
     char version[16];
     char status[16]; /* sin_empezar, prueba, jugable o perfecto */
+    char updated[11]; /* AAAA-MM-DD: ultima vez que se cambiaron sus logros */
 } gr_cat_game;
 
 /* Lista los juegos publicados, por nombre. 0 si respondio el catalogo, -1 sin conexion. */
