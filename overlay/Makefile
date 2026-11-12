@@ -39,7 +39,7 @@ include $(DEVKITPRO)/libnx/switch_rules
 #---------------------------------------------------------------------------------
 
 APP_TITLE			:=		Greeny
-APP_VERSION 	:= 		0.1.9
+APP_VERSION 	:= 		0.2.0
 
 TARGET		:=	greeny
 BUILD		:=	build

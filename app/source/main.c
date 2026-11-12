@@ -512,6 +512,12 @@ static void device_name(char *out, size_t cap) {
 
 /* Hilo de fondo. Nunca bloquea la interfaz. Hace dos cosas, las dos opcionales:
  * baja los archivos de logros de los juegos instalados y, si hay cuenta, sube los logros. */
+/* ---------- avisos ---------- */
+static gr_notif g_notifs[GR_NOTIFS_MAX], g_sync_notifs[GR_NOTIFS_MAX];
+static int g_nnotif, g_unread, g_sync_nnotif, g_sync_unread;
+static bool g_sync_notifs_ok;
+static u64 g_last_sync_tick; /* para volver a sincronizar cada 5 minutos */
+
 static void sync_thread(void *arg) {
     (void)arg;
     g_cat_downloaded = 0;
@@ -534,12 +540,6 @@ static void sync_thread(void *arg) {
     }
     g_bg_done = true;
 }
-
-/* ---------- avisos ---------- */
-static gr_notif g_notifs[GR_NOTIFS_MAX], g_sync_notifs[GR_NOTIFS_MAX];
-static int g_nnotif, g_unread, g_sync_nnotif, g_sync_unread;
-static bool g_sync_notifs_ok;
-static u64 g_last_sync_tick; /* para volver a sincronizar cada 5 minutos */
 
 static void sync_start(void) {
     g_last_sync_tick = armGetSystemTick();
