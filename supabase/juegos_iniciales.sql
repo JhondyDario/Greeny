@@ -89,7 +89,7 @@ insert into public.achievements (title_id, ach_id, name_es, desc_es, name_en, de
   ('0100152000022000', 'primera_partida', 'Primera partida', 'Juega 2 minutos seguidos', 'First session', 'Play for 2 minutes straight', 5, 'bronce', 0) on conflict (title_id, ach_id) do nothing;
 
 insert into public.games (title_id, name, version, build_id, definition, published, status) values
-  ('01004D300C5AE000', 'Kirby y la tierra olvidada', '1.1.0', null, $greeny$# Kirby y la tierra olvidada
+  ('01004D300C5AE000', 'Kirby and the Forgotten Land', '1.1.0', null, $greeny$# Kirby and the Forgotten Land
 # Va en  sdmc:/config/greeny/games/01004D300C5AE000.txt
 #
 # SIN EMPEZAR. Todavia no se han buscado las direcciones de memoria de este juego, asi que
@@ -100,7 +100,7 @@ insert into public.games (title_id, name, version, build_id, definition, publish
 # Ideas para los logros de verdad (hay que encontrarlas con el buscador de valores):
 #   Waddle Dees rescatados (total del pueblo) y monedas estrella.
 
-game = Kirby y la tierra olvidada
+game = Kirby and the Forgotten Land
 version = 1.1.0
 
 [primera_partida]
