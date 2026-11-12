@@ -17,7 +17,7 @@
 
 /* opciones, agrupadas en pestañas que se cambian con L y R */
 enum {
-    UI_OPT_LANG, UI_OPT_THEME, UI_OPT_ANIM, UI_OPT_GAMES_VIEW, UI_OPT_ACH_VIEW, UI_OPT_SOUND, UI_OPT_POPUP, UI_OPT_START, UI_OPT_SCOPE, UI_OPT_SHOW, UI_OPT_INGAME, UI_OPT_MUSIC, UI_OPT_SONG, UI_OPT_APPSOUND,
+    UI_OPT_LANG, UI_OPT_THEME, UI_OPT_ANIM, UI_OPT_GAMES_VIEW, UI_OPT_ACH_VIEW, UI_OPT_SOUND, UI_OPT_POPUP, UI_OPT_START, UI_OPT_SCOPE, UI_OPT_SHOW, UI_OPT_INGAME, UI_OPT_MUSIC, UI_OPT_SONG, UI_OPT_APPSOUND, UI_OPT_STARTPOP, UI_OPT_OVERLAY,
     UI_OPT_DIAG, UI_OPT_ABOUT, UI_OPT_SEARCH,
     /* pestaña Cuenta: unas u otras segun si la consola esta vinculada */
     UI_OPT_ACC_LINK, UI_OPT_ACC_LOGIN, UI_OPT_ACC_INFO, UI_OPT_ACC_SYNC, UI_OPT_ACC_UNLINK, UI_OPT_ACC_PHOTO, UI_OPT_ACC_COUNTRY,
@@ -26,6 +26,7 @@ enum {
 #define UI_TABS 6
 #define UI_TAB_MUSIC 3
 #define UI_TAB_ACCOUNT 4
+#define UI_TAB_INGAME 2
 int ui_tab_count(int tab, bool linked);            /* cuantas opciones tiene la pestaña */
 int ui_tab_option(int tab, int row, bool linked);  /* cual UI_OPT_* esta en esa fila */
 
@@ -110,6 +111,7 @@ typedef struct {
     const char *username;   /* "" si la consola no esta vinculada */
     const char *caption;
     const char *friend_code; /* "" si aun no se sabe */
+    const char *joined;     /* AAAA-MM-DD en que se unio; "" o NULL si no se sabe */
     const char *country;    /* pais, dos letras; "" = sin indicar */
     bool donor;             /* lleva la medalla de donador */
     int avatar;             /* foto de perfil elegida, de 1 a UI_AVATAR_COUNT; 0 = la inicial del nombre */

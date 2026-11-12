@@ -20,3 +20,6 @@ test/net/test_catalog
 test/toast/toast_host
 app/data/toast_*.bin
 test/search/test_search
+app/data/overlay.bin
+overlay/build/
+overlay/*.ovl

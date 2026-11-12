@@ -427,7 +427,7 @@ static void test_i18n_config(void) {
     CHECK(c2.animated_bg && !c2.intro_done && c2.start_page == GR_START_TROPHIES);
 
     /* valores fuera de rango no escriben basura */
-    gr_config bad_cfg = { 99, -4, 7, 2, true, true, true, false, 42, 9, -1, true, false, "" };
+    gr_config bad_cfg = { 99, -4, 7, 2, true, true, true, false, true, false, 42, 9, -1, true, false, "" };
     CHECK(gr_config_save(&bad_cfg, path) == 0);
     gr_config_load(&c2, path);
     CHECK(c2.lang == GR_LANG_AUTO && c2.theme == GR_THEME_AUTO && c2.games_view == GR_VIEW_LIST);

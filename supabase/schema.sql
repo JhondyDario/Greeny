@@ -591,7 +591,7 @@ as $$
     select jsonb_build_object(
                'username', p.username, 'display_name', p.display_name, 'caption', p.caption, 'avatar', p.avatar, 'country', p.country, 'donor', p.donor,
                'caption_en', (select c.text_en from public.caption_presets c where c.text_es = p.caption limit 1),
-               'friend_code', p.friend_code, 'review_points', s.review_points,
+               'friend_code', p.friend_code, 'review_points', s.review_points, 'created_at', p.created_at,
                'admin', exists (select 1 from public.admins a where a.user_id = p.id),
                'achievements', s.achievements, 'points', s.points, 'games', s.games, 'platinums', s.platinums,
                'followers', s.followers, 'following', s.following)

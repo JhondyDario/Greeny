@@ -155,6 +155,7 @@ void gr_account_load(gr_account *a, const char *path) {
         else if (!strcmp(line, "followers")) { a->followers = atoi(v); a->social_known = true; }
         else if (!strcmp(line, "following")) a->following = atoi(v);
         else if (!strcmp(line, "friend_code")) snprintf(a->friend_code, sizeof(a->friend_code), "%s", v);
+        else if (!strcmp(line, "joined")) snprintf(a->joined, sizeof(a->joined), "%.10s", v);
         else if (!strcmp(line, "avatar")) a->avatar = atoi(v);
         else if (!strcmp(line, "admin")) a->admin = v[0] == '1';
         else if (!strcmp(line, "donor")) a->donor = v[0] == '1';
@@ -173,6 +174,7 @@ int gr_account_save(const gr_account *a, const char *path) {
                      a->display, a->caption) > 0;
     if (ok && a->social_known) ok = fprintf(f, "followers=%d\nfollowing=%d\n", a->followers, a->following) > 0;
     if (ok && a->friend_code[0]) ok = fprintf(f, "friend_code=%s\n", a->friend_code) > 0;
+    if (ok && a->joined[0]) ok = fprintf(f, "joined=%s\n", a->joined) > 0;
     if (ok && a->avatar > 0) ok = fprintf(f, "avatar=%d\n", a->avatar) > 0;
     if (ok && a->admin) ok = fprintf(f, "admin=1\n") > 0;
     if (ok && a->donor) ok = fprintf(f, "donor=1\n") > 0;
@@ -236,6 +238,8 @@ gr_net_result gr_fetch_social(gr_http_fn http, gr_account *a) {
         a->social_known = true;
     }
     gr_json_string(resp, "friend_code", a->friend_code, sizeof(a->friend_code));
+    char created[40] = "";
+    if (gr_json_string(resp, "created_at", created, sizeof(created)) && strlen(created) >= 10) snprintf(a->joined, sizeof(a->joined), "%.10s", created);
     int avatar;
     if (gr_json_int(resp, "avatar", &avatar) && avatar > 0) a->avatar = avatar;
     bool admin;

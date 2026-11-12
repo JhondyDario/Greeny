@@ -4,7 +4,7 @@
 
 #include "model.h"
 
-#define GR_DIAG_MAX 12
+#define GR_DIAG_MAX 14
 
 typedef enum { GR_DIAG_OK, GR_DIAG_WARN, GR_DIAG_FAIL, GR_DIAG_INFO } gr_diag_state;
 
@@ -27,4 +27,6 @@ typedef struct {
     char prev_last_step[64];   /* ultimo paso que alcanzo si no cerro bien */
 } gr_diag_env;
 
+/* Esta nx-ovlloader con el menu de Tesla (o Ultrahand)? */
+bool gr_tesla_installed(const char *sd);
 int gr_diag_run(gr_diag_item *out, int max, const gr_diag_env *env, const gr_model *m);

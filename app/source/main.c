@@ -36,6 +36,7 @@
 #include "toast_oro_bin.h"
 #include "toast_plata_bin.h"
 #include "sysmodule_bin.h"
+#include "overlay_bin.h"
 #include "mascot_big_bin.h"
 #include "mascot_small_bin.h"
 
@@ -304,6 +305,40 @@ static bool install_file(const char *path, const void *data, size_t size) {
     return rename(tmp, path) == 0;
 }
 
+/* ---------- overlay de Tesla (opcional) ---------- */
+static void show_message(bool ok, const char *title, const char *line1, const char *line2);
+static bool g_overlay_msg; /* overlay_toggle dejo un mensaje para mostrar */
+#define OVERLAY_PATH "sdmc:/switch/.overlays/greeny.ovl"
+
+/* Lo pone o lo quita de la carpeta de Tesla. Sin Tesla no se activa y se explica por que. */
+static void overlay_toggle(void) {
+    if (g_config.overlay) {
+        remove(OVERLAY_PATH);
+        g_config.overlay = false;
+        return;
+    }
+    if (!gr_tesla_installed("sdmc:")) {
+        show_message(false, "Falta Tesla", "Instala nx-ovlloader y Tesla Menu (o Ultrahand) y reinicia la consola.",
+                     "Mira Opciones → Ayuda → Diagnóstico: \"Tesla\" tiene que salir en verde.");
+        g_msg_tab = UI_TAB_INGAME;
+        g_overlay_msg = true;
+        return;
+    }
+    mkdir("sdmc:/switch/.overlays", 0777);
+    install_file(OVERLAY_PATH, overlay_bin, overlay_bin_size);
+    struct stat st;
+    if (stat(OVERLAY_PATH, &st) != 0) {
+        show_message(false, "No se pudo instalar", "No se pudo copiar greeny.ovl a la SD.", NULL);
+        g_msg_tab = UI_TAB_INGAME;
+        g_overlay_msg = true;
+        return;
+    }
+    g_config.overlay = true;
+    show_message(true, "¡Listo!", "En el juego abre Tesla (L + abajo + R3) y elige Greeny.", "Se ve tu progreso sin tocar la memoria del juego.");
+    g_msg_tab = UI_TAB_INGAME;
+    g_overlay_msg = true;
+}
+
 /* Imagenes PNG que van dentro de la app (app/data/img_*.bin). Se decodifican una vez al abrir. */
 #define UI_IMG(name, w, h) extern const unsigned char img_##name##_bin[], img_##name##_bin_end[];
 #include "ui_images.h"
@@ -458,6 +493,7 @@ static void refresh_greeting(void) {
     g_profile.caption = !linked ? "" : (g_ui_en && g_account.caption_en[0]) ? g_account.caption_en : g_account.caption;
     g_profile.country = linked ? g_account.country : "";
     g_profile.friend_code = linked ? g_account.friend_code : "";
+    g_profile.joined = linked ? g_account.joined : "";
     g_profile.avatar = linked ? g_account.avatar : 0;
     g_profile.donor = linked && g_account.donor;
     ui_set_admin(linked && g_account.admin);
@@ -963,6 +999,8 @@ int main(int argc, char *argv[]) {
 
     trace("configuracion");
     gr_config_load(&g_config, CONFIG_PATH);
+    /* si el overlay esta activado, se pone al dia con el de esta version (solo escribe si cambio) */
+    if (g_config.overlay && gr_tesla_installed("sdmc:")) install_file(OVERLAY_PATH, overlay_bin, overlay_bin_size);
     apply_config();
     music_refresh();
     ui_set_music(g_songs, NSONGS, -1);
@@ -1365,6 +1403,11 @@ int main(int argc, char *argv[]) {
                         break;
                     case UI_OPT_SOUND:      g_config.sound = !g_config.sound; break;
                     case UI_OPT_POPUP:      g_config.popup = !g_config.popup; break;
+                    case UI_OPT_STARTPOP:   g_config.start_popup = !g_config.start_popup; break;
+                    case UI_OPT_OVERLAY:
+                        overlay_toggle();
+                        if (g_overlay_msg) { g_overlay_msg = false; g_msg_return = SCREEN_SETTINGS; screen = SCREEN_MSG; }
+                        break;
                     case UI_OPT_SCOPE:      g_config.games_scope = (g_config.games_scope + 1) % GR_SCOPE_COUNT; rescan(); cursor = top = 0; break;
                     case UI_OPT_SHOW:       g_config.games_show = (g_config.games_show + 1) % GR_SHOW_COUNT; rescan(); cursor = top = 0; break;
                     case UI_OPT_START:      g_config.start_page = (g_config.start_page + 1) % GR_START_COUNT; break;

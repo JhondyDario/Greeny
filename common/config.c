@@ -17,6 +17,8 @@ void gr_config_defaults(gr_config *c) {
     c->ach_view = GR_VIEW_LIST;
     c->sound = true;
     c->popup = true;
+    c->start_popup = true;
+    c->overlay = false;
     c->animated_bg = true;
     c->intro_done = false;
     c->start_page = GR_START_TROPHIES;
@@ -59,6 +61,8 @@ void gr_config_load(gr_config *c, const char *path) {
         else if (!strcmp(key, "games_show")) pick(val, k_show, GR_SHOW_COUNT, &c->games_show);
         else if (!strcmp(key, "music")) pick_bool(val, &c->music);
         else if (!strcmp(key, "app_sound")) pick_bool(val, &c->app_sound);
+        else if (!strcmp(key, "start_popup")) pick_bool(val, &c->start_popup);
+        else if (!strcmp(key, "overlay")) pick_bool(val, &c->overlay);
         else if (!strcmp(key, "music_track")) {
             /* solo letras, numeros y _: es parte del nombre de un archivo */
             bool ok = true;
@@ -83,6 +87,7 @@ int gr_config_save(const gr_config *c, const char *path) {
                      name_of(k_view, GR_VIEW_COUNT, c->games_view), name_of(k_view, GR_VIEW_COUNT, c->ach_view),
                      c->sound ? 1 : 0, c->popup ? 1 : 0, c->animated_bg ? 1 : 0, c->intro_done ? 1 : 0, name_of(k_start, GR_START_COUNT, c->start_page),
                      name_of(k_scope, GR_SCOPE_COUNT, c->games_scope), name_of(k_show, GR_SHOW_COUNT, c->games_show), c->music ? 1 : 0, c->app_sound ? 1 : 0) > 0;
+    if (ok) ok = fprintf(f, "start_popup = %d\noverlay = %d\n", c->start_popup ? 1 : 0, c->overlay ? 1 : 0) > 0;
     if (ok && c->music_track[0]) ok = fprintf(f, "music_track = %s\n", c->music_track) > 0;
     if (fclose(f) != 0) ok = 0;
     return ok ? 0 : -1;

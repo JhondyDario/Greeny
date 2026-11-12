@@ -16,6 +16,8 @@ typedef struct {
     int  ach_view;    /* gr_view: como se muestran los logros en la app */
     bool sound;       /* sonido al desbloquear un logro */
     bool popup;       /* aviso en pantalla al desbloquear un logro */
+    bool start_popup; /* aviso "Logros activos" al abrir un juego */
+    bool overlay;     /* overlay de Tesla para ver los logros en el juego (hace falta Tesla) */
     bool animated_bg; /* fondo animado en la app */
     bool intro_done;  /* ya se mostro la introduccion de la app */
     int  start_page;  /* gr_start: que pantalla abre la app */

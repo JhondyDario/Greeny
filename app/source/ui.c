@@ -1,5 +1,6 @@
 #include "ui.h"
 #include "qrcodegen.h"
+#include <stdlib.h>
 
 #include "account.h"
 
@@ -1092,7 +1093,13 @@ void ui_search(gfx_canvas *c, const ui_assets *a, unsigned value, int type_bits,
         { "5. DERECHA: punteros. ABAJO: qué", "5. RIGHT: pointers. DOWN: what" },
         { "   lee cada uno. Pide 3 GB en la SD.", "   each reads. Needs 3 GB on the SD." },
     };
-    for (int i = 0; i < 9; i++) gfx_text(c, lx + 4, 384 + i * 26, 18, P->gray, step == 0 ? T(unknown[i][0], unknown[i][1]) : T(known[i][0], known[i][1]));
+    /* la guia cabe en la columna de la izquierda: si una linea es larga se achica, nunca se mete en el panel */
+    for (int i = 0; i < 9; i++) {
+        const char *ln = step == 0 ? T(unknown[i][0], unknown[i][1]) : T(known[i][0], known[i][1]);
+        int sz = 17;
+        while (sz > 13 && gfx_text_width(sz, ln) > lw - 4) sz--;
+        gfx_text_fit(c, lx + 4, 384 + i * 26, sz, P->gray, ln, lw - 4);
+    }
 
     const int rx = lx + lw + 20, rw = UI_W - MARGIN - rx;
     card(c, rx, 116, rw, 524, false);
@@ -1118,7 +1125,7 @@ void ui_search(gfx_canvas *c, const ui_assets *a, unsigned value, int type_bits,
 static const struct { const char *es, *en; int n; int opt[5]; } k_tabs[UI_TABS] = {
     { "General",     "General",  5, { UI_OPT_LANG, UI_OPT_THEME, UI_OPT_START, UI_OPT_ANIM, UI_OPT_APPSOUND } },
     { "Vista",       "View",     4, { UI_OPT_SCOPE, UI_OPT_SHOW, UI_OPT_GAMES_VIEW, UI_OPT_ACH_VIEW } },
-    { "En el juego", "In-game",  3, { UI_OPT_INGAME, UI_OPT_SOUND, UI_OPT_POPUP } },
+    { "En el juego", "In-game",  5, { UI_OPT_INGAME, UI_OPT_SOUND, UI_OPT_POPUP, UI_OPT_STARTPOP, UI_OPT_OVERLAY } },
     { "Música",      "Music",    0, { 0 } },  /* una fila para encender y una por cancion */
     { "Cuenta",      "Account",  0, { 0 } },  /* sus filas dependen de si la consola esta vinculada */
     { "Ayuda",       "Help",     3, { UI_OPT_DIAG, UI_OPT_ABOUT, UI_OPT_SEARCH } }, /* la ultima solo la ve un administrador */
@@ -1316,6 +1323,18 @@ void ui_settings(gfx_canvas *c, const ui_assets *a, const gr_config *cfg, int ta
                              "On-screen messages while you play. Applies when a game starts."),
                            cfg->popup ? on : off, cfg->popup ? C_GREEN : C_NEUTRAL);
                 break;
+            case UI_OPT_STARTPOP:
+                option_row(c, y, sel, T("Aviso al abrir un juego", "Pop-up when a game starts"),
+                           T("El de \"Logros activos\" arriba a la derecha. Los de logros desbloqueados siguen saliendo.",
+                             "The \"Achievements on\" one at the top right. Unlock pop-ups still show."),
+                           cfg->start_popup ? on : off, C_GREEN);
+                break;
+            case UI_OPT_OVERLAY:
+                option_row(c, y, sel, T("Ver logros en el juego (Tesla)", "See achievements in-game (Tesla)"),
+                           T("Opcional: hace falta tener Tesla. Ábrelo en el juego y elige Greeny.",
+                             "Optional: needs Tesla. Open it in-game and pick Greeny."),
+                           cfg->overlay ? on : off, C_GREEN);
+                break;
             case UI_OPT_SCOPE:
                 option_row(c, y, sel, T("Juegos en el inicio", "Games on the home screen"),
                            T("Activos: los instalados en esta consola. Jugados: además, los que ya tienen logros tuyos.",
@@ -1383,12 +1402,12 @@ static void diag_icon(gfx_canvas *c, int cx, int cy, gr_diag_state st) {
     }
 }
 
-static void diag_row(gfx_canvas *c, int y, const gr_diag_item *it) {
-    const int x = MARGIN, w = CONTENT_W, h = 44;
+static void diag_row(gfx_canvas *c, int y, int h, const gr_diag_item *it) {
+    const int x = MARGIN, w = CONTENT_W;
     glass(c, x, y, w, h, 12, false);
     diag_icon(c, x + 28, y + h / 2, it->state);
-    gfx_text_fit(c, x + 58, y + 9, 21, P->ink, g_en ? it->title_en : it->title_es, 330);
-    gfx_text_fit(c, x + 400, y + 11, 18, it->state == GR_DIAG_FAIL ? C_RED : P->gray,
+    gfx_text_fit(c, x + 58, y + h / 2 - 13, 21, P->ink, g_en ? it->title_en : it->title_es, 330);
+    gfx_text_fit(c, x + 400, y + h / 2 - 11, 18, it->state == GR_DIAG_FAIL ? C_RED : P->gray,
                  g_en ? it->detail_en : it->detail_es, w - 400 - 20);
 }
 
@@ -1406,7 +1425,9 @@ void ui_diag(gfx_canvas *c, const ui_assets *a, const gr_diag_item *items, int c
     else snprintf(sub, sizeof(sub), "%s", T("Todo en orden", "Everything looks good"));
     header(c, a, NULL, T("Diagnóstico", "Diagnostics"), sub);
 
-    for (int i = 0; i < count && i < GR_DIAG_MAX; i++) diag_row(c, 112 + i * 49, &items[i]);
+    /* con muchas filas se aprietan para que quepan sobre la barra de abajo */
+    int step = count > 0 && (650 - 112) / count < 49 ? (650 - 112) / count : 49;
+    for (int i = 0; i < count && i < GR_DIAG_MAX; i++) diag_row(c, 112 + i * step, step - 5, &items[i]);
 
     footer_bar(c);
     int hx = hint(c, MARGIN, "Y", T("Revisar de nuevo", "Check again"));
@@ -1506,7 +1527,7 @@ void ui_intro(gfx_canvas *c, const ui_assets *a, int page, const gr_diag_item *i
     } else if (page == 1) {
         gfx_text(c, MARGIN, 122, 30, P->ink, T("Revisando la instalación", "Checking the installation"));
         int shown = count < 6 ? count : 6; /* las primeras son las de instalacion; el resto esta en Diagnostico */
-        for (int i = 0; i < shown; i++) diag_row(c, 180 + i * 52, &items[i]);
+        for (int i = 0; i < shown; i++) diag_row(c, 180 + i * 52, 44, &items[i]);
         gfx_text(c, MARGIN, 180 + shown * 52 + 14, 20, P->gray,
                  fails ? T("Lo que está en rojo hay que arreglarlo para que los logros funcionen.",
                            "Items in red must be fixed for achievements to work.")
@@ -1696,9 +1717,25 @@ void ui_profile_screen(gfx_canvas *c, const ui_assets *a, const ui_profile *p) {
         snprintf(buf, sizeof(buf), "“%s”", p->caption);
         text_center(c, cx, ly + 290, 21, P->ink, buf, lw - 40);
     }
-    if (p->linked && p->friend_code && p->friend_code[0]) {
-        text_center(c, cx, ly + 528, 16, P->gray, T("CÓDIGO DE AMIGO", "FRIEND CODE"), lw - 40);
-        text_center(c, cx, ly + 550, 26, P->accent, p->friend_code, lw - 40);
+    /* abajo: desde cuando esta en Greeny y el codigo de amigo, separados por una linea fina */
+    bool has_joined = p->linked && p->joined && strlen(p->joined) == 10;
+    bool has_code = p->linked && p->friend_code && p->friend_code[0];
+    if (has_joined || has_code) gfx_glass(c, lx + 40, ly + 470, lw - 80, 1, 0, P->gray, P->gray, 90, 90);
+    if (has_joined) {
+        static const char *const mes_es[12] = { "ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic" };
+        static const char *const mes_en[12] = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
+        int y4 = atoi(p->joined), m2 = atoi(p->joined + 5), d2 = atoi(p->joined + 8);
+        if (m2 >= 1 && m2 <= 12) {
+            char when[40];
+            if (g_en) snprintf(when, sizeof(when), "%s %d, %d", mes_en[m2 - 1], d2, y4);
+            else snprintf(when, sizeof(when), "%d %s %d", d2, mes_es[m2 - 1], y4);
+            text_center(c, cx, ly + 486, 16, P->gray, T("EN GREENY DESDE", "MEMBER SINCE"), lw - 40);
+            text_center(c, cx, ly + 506, 22, P->ink, when, lw - 40);
+        }
+    }
+    if (has_code) {
+        text_center(c, cx, ly + has_joined * 62 + 486, 16, P->gray, T("CÓDIGO DE AMIGO", "FRIEND CODE"), lw - 40);
+        text_center(c, cx, ly + has_joined * 62 + 506, 24, P->accent, p->friend_code, lw - 40);
     }
 
     snprintf(buf, sizeof(buf), T("Nivel %d", "Level %d"), level);

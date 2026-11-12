@@ -58,6 +58,11 @@ static const char *last_of(const char *hay, const char *needle) {
     return last;
 }
 
+bool gr_tesla_installed(const char *sd) {
+    /* nx-ovlloader (lo que carga los overlays) y el menu de Tesla o Ultrahand */
+    return exists("%s/atmosphere/contents/420000000007E51A/exefs.nsp", sd) && exists("%s/switch/.overlays/ovlmenu.ovl", sd);
+}
+
 int gr_diag_run(gr_diag_item *out, int max, const gr_diag_env *env, const gr_model *m) {
     int n = 0;
     gr_diag_item *it;
@@ -130,6 +135,14 @@ int gr_diag_run(gr_diag_item *out, int max, const gr_diag_env *env, const gr_mod
         else DETAIL(it, "Aún no se ha abierto un juego con logros.", "No game with achievements opened yet.");
     }
     free(log);
+
+    /* Tesla es opcional: solo hace falta para ver los logros dentro del juego */
+    bool tesla = gr_tesla_installed(env->sd);
+    it = add(out, &n, max, tesla ? GR_DIAG_OK : GR_DIAG_INFO, "Tesla (opcional)", "Tesla (optional)");
+    if (tesla) DETAIL(it, "Instalado. Puedes activar los logros en el juego en Opciones.",
+                      "Installed. You can turn on in-game achievements in Options.");
+    else DETAIL(it, "No está. Solo hace falta para ver los logros dentro del juego.",
+                "Not found. Only needed to see achievements inside the game.");
 
     it = add(out, &n, max, env->covers_ok ? GR_DIAG_OK : GR_DIAG_WARN, "Carátulas", "Covers");
     if (env->covers_ok) DETAIL(it, "Se leen de los juegos instalados.", "Read from installed games.");

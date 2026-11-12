@@ -34,6 +34,7 @@ typedef struct {
     bool social_known;   /* ya se consultaron seguidores y siguiendo alguna vez */
     int  followers, following;
     char friend_code[24];  /* GR-123456; "" si aun no se sabe */
+    char joined[11];       /* AAAA-MM-DD en que se creo la cuenta; "" si aun no se sabe */
     int  avatar;           /* foto de perfil elegida (1..); 0 = aun no se sabe */
     char country[4];       /* pais elegido, dos letras ("DO"); "" = sin indicar */
     char caption_en[64];   /* la frase en ingles, si es una de las de la lista */

@@ -476,7 +476,7 @@ int main(int argc, char *argv[]) {
                     char msg[64];
                     snprintf(msg, sizeof(msg), en ? "%d of %d unlocked" : "%d de %d desbloqueados", count_unlocked(),
                              g_game.nach);
-                    if (g_config.popup)
+                    if (g_config.popup && g_config.start_popup)
                         toast_push(TOAST_INFO, 0, -1, g_cfg_dark, en ? "ACHIEVEMENTS ON" : "LOGROS ACTIVOS", g_game.game[0] ? g_game.game : "Greeny", msg);
                     if (g_config.sound) sound_play(SOUND_LOADED);
                     log_line("%016lX: %d logros cargados, %s", cur_tid, g_game.nach, msg);
