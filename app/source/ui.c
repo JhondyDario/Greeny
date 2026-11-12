@@ -122,6 +122,16 @@ const ui_zone *ui_zone_at(int x, int y) {
     return NULL;
 }
 
+/* el elemento elegido de la pantalla que se esta dibujando (ver card) */
+static bool g_ext_cursor, g_sel_set;
+static int g_sel_x, g_sel_y, g_sel_w, g_sel_h;
+void ui_set_external_cursor(bool on) { g_ext_cursor = on; }
+bool ui_selected_rect(int *x, int *y, int *w, int *h) {
+    if (!g_sel_set) return false;
+    *x = g_sel_x; *y = g_sel_y; *w = g_sel_w; *h = g_sel_h;
+    return true;
+}
+
 /* toda pantalla empieza por aqui */
 static bool g_chip_opens_profile; /* solo en el inicio, donde R abre el perfil */
 
@@ -277,15 +287,6 @@ static void footer_bar(gfx_canvas *c) {
 static void progress(gfx_canvas *c, int x, int y, int w, int done, int total) {
     gfx_round_rect(c, x, y, w, 14, 7, P->gray_lt);
     if (total > 0 && done > 0) gfx_round_rect(c, x, y, 14 + (w - 14) * done / total, 14, 7, C_GREEN);
-}
-
-static bool g_ext_cursor, g_sel_set;
-static int g_sel_x, g_sel_y, g_sel_w, g_sel_h;
-void ui_set_external_cursor(bool on) { g_ext_cursor = on; }
-bool ui_selected_rect(int *x, int *y, int *w, int *h) {
-    if (!g_sel_set) return false;
-    *x = g_sel_x; *y = g_sel_y; *w = g_sel_w; *h = g_sel_h;
-    return true;
 }
 
 static void card(gfx_canvas *c, int x, int y, int w, int h, bool selected) {
