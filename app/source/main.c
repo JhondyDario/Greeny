@@ -234,7 +234,6 @@ static void apply_config(void) {
     g_ui_en = g_config.lang == GR_LANG_EN || (g_config.lang == GR_LANG_AUTO && !g_system_spanish);
     ui_set_english(g_ui_en);
     sfx_set_enabled(g_config.app_sound);
-    ui_set_external_cursor(g_config.animated_bg);
     ui_set_dark(dark);
     load_background(dark);
 }
@@ -948,11 +947,6 @@ int main(int argc, char *argv[]) {
     u64 link_started = 0, link_last_poll = 0;
     int link_shown_left = -1;
     bool dirty = true, plus_pressed = false;
-#define ANIM_FRAMES 11
-    int anim = 0, anim_dir = 0, shown_tab = 0, shown_item = -1, ring_fade = 0;
-    bool ring_on = false;
-    float rx = 0, ry = 0, rw = 0, rh = 0;
-    screen_t shown_screen = SCREEN_HOME;
     bool in_focus = true;
     /* Que la app siga viva al pulsar HOME en vez de quedar suspendida: asi puede callar la musica,
      * dejar de dibujar y anotar en el registro lo que pasa. */
@@ -1502,23 +1496,6 @@ int main(int argc, char *argv[]) {
 
         /* La pantalla (texto, tarjetas) solo se redibuja en su capa cuando algo cambia.
          * Con el fondo animado, cada cuadro se pinta el fondo y se pone la capa encima. */
-        /* Transiciones: hacia la derecha al entrar a algo, hacia la izquierda al volver, y hacia el lado
-         * de L o R al cambiar de pestaña o de logro. */
-        if (g_config.animated_bg) {
-            int dir = 0;
-            bool change = false;
-            if (screen != shown_screen) { change = true; dir = back ? -1 : 1; }
-            else if (screen == SCREEN_SETTINGS && stab != shown_tab) { change = true; dir = (down & HidNpadButton_L) ? -1 : (down & HidNpadButton_R) ? 1 : (stab > shown_tab ? 1 : -1); }
-            else if ((screen == SCREEN_ACH && dcursor != shown_item) || (screen == SCREEN_INTRO && intro_page != shown_item)) {
-                change = true;
-                dir = (screen == SCREEN_ACH ? dcursor : intro_page) > shown_item ? 1 : -1;
-            }
-            if (change) { anim = ANIM_FRAMES; anim_dir = dir; }
-        }
-        shown_screen = screen;
-        shown_tab = stab;
-        shown_item = screen == SCREEN_ACH ? dcursor : screen == SCREEN_INTRO ? intro_page : -1;
-
         bool redraw = dirty;
         if (dirty) {
             if (screen == SCREEN_DETAIL) ui_detail(&layer, &g_assets, &g_model, &g_config, cursor, dcursor, dtop);
@@ -1566,28 +1543,7 @@ int main(int argc, char *argv[]) {
             gfx_canvas c = { .px = px, .w = UI_W, .h = UI_H, .stride = (int)(stride / sizeof(u32)) };
             float t = g_config.animated_bg ? (float)(armTicksToNs(armGetSystemTick() - start_tick) / 1000000ull) / 1000.0f : 0.0f;
             ui_background(&c, t);
-            if (anim > 0) {
-                /* la pantalla nueva entra desde el lado hacia el que vas, frenando al llegar */
-                float k = (float)anim / ANIM_FRAMES;
-                k = k * k * k;
-                gfx_compose_fx(&c, &layer, (int)(anim_dir * 150 * k), 0, 256 - (unsigned)(230 * k));
-                anim--;
-                ring_on = false; /* el cursor reaparece en su sitio al terminar */
-            } else {
-                gfx_compose(&c, &layer);
-                /* cursor: un aro que se desliza hasta el elemento elegido y late despacio */
-                int sx, sy, sw, sh;
-                if (g_config.animated_bg && ui_selected_rect(&sx, &sy, &sw, &sh)) {
-                    if (!ring_on) { rx = (float)sx; ry = (float)sy; rw = (float)sw; rh = (float)sh; ring_on = true; ring_fade = 0; }
-                    rx += ((float)sx - rx) * 0.38f; ry += ((float)sy - ry) * 0.38f;
-                    rw += ((float)sw - rw) * 0.38f; rh += ((float)sh - rh) * 0.38f;
-                    if (ring_fade < 256) ring_fade += 64;
-                    float beat = 0.5f + 0.5f * sinf(t * 3.2f);
-                    int grow = (int)(beat * 2.5f);
-                    gfx_ring(&c, (int)(rx + 0.5f) - grow, (int)(ry + 0.5f) - grow, (int)(rw + 0.5f) + 2 * grow, (int)(rh + 0.5f) + 2 * grow,
-                             19 + grow, 5, GFX_RGB(0xF7, 0xC9, 0x1E), (unsigned)ring_fade);
-                } else ring_on = false;
-            }
+            gfx_compose(&c, &layer);
         }
         framebufferEnd(&fb);
     }
