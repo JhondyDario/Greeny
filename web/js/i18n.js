@@ -169,6 +169,7 @@
     "No tienes avisos todavía. Aquí sale cuando alguien te sigue, le da me gusta a tu comentario o consigues algo nuevo.": "No notifications yet. They show up when someone follows you, likes your comment or you earn something new.",
     "¿Qué es Greeny?": "What is Greeny?", "¿Está Greeny afiliado a Nintendo?": "Is Greeny affiliated with Nintendo?", "¿Qué necesito para usarlo?": "What do I need?",
     "¿Greeny me da juegos o los modifica?": "Does Greeny give me games or change them?", "¿Puedo usarlo jugando en línea?": "Can I use it while playing online?",
+    "Me gusta recibidos en sus comentarios": "Likes received on their comments",
     "Comentarios": "Comments", "Tu comentario": "Your comment", "Escribe un comentario": "Write a comment", "Publicar": "Post",
     "Guardar": "Save", "Borrar": "Delete", "Listo.": "Done.", "Entra": "Sign in", " para comentar y dar me gusta.": " to comment and like.",
     "Nadie ha comentado este juego todavía. ¡Sé el primero!": "Nobody has commented on this game yet. Be the first!",

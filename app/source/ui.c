@@ -1085,7 +1085,7 @@ void ui_notifs(gfx_canvas *c, const ui_assets *a, const gr_notif *n, int count, 
                     if (!strcmp(gr_badges[k].id, v->badge)) drawn = img_fit(c, a, UI_IMG_badge_primer_logro + k, ix, iy, 52);
             if (!drawn && v->kind == GR_NOTIF_LIKE) {
                 gfx_circle_alpha(c, ix + 26, iy + 26, 26, GFX_RGB(0xFF, 0x6B, 0x8A), 60);
-                heart(c, ix + 26, iy + 27, 28, GFX_RGB(0xFF, 0x6B, 0x8A));
+                if (!img_fit(c, a, UI_IMG_heart_lleno, ix + 8, iy + 8, 36)) heart(c, ix + 26, iy + 27, 28, GFX_RGB(0xFF, 0x6B, 0x8A));
                 drawn = true;
             }
             if (!drawn) img_fit(c, a, v->kind == GR_NOTIF_FOLLOW ? UI_IMG_stat_seguidores : UI_IMG_trophy, ix, iy, 52);
@@ -1196,7 +1196,8 @@ void ui_reviews(gfx_canvas *c, const ui_assets *a, const char *game, const gr_re
             int lw = gfx_text_width(24, likes) + 74;
             int lx = x + w - 24 - lw, ly = y + h / 2 - 24;
             gfx_round_rect(c, lx, ly, lw, 48, 24, v->liked ? C_GREEN : P->card_sel);
-            heart(c, lx + 30, ly + 24, 20, v->liked ? C_WHITE : P->gray);
+            if (!img_fit(c, g_a, v->liked ? UI_IMG_heart_lleno : UI_IMG_heart_vacio, lx + 14, ly + 8, 32))
+                heart(c, lx + 30, ly + 24, 20, v->liked ? C_WHITE : P->gray);
             gfx_text(c, lx + 52, ly + 9, 24, v->liked ? C_WHITE : P->ink, likes);
         }
         if (n > top + UI_REVIEW_ROWS) text_center(c, UI_W / 2, 632, 18, P->gray, "▼", 40);
@@ -1394,11 +1395,14 @@ static int opt_icon(int opt, int row) {
         case UI_OPT_SOUND: return UI_IMG_opt_sonido_juego;
         case UI_OPT_POPUP: return UI_IMG_opt_avisos;
         case UI_OPT_STARTPOP: return UI_IMG_opt_aviso_inicio;
-        case UI_OPT_OVERLAY: return UI_IMG_opt_mostrar; /* falta el suyo: el de Tesla era el logo de la empresa de carros */
+        case UI_OPT_OVERLAY: return UI_IMG_opt_ver_logros_juego;
         case UI_OPT_MUSIC: return UI_IMG_opt_musica;
         case UI_OPT_SONG: return -1;
         case UI_OPT_ACC_INFO: case UI_OPT_ACC_PHOTO: case UI_OPT_ACC_LINK: case UI_OPT_ACC_LOGIN: return UI_IMG_opt_foto;
-        case UI_OPT_ACC_COUNTRY: return UI_IMG_opt_pais;
+        case UI_OPT_ACC_COUNTRY: { /* la bandera del pais que elegiste; sin pais, el icono generico */
+            int ci = g_profile ? ui_country_index(g_profile->country) : -1;
+            return ci >= 0 ? UI_IMG_flag_do + ci : UI_IMG_opt_pais;
+        }
         case UI_OPT_ACC_SYNC: case UI_OPT_UPDATE: return UI_IMG_opt_sincronizar;
         case UI_OPT_ACC_UNLINK: return UI_IMG_opt_desvincular;
         case UI_OPT_DIAG: case UI_OPT_SEARCH: return UI_IMG_opt_diagnostico;
@@ -1971,10 +1975,25 @@ void ui_profile_screen(gfx_canvas *c, const ui_assets *a, const ui_profile *p) {
         text_center(c, cx, ly + has_joined * 62 + 506, 24, P->accent, p->friend_code, lw - 40);
     }
 
+    /* el nivel y, a su izquierda, los corazones (me gusta recibidos); los dos juntos y centrados */
     snprintf(buf, sizeof(buf), T("Nivel %d", "Level %d"), level);
     int pw = gfx_text_width(26, buf) + 44;
-    gfx_round_rect(c, cx - pw / 2, ly + 340, pw, 46, 23, C_YELLOW);
-    gfx_text(c, cx - pw / 2 + 22, ly + 348, 26, C_ON_YELLOW, buf);
+    char hearts[16] = "";
+    int hw = 0;
+    if (p->linked) {
+        snprintf(hearts, sizeof(hearts), "%d", p->likes);
+        hw = gfx_text_width(26, hearts) + 30 + 44;
+    }
+    int gx = cx - (pw + (hw ? hw + 12 : 0)) / 2;
+    if (hw) {
+        gfx_glass(c, gx, ly + 340, hw, 46, 23, GFX_RGB(0xFF, 0x8F, 0xA6), GFX_RGB(0xE5, 0x3E, 0x5C), 255, 255);
+        gfx_glass(c, gx + 23, ly + 341, hw - 46, 1, 0, C_WHITE, C_WHITE, 120, 120);
+        if (!img_fit(c, a, UI_IMG_heart_lleno, gx + 14, ly + 348, 30)) heart(c, gx + 29, ly + 363, 24, C_WHITE);
+        gfx_text(c, gx + 52, ly + 348, 26, C_WHITE, hearts);
+        gx += hw + 12;
+    }
+    gfx_round_rect(c, gx, ly + 340, pw, 46, 23, C_YELLOW);
+    gfx_text(c, gx + 22, ly + 348, 26, C_ON_YELLOW, buf);
     gfx_round_rect(c, lx + 40, ly + 406, lw - 80, 18, 9, P->gray_lt);
     if (into > 0) gfx_round_rect(c, lx + 40, ly + 406, 18 + (lw - 98) * into / span, 18, 9, C_GREEN);
     snprintf(buf, sizeof(buf), T("%d / %d pts para el nivel %d", "%d / %d pts to level %d"), into, span, level + 1);

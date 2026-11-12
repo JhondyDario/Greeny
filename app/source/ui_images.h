@@ -165,5 +165,8 @@ UI_IMG(opt_sincronizar, 48, 48)
 UI_IMG(opt_desvincular, 48, 48)
 UI_IMG(opt_diagnostico, 48, 48)
 UI_IMG(opt_acerca, 48, 48)
+UI_IMG(opt_ver_logros_juego, 48, 48)
+UI_IMG(heart_lleno, 48, 48)
+UI_IMG(heart_vacio, 48, 48)
 #define UI_AVATAR_COUNT 36
 #define UI_COUNTRY_COUNT 60

@@ -309,7 +309,7 @@
   }
   function notifIcon(n) {
     const box = h("span", { class: "notif-icon", "aria-hidden": "true" });
-    if (n.kind === "like") box.append(svgEl(HEART));
+    if (n.kind === "like") box.append(h("img", { src: "img/corazon_lleno.png", alt: "" }));
     else if (n.kind === "follow") box.append(n.actor_avatar ? h("img", { src: avatarSrc(n.actor_avatar), alt: "" }) : h("img", { src: "img/stat_seguidores.png", alt: "" }));
     else if (n.kind === "badge") box.append(h("img", { src: "img/badges/" + n.badge + ".png", alt: "" }));
     else box.append(h("img", { src: "img/trophy.png", alt: "" }));
@@ -613,7 +613,7 @@
       let liked = !!r.liked, likes = Number(r.likes || 0);
       const btn = h("button", { type: "button", class: "like", "aria-pressed": String(liked), disabled: !session || r.mine,
         title: r.mine ? "Es tu comentario" : !session ? "Entra para dar me gusta" : null });
-      const paint = () => { btn.setAttribute("aria-pressed", String(liked)); btn.replaceChildren(liked ? "♥" : "♡", " " + likes); };
+      const paint = () => { btn.setAttribute("aria-pressed", String(liked)); btn.replaceChildren(h("img", { src: liked ? "img/corazon_lleno.png" : "img/corazon_vacio.png", alt: "", width: 20, height: 20 }), String(likes)); };
       paint();
       btn.addEventListener("click", async () => {
         btn.disabled = true;
@@ -699,7 +699,10 @@
         isMe ? h("a", { class: "btn alt", href: "#/cuenta" }, "Editar") : followBtn),
       h("section", { class: "card level", style: "margin-top:14px" },
         h("div", { class: "row" },
-          h("span", { class: "pill pts lvl" }, "Nivel " + lvl.level),
+          h("div", { class: "lvl-tags" },
+            stats.likes != null ? h("span", { class: "pill hearts", title: "Me gusta recibidos en sus comentarios" },
+              h("img", { src: "img/corazon_lleno.png", alt: "", width: 18, height: 18 }), fmtNum(stats.likes)) : null,
+            h("span", { class: "pill pts lvl" }, "Nivel " + lvl.level)),
           h("div", { class: "grow" }, h("div", { class: "bar", role: "img", "aria-label": lvl.into + " de " + lvl.span + " puntos para el nivel " + (lvl.level + 1) },
             h("i", { style: "width:" + Math.round((lvl.into / lvl.span) * 100) + "%" }))),
           h("span", { class: "muted small nowrap lvl-pts" }, h("img", { src: "img/estrella.png", alt: "", width: 18, height: 18 }), lvl.into + " / " + lvl.span + " pts para el nivel " + (lvl.level + 1)))),

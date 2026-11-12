@@ -495,6 +495,7 @@ static void refresh_greeting(void) {
     g_profile.country = linked ? g_account.country : "";
     g_profile.friend_code = linked ? g_account.friend_code : "";
     g_profile.joined = linked ? g_account.joined : "";
+    g_profile.likes = linked ? g_account.likes : 0;
     g_profile.avatar = linked ? g_account.avatar : 0;
     g_profile.donor = linked && g_account.donor;
     ui_set_admin(linked && g_account.admin);

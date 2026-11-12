@@ -508,6 +508,7 @@ select p.id, p.username,
        (coalesce(s.points, 0) + coalesce(r.review_points, 0))::int as points,
        coalesce(s.points, 0)::int       as achievement_points,
        coalesce(r.review_points, 0)::int as review_points,
+       coalesce(r.likes, 0)::int        as likes,
        coalesce(s.games, 0)::int        as games,
        coalesce(s.platinums, 0)::int    as platinums,
        (select count(*) from public.follows f where f.followed_id = p.id)::int as followers,
@@ -525,7 +526,7 @@ select p.id, p.username,
             on t.title_id = g.title_id
        ) s on true
   left join lateral (
-        select sum(least(l.n, 10) * 2) as review_points
+        select sum(least(l.n, 10) * 2) as review_points, sum(l.n) as likes
           from (select (select count(*) from public.review_likes k where k.review_id = v.id) as n
                   from public.reviews v where v.user_id = p.id) l
        ) r on true;
@@ -591,7 +592,7 @@ as $$
     select jsonb_build_object(
                'username', p.username, 'display_name', p.display_name, 'caption', p.caption, 'avatar', p.avatar, 'country', p.country, 'donor', p.donor,
                'caption_en', (select c.text_en from public.caption_presets c where c.text_es = p.caption limit 1),
-               'friend_code', p.friend_code, 'review_points', s.review_points, 'created_at', p.created_at,
+               'friend_code', p.friend_code, 'review_points', s.review_points, 'likes', s.likes, 'created_at', p.created_at,
                'admin', exists (select 1 from public.admins a where a.user_id = p.id),
                'achievements', s.achievements, 'points', s.points, 'games', s.games, 'platinums', s.platinums,
                'followers', s.followers, 'following', s.following)

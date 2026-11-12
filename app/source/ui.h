@@ -112,6 +112,7 @@ typedef struct {
     const char *caption;
     const char *friend_code; /* "" si aun no se sabe */
     const char *joined;     /* AAAA-MM-DD en que se unio; "" o NULL si no se sabe */
+    int likes;              /* me gusta recibidos en sus comentarios */
     const char *country;    /* pais, dos letras; "" = sin indicar */
     bool donor;             /* lleva la medalla de donador */
     int avatar;             /* foto de perfil elegida, de 1 a UI_AVATAR_COUNT; 0 = la inicial del nombre */

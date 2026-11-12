@@ -664,3 +664,8 @@ a.card.notif { display: flex; }
 .foot-brand img { border-radius: 50%; }
 .lvl-pts { display: inline-flex; align-items: center; gap: 6px; }
 .lvl-pts img { width: 18px; height: 18px; }
+.like img { width: 20px; height: 20px; }
+.lvl-tags { display: inline-flex; align-items: center; gap: 8px; }
+.pill.hearts { display: inline-flex; align-items: center; gap: 6px; background: linear-gradient(180deg, #ff8fa6, #e53e5c); color: #fff; font-weight: 800; }
+.pill.hearts img { width: 18px; height: 18px; }
+@media (max-width: 1080px) { .level .lvl-tags { justify-content: center; width: 100%; } }
