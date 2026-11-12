@@ -1438,8 +1438,7 @@ int main(int argc, char *argv[]) {
                     fvalue = v < 0 ? 0 : v > 9999999 ? 9999999 : (unsigned)v;
                 } else if (frow == 1) ftype = (ftype + (step > 0 ? 1 : 2)) % 3;
                 else {
-                    fcand += step > 0 ? 1 : -1;
-                    if (fcand == 0) fcand += step > 0 ? 1 : -1; /* cero no tiene sentido: el numero tiene que cambiar */
+                    fcand += step > 0 ? 1 : -1; /* 0 = no se sabe el numero: cambio / no cambio */
                     if (fcand > 100) fcand = 100;
                     if (fcand < -100) fcand = -100;
                 }

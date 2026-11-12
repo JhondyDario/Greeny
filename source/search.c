@@ -37,6 +37,7 @@ typedef struct { u64 base_off; u8 n; u16 off[PTR_DEPTH]; } chain; /* main+base_o
  * no ocupe mas memoria del sistema cuando nadie usa el buscador. */
 typedef struct {
     u8 buf[CHUNK];
+    u8 buf2[CHUNK];   /* el mismo trozo, como estaba en la foto de la memoria */
     u64 batch[1024];
     node level[PTR_DEPTH + 1][PTR_LEVEL_MAX];
     int level_n[PTR_DEPTH + 1];
@@ -314,6 +315,8 @@ static void do_ptr(int which) {
     write_chains(g_nchains ? "Cadenas de punteros encontradas:" : "No se encontro ninguna cadena desde main. Prueba con otra candidata.");
 }
 
+static bool g_check_any; /* modo "no se el numero": no hay valor que comparar, solo se muestra lo que lee cada cadena */
+
 static void do_check(u64 value) {
     load_state();
     FILE *b = fopen(CHAINS_PATH, "rb");
@@ -327,7 +330,8 @@ static void do_check(u64 value) {
     FILE *r;
     result_begin(&r);
     if (!r) return;
-    fprintf(r, "Comprobando las cadenas con el valor %lu:\n", value);
+    if (g_check_any) fprintf(r, "Lo que lee cada cadena ahora:\n");
+    else fprintf(r, "Comprobando las cadenas con el valor %lu:\n", value);
     int good = 0;
     for (int i = 0; i < g_nchains; i++) {
         u64 addr = g_main + g_chains[i].base_off;
@@ -341,17 +345,20 @@ static void do_check(u64 value) {
         if (broke < 0 && R_FAILED(dmntchtReadCheatProcessMemory(addr, raw, (size_t)g_width))) broke = g_chains[i].n;
         u32 now = 0;
         memcpy(&now, raw, (size_t)g_width);
-        bool ok = broke < 0 && matches(raw, value);
+        bool ok = broke < 0 && (g_check_any || matches(raw, value));
         if (ok) good++;
-        fprintf(r, "%s  main+0x%lX", ok ? "SIRVE" : "no   ", g_chains[i].base_off);
+        fprintf(r, "%s  main+0x%lX", ok ? (g_check_any ? "lee  " : "SIRVE") : "no   ", g_chains[i].base_off);
         for (int k = 0; k < g_chains[i].n; k++) fprintf(r, "->0x%X", g_chains[i].off[k]);
         if (broke >= 0) fprintf(r, " u%d   (puntero vacio en el paso %d)\n", g_width * 8, broke + 1);
         else fprintf(r, " u%d   = %u\n", g_width * 8, now);
     }
     g_last_count = (unsigned)good;
-    fprintf(r, "%d de %d dan el valor.%s\n", good, g_nchains,
-            good ? " Las que dicen SIRVE van en el archivo de logros."
-                 : " Si acabas de abrir el juego, entra primero a la partida (donde se ve el numero) y comprueba otra vez.");
+    if (g_check_any)
+        fprintf(r, "%d de %d se pueden leer. Cambia el estado en el juego y comprueba otra vez: sirve la que cambie como esperas.\n", good, g_nchains);
+    else
+        fprintf(r, "%d de %d dan el valor.%s\n", good, g_nchains,
+                good ? " Las que dicen SIRVE van en el archivo de logros."
+                     : " Si acabas de abrir el juego, entra primero a la partida (donde se ve el numero) y comprueba otra vez.");
     fclose(r);
 }
 
@@ -384,6 +391,162 @@ void search_poll(uint64_t main_base, uint64_t main_size, uint64_t heap_base, uin
     else result_status("ERROR: orden desconocida.");
     free(g_w);
     g_w = NULL;
+}
+
+/* ---------- cuando no se sabe el numero: cambio / no cambio ----------
+ * Sirve para cosas que no son un contador a la vista (el traje, si vas montado, un nivel
+ * terminado). Se guarda una foto de toda la memoria en la SD y despues se va filtrando:
+ * "cambio" deja lo que es distinto de la ultima vez, "no cambio" deja lo que sigue igual.
+ * La foto ocupa lo mismo que la memoria del juego (uno o dos GB) y tarda varios minutos. */
+
+#define SNAP_PATH DIR_S "/snap.bin"
+#define VALS_PATH DIR_S "/vals.bin"
+#define VALS_TMP DIR_S "/vals.tmp"
+#define MAX_VALS 8000000u /* 96 MB de archivo */
+
+typedef struct { u64 addr; u32 val; } __attribute__((packed)) val_entry;
+typedef struct { u64 addr; u32 size; } __attribute__((packed)) snap_head;
+
+typedef struct { FILE *out; bool failed; u64 bytes; } snap_ctx;
+
+static bool snap_chunk(u64 addr, const u8 *data, size_t size, void *vctx) {
+    snap_ctx *c = vctx;
+    snap_head h = { addr, (u32)size };
+    if (fwrite(&h, sizeof(h), 1, c->out) != 1 || fwrite(data, 1, size, c->out) != size) { c->failed = true; return false; }
+    c->bytes += size;
+    return true;
+}
+
+static bool do_snap(void) {
+    result_status("Guardando una foto de la memoria en la SD... tarda varios minutos.");
+    remove(VALS_PATH);
+    remove(CAND_PATH);
+    snap_ctx c = { fopen(SNAP_PATH, "wb"), false, 0 };
+    if (!c.out) { result_status("ERROR: no se pudo escribir en la SD."); return false; }
+    walk_memory(snap_chunk, &c);
+    if (fclose(c.out) != 0) c.failed = true;
+    if (c.failed) {
+        remove(SNAP_PATH);
+        result_status("ERROR: no cabe la foto de la memoria en la SD. Hacen falta unos 3 GB libres.");
+        return false;
+    }
+    g_width = 4;
+    g_step = 1;
+    g_last_value = 0;
+    g_last_count = (unsigned)(c.bytes >> 20);
+    save_state();
+    char msg[160];
+    snprintf(msg, sizeof(msg), "Foto guardada (%u MB). Ahora cambia eso en el juego y pulsa \"cambio\".", g_last_count);
+    result_status(msg);
+    return true;
+}
+
+static void write_vals(const char *headline, u32 count) {
+    FILE *r;
+    result_begin(&r);
+    if (!r) return;
+    fprintf(r, "%s\n", headline);
+    fprintf(r, "Paso %d  |  %u candidata(s)\n", g_step, count);
+    FILE *v = fopen(VALS_PATH, "rb"), *c = count <= MAX_CAND ? fopen(CAND_PATH, "wb") : NULL;
+    val_entry e;
+    char where[48];
+    for (u32 i = 0; v && fread(&e, sizeof(e), 1, v) == 1; i++) {
+        if (i < SHOWN) {
+            describe(e.addr, where, sizeof(where));
+            fprintf(r, "#%u  %s = %u (0x%X)\n", i, where, e.val, e.val);
+        }
+        if (c) fwrite(&e.addr, 8, 1, c); /* las mismas direcciones, para buscar punteros despues */
+        else if (i >= SHOWN) break;
+    }
+    if (v) fclose(v);
+    if (c) fclose(c);
+    if (count > SHOWN) fprintf(r, "Sigue filtrando: cambia eso y pulsa \"cambio\", o dejalo igual y pulsa \"no cambio\".\n");
+    else if (count > 0) fprintf(r, "Ya son pocas. Apunta que valor tiene cada una en cada estado y busca punteros.\n");
+    else fprintf(r, "Ninguna. Guarda el plan otra vez y empieza de nuevo.\n");
+    fclose(r);
+}
+
+/* primer filtro: la memoria de ahora contra la foto */
+static void diff_snapshot(bool want_changed) {
+    FILE *in = fopen(SNAP_PATH, "rb"), *out = fopen(VALS_TMP, "wb");
+    if (!in || !out) { if (in) fclose(in); if (out) fclose(out); result_status("ERROR: no hay foto de la memoria. Empieza de nuevo."); return; }
+    result_status("Comparando la memoria con la foto... tarda varios minutos.");
+    u32 kept = 0;
+    bool overflow = false;
+    snap_head h;
+    while (!overflow && fread(&h, sizeof(h), 1, in) == 1 && h.size <= CHUNK) {
+        if (fread(g_w->buf2, 1, h.size, in) != h.size) break;
+        if (R_FAILED(dmntchtReadCheatProcessMemory(h.addr, g_buf, h.size))) continue; /* ese trozo ya no existe */
+        for (u32 i = 0; i + 4 <= h.size; i += 4) {
+            u32 a, b;
+            memcpy(&a, g_w->buf2 + i, 4);
+            memcpy(&b, g_buf + i, 4);
+            if ((a != b) != want_changed) continue;
+            if (kept >= MAX_VALS) { overflow = true; break; }
+            val_entry e = { h.addr + i, b };
+            fwrite(&e, sizeof(e), 1, out);
+            kept++;
+        }
+    }
+    fclose(in);
+    fclose(out);
+    if (overflow) {
+        /* demasiadas cosas distintas (o iguales): no caben. Se toma una foto nueva y se repite. */
+        remove(VALS_TMP);
+        if (do_snap())
+            result_status(want_changed ? "Cambiaron demasiadas cosas a la vez. Hice una foto nueva: cambia SOLO eso y pulsa \"cambio\"."
+                                       : "Casi todo sigue igual: asi no se puede empezar. Hice una foto nueva: cambia eso y pulsa \"cambio\".");
+        g_last_count = 0;
+        return;
+    }
+    remove(VALS_PATH);
+    rename(VALS_TMP, VALS_PATH);
+    remove(SNAP_PATH); /* ya no hace falta, y ocupa mucho */
+    g_step++;
+    g_last_count = kept;
+    save_state();
+    write_vals("Primer filtro terminado.", kept);
+}
+
+/* filtros siguientes: cada candidata contra el valor que tenia la ultima vez */
+static void diff_values(bool want_changed) {
+    FILE *in = fopen(VALS_PATH, "rb"), *out = fopen(VALS_TMP, "wb");
+    if (!in || !out) { if (in) fclose(in); if (out) fclose(out); result_status("ERROR: no se pudo leer la lista de candidatas."); return; }
+    result_status("Filtrando las candidatas...");
+    u32 kept = 0;
+    u64 win = 0;
+    size_t win_n = 0;
+    val_entry e;
+    while (fread(&e, sizeof(e), 1, in) == 1) {
+        if (!(win_n && e.addr >= win && e.addr + 4 <= win + win_n)) {
+            win = e.addr;
+            win_n = CHUNK;
+            if (R_FAILED(dmntchtReadCheatProcessMemory(win, g_buf, win_n))) {
+                win_n = 4;
+                if (R_FAILED(dmntchtReadCheatProcessMemory(win, g_buf, win_n))) { win_n = 0; continue; }
+            }
+        }
+        u32 now;
+        memcpy(&now, g_buf + (e.addr - win), 4);
+        if ((now != e.val) != want_changed) continue;
+        e.val = now;
+        fwrite(&e, sizeof(e), 1, out);
+        kept++;
+    }
+    fclose(in);
+    fclose(out);
+    remove(VALS_PATH);
+    rename(VALS_TMP, VALS_PATH);
+    g_step++;
+    g_last_count = kept;
+    save_state();
+    write_vals(want_changed ? "Filtro \"cambio\" terminado." : "Filtro \"no cambio\" terminado.", kept);
+}
+
+static void do_diff(bool want_changed) {
+    struct stat st;
+    if (stat(VALS_PATH, &st) == 0) diff_values(want_changed);
+    else diff_snapshot(want_changed);
 }
 
 /* ---------- manejo desde el juego, con botones ---------- */
@@ -420,7 +583,24 @@ void search_button(search_action action, uint64_t main_base, uint64_t main_size,
     g_step = 0;
     load_state();
     g_last_count = 0;
-    if (action == SEARCH_NEXT) {
+    bool unknown = step == 0; /* "no se el numero": cambio / no cambio */
+    g_check_any = unknown;
+    if (unknown && (action == SEARCH_NEXT || action == SEARCH_SAME)) {
+        if (g_step == 0) {
+            bool ok = do_snap();
+            snprintf(line1, cap1, ok ? "Foto de la memoria guardada" : "No se pudo guardar la foto");
+            snprintf(line2, cap2, ok ? "Cambia eso en el juego y pulsa ARRIBA." : "Hacen falta unos 3 GB libres en la SD.");
+        } else {
+            do_diff(action == SEARCH_NEXT);
+            snprintf(line1, cap1, "Paso %d (%s)", g_step, action == SEARCH_NEXT ? "cambio" : "no cambio");
+            if (g_last_count == 0) snprintf(line2, cap2, "Sin candidatas o foto nueva. Mira Greeny.");
+            else if (g_last_count <= SHOWN) snprintf(line2, cap2, "%u candidata(s). Ya puedes buscar punteros.", g_last_count);
+            else snprintf(line2, cap2, "%u candidatas. Sigue filtrando.", g_last_count);
+        }
+    } else if (action == SEARCH_SAME) {
+        snprintf(line1, cap1, "IZQUIERDA es para \"no cambio\"");
+        snprintf(line2, cap2, "Solo sirve con el plan \"no se el numero\".");
+    } else if (action == SEARCH_NEXT) {
         if (g_step == 0) do_new(!strcmp(type, "u8") ? 1 : !strcmp(type, "u16") ? 2 : 4, start);
         else do_next((unsigned long)((long)g_last_value + step));
         snprintf(line1, cap1, "Paso %d: busque el %lu", g_step, g_last_value);
@@ -433,8 +613,10 @@ void search_button(search_action action, uint64_t main_base, uint64_t main_size,
         snprintf(line2, cap2, g_last_count ? "Cierra el juego, abrelo y comprueba." : "No salio ninguna desde main.");
     } else {
         do_check(g_last_value);
-        snprintf(line1, cap1, "Comprobado con el %lu", g_last_value);
-        snprintf(line2, cap2, g_last_count ? "%u cadena(s) sirven. Mira result.txt." : "%u sirven. Entra a la partida y repite.", g_last_count);
+        if (unknown) snprintf(line1, cap1, "Cadenas leidas");
+        else snprintf(line1, cap1, "Comprobado con el %lu", g_last_value);
+        if (unknown) snprintf(line2, cap2, "%u se pueden leer. Mira result.txt.", g_last_count);
+        else snprintf(line2, cap2, g_last_count ? "%u cadena(s) sirven. Mira result.txt." : "%u sirven. Entra a la partida y repite.", g_last_count);
     }
     free(g_w);
     g_w = NULL;

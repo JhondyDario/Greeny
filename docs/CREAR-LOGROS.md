@@ -116,6 +116,17 @@ Solo aparece si la cuenta vinculada a la consola es de un administrador.
 7. El resultado queda en `config/greeny/search/result.txt` y se ve en la misma pantalla
    de Greeny. Las líneas marcadas con `SIRVE` son las que van en el `when` del logro.
 
+**Cuando no es un número a la vista** (el traje, si vas montado, un nivel terminado): en el plan,
+pon "cada vez cambia en" en 0, que es "No sé el número". Dentro del juego:
+
+- L+R+ZL+ZR + **arriba** la primera vez guarda una foto de toda la memoria en la SD (uno o
+  dos GB, varios minutos; hacen falta unos 3 GB libres).
+- Cambia solo eso en el juego y pulsa **arriba** otra vez: quedan las direcciones que cambiaron.
+- Sin cambiarlo, muévete un poco y pulsa **izquierda**: quedan las que siguen igual. Alterna
+  "cambió" y "no cambió" hasta que queden pocas.
+- **Derecha** busca los punteros y **abajo** dice qué lee cada cadena en ese momento. Aquí no
+  hay un valor que comprobar: sirve la cadena que cambia como esperas al cambiar de estado.
+
 **Busca el número donde el juego lo guarda de verdad.** Muchos juegos llevan un contador
 temporal mientras juegas y solo pasan el valor al total de la partida al terminar el nivel o
 al guardar. En Super Mario 3D World, las estrellas verdes se suman al total al tocar el

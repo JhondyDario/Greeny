@@ -19,8 +19,8 @@
 void search_poll(uint64_t main_base, uint64_t main_size, uint64_t heap_base, uint64_t space_end);
 
 /* Manejo sin salir del juego: la app deja un plan (plan.txt: "u32 10 1" = tipo, numero con el que
- * se empieza y cuanto cambia cada vez) y dentro del juego se avanza con una combinacion de botones. */
-typedef enum { SEARCH_NEXT, SEARCH_PTR, SEARCH_CHECK } search_action;
+ * se empieza y cuanto cambia cada vez; con 0 al final es "no se el numero": cambio / no cambio) y dentro del juego se avanza con una combinacion de botones. */
+typedef enum { SEARCH_NEXT, SEARCH_PTR, SEARCH_CHECK, SEARCH_SAME } search_action;
 bool search_has_plan(void);
 /* Ejecuta el paso (puede tardar minutos) y deja en line1 y line2 un resumen para mostrar en el aviso. */
 void search_button(search_action action, uint64_t main_base, uint64_t main_size, uint64_t heap_base, uint64_t space_end,

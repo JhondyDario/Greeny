@@ -855,21 +855,34 @@ void ui_search(gfx_canvas *c, const ui_assets *a, unsigned value, int type_bits,
     snprintf(buf, sizeof(buf), type_bits == 8 ? T("u8 (0 a 255)", "u8 (0 to 255)") : type_bits == 16 ? T("u16 (0 a 65535)", "u16 (0 to 65535)")
                                                                                                      : T("u32 (lo normal)", "u32 (the usual)"));
     search_field(c, lx, 204, lw, row == 1, T("TIPO", "TYPE"), buf);
-    snprintf(buf, sizeof(buf), "%+d", step);
+    if (step == 0) snprintf(buf, sizeof(buf), "%s", T("No sé el número", "Number unknown"));
+    else snprintf(buf, sizeof(buf), "%+d", step);
     search_field(c, lx, 292, lw, row == 2, T("CADA VEZ CAMBIA EN", "EACH TIME IT CHANGES BY"), buf);
 
-    const char *help[] = {
-        T("1. A guarda el plan. Cierra Greeny.", "1. A saves the plan. Close Greeny."),
-        T("2. Abre el juego. Mantén L+R+ZL+ZR", "2. Start the game. Hold L+R+ZL+ZR"),
-        T("   y pulsa ARRIBA: busca el número.", "   and press UP: searches the number."),
-        T("3. Haz que cambie (coge una estrella)", "3. Make it change (grab a star)"),
-        T("   y repite la combinación.", "   and repeat the combo."),
-        T("4. Con pocas candidatas: la misma", "4. With few candidates: same combo"),
-        T("   combinación con DERECHA (punteros).", "   with RIGHT (pointers)."),
-        T("5. Cierra y abre el juego: la misma", "5. Close and reopen the game: same"),
-        T("   con ABAJO comprueba cuáles sirven.", "   with DOWN checks which ones work."),
+    static const char *const known[9][2] = {
+        { "1. A guarda el plan. Cierra Greeny.", "1. A saves the plan. Close Greeny." },
+        { "2. Abre el juego. Mantén L+R+ZL+ZR", "2. Start the game. Hold L+R+ZL+ZR" },
+        { "   y pulsa ARRIBA: busca el número.", "   and press UP: searches the number." },
+        { "3. Haz que cambie (coge una estrella)", "3. Make it change (grab a star)" },
+        { "   y repite la combinación.", "   and repeat the combo." },
+        { "4. Con pocas candidatas: la misma", "4. With few candidates: same combo" },
+        { "   combinación con DERECHA (punteros).", "   with RIGHT (pointers)." },
+        { "5. Cierra y abre el juego: la misma", "5. Close and reopen the game: same" },
+        { "   con ABAJO comprueba cuáles sirven.", "   with DOWN checks which ones work." },
     };
-    for (int i = 0; i < 9; i++) gfx_text(c, lx + 4, 384 + i * 26, 18, P->gray, help[i]);
+    /* "No sé el número": para un traje, una montura, un nivel terminado... */
+    static const char *const unknown[9][2] = {
+        { "1. A guarda el plan. Cierra Greeny.", "1. A saves the plan. Close Greeny." },
+        { "2. En el juego, L+R+ZL+ZR + ARRIBA", "2. In the game, L+R+ZL+ZR + UP" },
+        { "   guarda una foto de la memoria.", "   saves a snapshot of memory." },
+        { "3. Cambia eso (ponte un traje) y", "3. Change it (put on a suit) and" },
+        { "   pulsa ARRIBA: \"cambió\".", "   press UP: \"changed\"." },
+        { "4. Sin cambiarlo, muévete y pulsa", "4. Without changing it, move and" },
+        { "   IZQUIERDA: \"no cambió\". Repite.", "   press LEFT: \"unchanged\". Repeat." },
+        { "5. DERECHA: punteros. ABAJO: qué", "5. RIGHT: pointers. DOWN: what" },
+        { "   lee cada uno. Pide 3 GB en la SD.", "   each reads. Needs 3 GB on the SD." },
+    };
+    for (int i = 0; i < 9; i++) gfx_text(c, lx + 4, 384 + i * 26, 18, P->gray, step == 0 ? T(unknown[i][0], unknown[i][1]) : T(known[i][0], known[i][1]));
 
     const int rx = lx + lw + 20, rw = UI_W - MARGIN - rx;
     card(c, rx, 116, rw, 524, false);

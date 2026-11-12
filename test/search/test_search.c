@@ -96,6 +96,32 @@ int main(void) {
     if (!strstr(l2, "1 cadena")) { printf("FALLO: comprobar por botones\n"); fail++; }
     fail += show("resultado final", "SIRVE  main+0x1C00->0x18->0x138->0x48 u32");
 
+    /* "no se el numero": un estado (el traje) que vale 0, luego 3, luego 5; alrededor hay cosas que cambian solas */
+    remove("sdmc:/config/greeny/search/state.txt");
+    pf = fopen("sdmc:/config/greeny/search/plan.txt", "w");
+    fprintf(pf, "u32 0 0\n"); fclose(pf);
+    where = build(0, 0);
+    search_button(SEARCH_NEXT, MAIN, MAIN_SIZE, HEAP, END, l1, sizeof(l1), l2, sizeof(l2));
+    printf("--- cambio / no cambio\n%s | %s\n", l1, l2);
+    put32(where, 3);
+    for (u64 a = HEAP + 0x200000; a < HEAP + 0x200400; a += 4) put32(a, 777);  /* ruido: cambia una vez */
+    search_button(SEARCH_NEXT, MAIN, MAIN_SIZE, HEAP, END, l1, sizeof(l1), l2, sizeof(l2));
+    printf("%s | %s\n", l1, l2);
+    for (u64 a = HEAP + 0x200000; a < HEAP + 0x200200; a += 4) put32(a, 778);  /* la mitad del ruido sigue cambiando */
+    search_button(SEARCH_SAME, MAIN, MAIN_SIZE, HEAP, END, l1, sizeof(l1), l2, sizeof(l2));
+    printf("%s | %s\n", l1, l2);
+    put32(where, 5);
+    search_button(SEARCH_NEXT, MAIN, MAIN_SIZE, HEAP, END, l1, sizeof(l1), l2, sizeof(l2));
+    printf("%s | %s\n", l1, l2);
+    if (!strstr(l2, "1 candidata")) { printf("FALLO: cambio / no cambio\n"); fail++; }
+    fail += show("candidata final", "= 5 (0x5)");
+    search_button(SEARCH_PTR, MAIN, MAIN_SIZE, HEAP, END, l1, sizeof(l1), l2, sizeof(l2));
+    printf("%s | %s\n", l1, l2);
+    where = build(0x7770, 2);
+    search_button(SEARCH_CHECK, MAIN, MAIN_SIZE, HEAP, END, l1, sizeof(l1), l2, sizeof(l2));
+    printf("%s | %s\n", l1, l2);
+    fail += show("cadenas tras reiniciar", "lee    main+0x1C00->0x18->0x138->0x48 u32   = 2");
+
     printf("%s\n", fail ? "HAY FALLOS" : "buscador: todo bien");
     return fail != 0;
 }

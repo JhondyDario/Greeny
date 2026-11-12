@@ -158,7 +158,8 @@ static void combo_init(void) {
     log_line("buscador: plan encontrado; L+R+ZL+ZR con la cruceta (arriba, derecha, abajo) lo maneja");
 }
 
-/* L+R+ZL+ZR mantenidos y una direccion de la cruceta: arriba = paso siguiente, derecha = punteros, abajo = comprobar. */
+/* L+R+ZL+ZR mantenidos y una direccion de la cruceta: arriba = paso siguiente (o "cambio"),
+ * izquierda = "no cambio", derecha = punteros, abajo = comprobar. */
 static void combo_poll(u64 now) {
     if (!g_pad_ready) return;
     padUpdate(&g_pad);
@@ -169,6 +170,7 @@ static void combo_poll(u64 now) {
         if (b & HidNpadButton_Up) action = SEARCH_NEXT;
         else if (b & HidNpadButton_Right) action = SEARCH_PTR;
         else if (b & HidNpadButton_Down) action = SEARCH_CHECK;
+        else if (b & HidNpadButton_Left) action = SEARCH_SAME;
     }
     if (action < 0) { g_combo_held = false; return; }
     if (g_combo_held) return; /* una vez por pulsacion */
