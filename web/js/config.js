@@ -7,5 +7,5 @@ window.GREENY_CONFIG = {
   donateUrl: "https://www.paypal.com/donate/?hosted_button_id=B82PT4TEHBG3G",
   // Clave del SITIO de Cloudflare Turnstile (publica). Vacia = sin captcha.
   // La clave SECRETA va solo en Supabase (Authentication → Attack Protection).
-  turnstileSiteKey: "",
+  turnstileSiteKey: "0x4AAAAAAF-38a9egevH7JCS",
 };
