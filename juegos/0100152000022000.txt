@@ -2,13 +2,15 @@
 # Va en  sdmc:/config/greeny/games/0100152000022000.txt
 #
 # SIN EMPEZAR. Todavia no se han buscado las direcciones de memoria de este juego, asi que
-# solo trae un logro que no depende de ninguna: jugar un rato. Sin "version" ni "build" a
-# proposito: ese logro sirve con cualquier version del juego.
+# solo trae un logro que no depende de ninguna: jugar un rato. Sin "build" a proposito: ese
+# logro sirve con cualquier version. "version" solo dice la ultima para Switch 1, para la que
+# se haran los logros de verdad.
 #
 # Ideas para los logros de verdad (hay que encontrarlas con el buscador de valores):
 #   Monedas totales acumuladas y monedas en carrera (0 a 10).
 
 game = Mario Kart 8 Deluxe
+version = 4.0.0
 
 [primera_partida]
 name = Primera partida

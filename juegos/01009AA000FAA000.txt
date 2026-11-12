@@ -2,13 +2,15 @@
 # Va en  sdmc:/config/greeny/games/01009AA000FAA000.txt
 #
 # SIN EMPEZAR. Todavia no se han buscado las direcciones de memoria de este juego, asi que
-# solo trae un logro que no depende de ninguna: jugar un rato. Sin "version" ni "build" a
-# proposito: ese logro sirve con cualquier version del juego.
+# solo trae un logro que no depende de ninguna: jugar un rato. Sin "build" a proposito: ese
+# logro sirve con cualquier version. "version" solo dice la ultima para Switch 1, para la que
+# se haran los logros de verdad.
 #
 # Ideas para los logros de verdad (hay que encontrarlas con el buscador de valores):
 #   Anillos (0 a 999), vidas y Esmeraldas del Caos (0 a 7).
 
 game = Sonic Mania
+version = 1.0.4
 
 [primera_partida]
 name = Primera partida
