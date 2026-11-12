@@ -76,6 +76,20 @@ int main(void) {
     fail += show("comprobar tras reiniciar", "SIRVE  main+0x1C00->0x18->0x138->0x48 u32");
     cmd("check 99");
     fail += show("comprobar con un valor que no es", "0 de 1 dan");
+    /* Varias candidatas, y las primeras son señuelos con cientos de punteros encima: la cadena buena
+     * tiene que salir igual (antes los señuelos llenaban la lista y no salia ninguna). */
+    {
+        where = build(0, 77);
+        for (int d = 0; d < 7; d++) {
+            u64 decoy = HEAP + 0x1000 + (u64)d * 0x100;
+            put32(decoy, 77);
+            for (int k = 0; k < 400; k++) put64(HEAP + 0x220000 + (u64)(d * 400 + k) * 8, decoy); /* 400 punteros directos a cada uno */
+        }
+        cmd("new u32 77");
+        cmd("ptr -1");
+        fail += show("punteros con senuelos", "main+0x1C00->0x18->0x138->0x48 u32");
+    }
+
     /* lo mismo, pero como se usa dentro del juego: un plan y la combinacion de botones */
     remove("sdmc:/config/greeny/search/state.txt");
     FILE *pf = fopen("sdmc:/config/greeny/search/plan.txt", "w");

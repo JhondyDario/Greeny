@@ -21,7 +21,8 @@
 #define SHOWN 12           /* candidatas que se listan en result.txt */
 #define PTR_MAX_OFF 0x800  /* cuanto puede haber entre un puntero y el dato */
 #define PTR_DEPTH 7
-#define PTR_LEVEL_MAX 192  /* direcciones que se siguen por nivel */
+#define PTR_LEVEL_MAX 480  /* direcciones que se siguen por nivel, repartidas entre las candidatas */
+#define PTR_ROOTS 12       /* candidatas hacia las que se buscan punteros a la vez */
 #define CHAINS_MAX 28
 
 static u64 g_main, g_main_size, g_heap, g_end;
@@ -30,7 +31,7 @@ static int g_step;
 static unsigned long g_last_value; /* el ultimo numero que se busco o filtro */
 static unsigned g_last_count;     /* candidatas, cadenas o cadenas buenas de la ultima orden */
 
-typedef struct { u64 loc; u16 off; s16 parent; } node;   /* loc guarda un puntero a (nodo padre - off) */
+typedef struct { u64 loc; u16 off; s16 parent; u8 root; } node; /* loc guarda un puntero a (nodo padre - off); root = de que candidata viene */
 typedef struct { u64 base_off; u8 n; u16 off[PTR_DEPTH]; } chain; /* main+base_off->off[0]->off[1]... */
 
 /* Memoria de trabajo: se pide solo mientras se ejecuta una orden, para que el sysmodule
@@ -40,6 +41,8 @@ typedef struct {
     u8 buf2[CHUNK];   /* el mismo trozo, como estaba en la foto de la memoria */
     u64 batch[1024];
     node level[PTR_DEPTH + 1][PTR_LEVEL_MAX];
+    int root_n[PTR_ROOTS];   /* cuantas direcciones lleva cada candidata en el nivel que se esta llenando */
+    int nroots;
     int level_n[PTR_DEPTH + 1];
     chain chains[CHAINS_MAX];
     int nchains;
@@ -238,14 +241,22 @@ static bool ptr_chunk(u64 addr, const u8 *data, size_t size, void *vctx) {
         u16 off = (u16)(p->sorted[lo] - v);
         s16 parent = p->index[lo];
         if (loc >= g_main && loc < g_main + g_main_size) { add_chain(p->level, parent, loc, off); continue; }
-        /* si no esta en main, se sigue subiendo desde aqui; se guardan las de offset mas chico */
+        /* Si no esta en main, se sigue subiendo desde aqui. Cada candidata tiene su propio cupo y se
+         * queda con las de offset mas chico: sin cupo, una candidata con muchisimos punteros encima
+         * dejaba sin sitio a la buena y no salia ninguna cadena. */
         node *lvl = g_level[p->level];
         int *n = &g_level_n[p->level];
-        if (*n < PTR_LEVEL_MAX) { lvl[*n] = (node){ loc, off, parent }; (*n)++; }
-        else {
-            int worst = 0;
-            for (int k = 1; k < *n; k++) if (lvl[k].off > lvl[worst].off) worst = k;
-            if (off < lvl[worst].off) lvl[worst] = (node){ loc, off, parent };
+        u8 root = g_level[p->level - 1][parent].root;
+        int quota = PTR_LEVEL_MAX / (g_w->nroots > 0 ? g_w->nroots : 1);
+        if (g_w->root_n[root] < quota && *n < PTR_LEVEL_MAX) {
+            lvl[*n] = (node){ loc, off, parent, root };
+            (*n)++;
+            g_w->root_n[root]++;
+        } else {
+            int worst = -1;
+            for (int k = 0; k < *n; k++)
+                if (lvl[k].root == root && (worst < 0 || lvl[k].off > lvl[worst].off)) worst = k;
+            if (worst >= 0 && off < lvl[worst].off) lvl[worst] = (node){ loc, off, parent, root };
         }
     }
     return g_nchains < CHAINS_MAX;
@@ -274,16 +285,17 @@ static void do_ptr(int which) {
 
     /* which >= 0: solo esa candidata. which < 0: todas las que queden (hasta 8); una cadena sirve
      * llegue a la que llegue, y asi no hay que adivinar cual de ellas es la buena. */
+    g_w->nroots = 0;
     FILE *c = fopen(CAND_PATH, "rb");
     u64 target = 0;
     int idx = 0;
-    while (c && g_level_n[0] < 8 && fread(&target, 8, 1, c) == 1) {
+    while (c && g_level_n[0] < PTR_ROOTS && fread(&target, 8, 1, c) == 1) {
         if (which < 0 || idx == which) {
             if (target >= g_main && target < g_main + g_main_size) {
                 /* esta en main: es fija y no necesita punteros */
                 if (g_nchains < CHAINS_MAX) { g_chains[g_nchains].base_off = target - g_main; g_chains[g_nchains].n = 0; g_nchains++; }
             } else {
-                g_level[0][g_level_n[0]] = (node){ target, 0, -1 };
+                g_level[0][g_level_n[0]] = (node){ target, 0, -1, (u8)g_level_n[0] };
                 g_level_n[0]++;
             }
         }
@@ -298,6 +310,8 @@ static void do_ptr(int which) {
         result_status(msg);
         static ptr_ctx p; /* 2 KB: se queda fijo */
         p.level = level;
+        g_w->nroots = g_level_n[0];
+        memset(g_w->root_n, 0, sizeof(g_w->root_n));
         p.n = g_level_n[level - 1];
         if (p.n == 0) break;
         for (int i = 0; i < p.n; i++) { p.sorted[i] = g_level[level - 1][i].loc; p.index[i] = (s16)i; }
@@ -386,7 +400,7 @@ void search_poll(uint64_t main_base, uint64_t main_size, uint64_t heap_base, uin
         int w = !strcmp(type, "u8") ? 1 : !strcmp(type, "u16") ? 2 : 4;
         do_new(w, value);
     } else if (sscanf(line, "next %lu", &value) == 1) do_next(value);
-    else if (sscanf(line, "ptr %d", &which) == 1 && which >= 0) do_ptr(which);
+    else if (sscanf(line, "ptr %d", &which) == 1) do_ptr(which);
     else if (sscanf(line, "check %lu", &value) == 1) do_check(value);
     else result_status("ERROR: orden desconocida.");
     free(g_w);
