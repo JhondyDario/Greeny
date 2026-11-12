@@ -595,4 +595,26 @@ begin
     assert not exists (select 1 from public.profiles where id = z) and not exists (select 1 from auth.users where id = z), 'cuenta borrada';
 end $$;
 
+-- orden de los comentarios: el tuyo, luego tus amigos, luego el resto
+do $$
+declare me uuid := '00000000-0000-0000-0000-0000000000c1'; amigo uuid := '00000000-0000-0000-0000-0000000000c2';
+        otro uuid := '00000000-0000-0000-0000-0000000000c3'; fan uuid := '00000000-0000-0000-0000-0000000000c4';
+        j jsonb; r bigint;
+begin
+    insert into auth.users (id, email, raw_user_meta_data) values
+        (me, 'c1@g.test', '{"username":"orden_yo"}'), (amigo, 'c2@g.test', '{"username":"orden_amigo"}'),
+        (otro, 'c3@g.test', '{"username":"orden_otro"}'), (fan, 'c4@g.test', '{"username":"orden_fan"}');
+    insert into public.games (title_id, name, definition, published) values ('0100ABCDEF000000', 'Orden', 'game = Orden', true) on conflict do nothing;
+    insert into public.reviews (title_id, user_id, body) values ('0100ABCDEF000000', otro, 'muy querido') returning id into r;
+    insert into public.review_likes (review_id, user_id) values (r, fan), (r, amigo);
+    insert into public.reviews (title_id, user_id, body) values ('0100ABCDEF000000', amigo, 'de mi amigo');
+    insert into public.reviews (title_id, user_id, body) values ('0100ABCDEF000000', me, 'el mio');
+    insert into public.follows (follower_id, followed_id) values (me, amigo);
+    j := public.reviews_for(me, '0100ABCDEF000000');
+    assert j -> 0 ->> 'username' = 'orden_yo' and j -> 1 ->> 'username' = 'orden_amigo' and j -> 2 ->> 'username' = 'orden_otro', 'orden: ' || j::text;
+    assert (j -> 1 ->> 'friend')::boolean and not (j -> 2 ->> 'friend')::boolean, 'marca de amigo';
+    j := public.reviews_for(null, '0100ABCDEF000000');
+    assert j -> 0 ->> 'username' = 'orden_otro', 'sin sesion: el mas querido primero';
+end $$;
+
 select 'TODAS LAS PRUEBAS PASARON' as resultado;

@@ -271,9 +271,9 @@ int main(int argc, char **argv) {
             ui_ranking(&c, &a, rows, 10, &yo, 37, "Global", "Global", "Puntos totales", 2, 1);
             save(&c, out, "ranking", sfx);
             static gr_review rv[4] = {
-                { 7, "Los logros de las estrellas están durísimos, pero vale la pena. El de los sellos me tomó toda una tarde buscando en cada nivel del mundo 4, y todavía me falta el de la corona.", "Ana_99", "Ana", 9, "MX", true, 310, 9, 3, true, false, "2026-11-10" },
-                { 8, "Me encanta el de la Supercampana", "megaJHONDY", "Jhondy", 4, "DO", false, 190, 12, 1, false, true, "2026-11-11" },
-                { 9, "Buenísimo", "luis", "", 15, "", false, 40, 2, 0, false, false, "2026-11-12" },
+                { 7, "Los logros de las estrellas están durísimos, pero vale la pena. El de los sellos me tomó toda una tarde buscando en cada nivel del mundo 4, y todavía me falta el de la corona.", "Ana_99", "Ana", 9, "MX", true, 310, 9, 3, true, false, false, "2026-11-10" },
+                { 8, "Me encanta el de la Supercampana", "megaJHONDY", "Jhondy", 4, "DO", false, 190, 12, 1, false, true, false, "2026-11-11" },
+                { 9, "Buenísimo", "luis", "", 15, "", false, 40, 2, 0, false, false, true, "2026-11-12" },
             };
             ui_reviews(&c, &a, "Super Mario 3D World", rv, 3, 0, 0, 1, true);
             save(&c, out, "comentarios", sfx);

@@ -669,3 +669,5 @@ a.card.notif { display: flex; }
 .pill.hearts { display: inline-flex; align-items: center; gap: 6px; background: linear-gradient(180deg, #ff8fa6, #e53e5c); color: #fff; font-weight: 800; }
 .pill.hearts img { width: 18px; height: 18px; }
 @media (max-width: 1080px) { .level .lvl-tags { justify-content: center; width: 100%; } }
+.pill.tag-friend { background: rgba(67, 208, 88, .2); color: #8ff09c; font-size: .72rem; }
+.pill.tag-mine { background: rgba(247, 201, 30, .2); color: #ffe169; font-size: .72rem; }

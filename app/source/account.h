@@ -109,6 +109,7 @@ typedef struct {
     int  likes;
     bool liked;   /* le diste me gusta */
     bool mine;    /* es tu comentario */
+    bool friend_; /* es de alguien que sigues */
     char date[11]; /* AAAA-MM-DD */
 } gr_review;
 /* Lee la lista que devuelve device_reviews. El texto del comentario se lee primero y

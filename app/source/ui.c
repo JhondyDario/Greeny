@@ -1187,7 +1187,7 @@ void ui_reviews(gfx_canvas *c, const ui_assets *a, const char *game, const gr_re
             if (v->donor && img_fit(c, a, UI_IMG_badge_donador, fx, y + 12, 30)) fx += 36;
             char info[96];
             snprintf(info, sizeof(info), "@%s  ·  %d pts  ·  %.2s/%.2s/%.4s%s", v->username, v->total_points,
-                     T(v->date + 8, v->date + 5), T(v->date + 5, v->date + 8), v->date, v->mine ? T("  ·  tuyo", "  ·  yours") : "");
+                     T(v->date + 8, v->date + 5), T(v->date + 5, v->date + 8), v->date, v->mine ? T("  ·  tuyo", "  ·  yours") : v->friend_ ? T("  ·  amigo", "  ·  friend") : "");
             gfx_text_fit(c, fx + 6, y + 19, 18, P->gray, info, x + w - 200 - fx);
             text_wrap(c, x + 104, y + 52, 21, 30, P->ink, v->body, w - 104 - 190, 3);
             /* me gusta */

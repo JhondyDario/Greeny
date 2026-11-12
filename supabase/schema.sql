@@ -990,23 +990,27 @@ grant select on public.reviews, public.review_likes to anon, authenticated;
 grant insert, delete on public.reviews, public.review_likes to authenticated;
 grant update (body, updated_at) on public.reviews to authenticated;
 
--- Los comentarios de un juego, los mas queridos primero. `viewer` puede ser null.
+-- Los comentarios de un juego: primero el tuyo, luego los de la gente que sigues y despues
+-- el resto; dentro de cada grupo, los mas queridos primero. `viewer` puede ser null.
 create or replace function public.reviews_for(viewer uuid, title text)
 returns jsonb
 language sql stable security definer set search_path = ''
 as $$
-    select coalesce(jsonb_agg(x order by x.likes desc, x.created_at desc), '[]'::jsonb)
+    select coalesce(jsonb_agg(x order by x.mine desc, x.friend desc, x.likes desc, x.created_at desc), '[]'::jsonb)
       from (select v.id, v.body, v.created_at, v.updated_at,
                    p.username, p.display_name, p.avatar, p.country, p.donor,
                    s.points as total_points, s.achievements,
                    (select count(*) from public.review_likes k where k.review_id = v.id)::int as likes,
                    exists (select 1 from public.review_likes k where k.review_id = v.id and k.user_id = viewer) as liked,
-                   v.user_id = viewer as mine
+                   coalesce(v.user_id = viewer, false) as mine,
+                   exists (select 1 from public.follows f where f.follower_id = viewer and f.followed_id = v.user_id) as friend
               from public.reviews v
               join public.profiles p on p.id = v.user_id
               join public.profile_stats s on s.id = p.id
              where v.title_id = title
-             order by 12 desc, v.created_at desc
+             order by coalesce(v.user_id = viewer, false) desc,
+                      exists (select 1 from public.follows f where f.follower_id = viewer and f.followed_id = v.user_id) desc,
+                      (select count(*) from public.review_likes k where k.review_id = v.id) desc, v.created_at desc
              limit 40) x;
 $$;
 

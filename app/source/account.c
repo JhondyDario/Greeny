@@ -404,6 +404,7 @@ int gr_parse_reviews(char *json, gr_review *out, int max) {
         gr_json_int(p, "likes", &r->likes);
         gr_json_bool(p, "liked", &r->liked);
         gr_json_bool(p, "mine", &r->mine);
+        gr_json_bool(p, "friend", &r->friend_);
         char d[40] = "";
         gr_json_string(p, "created_at", d, sizeof(d));
         snprintf(r->date, sizeof(r->date), "%.10s", d);

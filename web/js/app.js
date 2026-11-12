@@ -630,7 +630,8 @@
           h("a", { class: "who", href: "#/u/" + encodeURIComponent(r.username) },
             h("strong", {}, shownName(r)), flag(r.country, 20),
             r.donor ? h("img", { class: "donor-mini", src: "img/badges/donador.png", alt: "Donador", title: "Donador" }) : null,
-            h("span", { class: "muted small" }, "@" + r.username + " · " + fmtNum(r.total_points) + " pts · " + fmtNum(r.achievements) + " logros")),
+            h("span", { class: "muted small" }, "@" + r.username + " · " + fmtNum(r.total_points) + " pts · " + fmtNum(r.achievements) + " logros"),
+            r.mine ? h("span", { class: "pill tag-mine" }, "Tú") : r.friend ? h("span", { class: "pill tag-friend" }, "Amigo") : null),
           h("p", { class: "body" }, r.body),
           h("div", { class: "acts" }, btn,
             h("span", { class: "muted small" }, fmtDate(r.created_at) + (edited ? " · editado" : "")))));
