@@ -503,6 +503,53 @@ static void test_store(void) {
     remove(path);
 }
 
+/* progreso de logros bloqueados */
+static void test_ach_progress(void) {
+    static lg_game g, h;
+    char err[128];
+    int out[8];
+    memset(g_main, 0, sizeof(g_main));
+    const char *src =
+        "[monedas]\nwhen=main+0x20 u32 >= 90\nwhen=main+0x20 u32 <= 99\n"                   /* meta 90, limite 99 */
+        "[vidas]\nwhen=main+0x40 u32 >= 1\nwhen=main+0x24 u32 > 9\n"                         /* la de >= 1 es un seguro: meta 10 */
+        "[item]\nwhen=main+0x28 u32 == 3\n"                                                  /* sin progreso */
+        "[manual]\nprogress=2\nwhen=main+0x2C u32 >= 50\nwhen=main+0x30 u32 >= 7\n"          /* elegida a mano */
+        "[sin]\nprogress=0\nwhen=main+0x34 u32 >= 5\n";
+    CHECK(parse(&g, src, err, sizeof(err)) == 0);
+    CHECK(g.ach[0].prog_cond == 0 && g.ach[0].prog_goal == 90);
+    CHECK(g.ach[1].prog_cond == 1 && g.ach[1].prog_goal == 10);
+    CHECK(g.ach[2].prog_cond == -1);
+    CHECK(g.ach[3].prog_cond == 1 && g.ach[3].prog_goal == 7);
+    CHECK(g.ach[4].prog_cond == -1);
+    CHECK(bad("[a]\nprogress=2\nwhen=main+0 u8 >= 3\n", "condicion que no existe"));
+    CHECK(bad("[a]\nprogress=1\nwhen=main+0 u8 == 3\n", "condicion >= o >"));
+
+    /* basura que cambia en cada lectura: no se anota */
+    uint64_t t = 1000;
+    for (int i = 0; i < 80; i++, t += 250) { PUT(g_main, 0x20, uint32_t, (uint32_t)(i * 7 % 60)); lg_tick(&g, &g_bases, fake_read, NULL, t, out, 8); }
+    CHECK(!g.ach[0].prog_known);
+    /* un valor fuera del limite del mismo logro (<= 99), aunque este quieto, tampoco */
+    PUT(g_main, 0x20, uint32_t, 562032336u);
+    for (int i = 0; i < 60; i++, t += 250) lg_tick(&g, &g_bases, fake_read, NULL, t, out, 8);
+    CHECK(!g.ach[0].prog_known);
+    /* 40 monedas, quietas 10 segundos: se anota, aunque el logro no se cumpla */
+    PUT(g_main, 0x20, uint32_t, 40);
+    for (int i = 0; i < 45; i++, t += 250) lg_tick(&g, &g_bases, fake_read, NULL, t, out, 8);
+    CHECK(g.ach[0].prog_known && g.ach[0].prog_value == 40 && g.prog_dirty);
+    /* la meta de vidas se lee aunque la primera condicion (el seguro) no se cumpla */
+    PUT(g_main, 0x24, uint32_t, 6);
+    for (int i = 0; i < 45; i++, t += 250) lg_tick(&g, &g_bases, fake_read, NULL, t, out, 8);
+    CHECK(g.ach[1].prog_known && g.ach[1].prog_value == 6);
+
+    /* guardar y leer */
+    const char *path = "test_progress.tmp";
+    CHECK(lg_progress_save(&g, path) == 0 && !g.prog_dirty);
+    CHECK(parse(&h, src, err, sizeof(err)) == 0);
+    CHECK(lg_progress_load(&h, path) == 3); /* monedas 40, vidas 6 y manual 0 (sin empezar tambien es progreso) */
+    CHECK(h.ach[0].prog_known && h.ach[0].prog_value == 40 && h.ach[1].prog_value == 6 && !h.ach[2].prog_known);
+    remove(path);
+}
+
 int main(void) {
     test_parse();
     test_eval();
@@ -512,6 +559,7 @@ int main(void) {
     test_i18n_config();
     test_progress();
     test_store();
+    test_ach_progress();
     printf("%d/%d pruebas pasaron\n", g_total - g_fail, g_total);
     return g_fail ? 1 : 0;
 }

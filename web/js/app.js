@@ -135,10 +135,25 @@
 
   // Paises que se pueden elegir (web/js/countries.js) y su bandera.
   const COUNTRIES = (window.GreenyCountries || []).slice().sort((a, b) => a.es.localeCompare(b.es, "es"));
-  const countryName = (code) => { const c = COUNTRIES.find((x) => x.code === code); return c ? c.es : code; };
+  const countryName = (code) => { const c = COUNTRIES.find((x) => x.code === code); return c ? (uiLang() === "en" ? c.en : c.es) : code; };
   function flag(code, size) {
     if (!code || !COUNTRIES.some((c) => c.code === code)) return null;
     return h("img", { class: "flag", src: "img/flags/" + code.toLowerCase() + ".png", alt: countryName(code), title: countryName(code), width: size || 22, height: size || 22, loading: "lazy" });
+  }
+
+  // Cuadricula de banderas para elegir pais, como en la app. `withNone` añade "Sin indicar".
+  function flagGrid(current, onPick, withNone) {
+    const grid = h("div", { class: "flag-grid", role: "radiogroup", "aria-label": "País" });
+    const paint = (cur) => grid.replaceChildren(...[
+      withNone ? h("button", { type: "button", role: "radio", "aria-checked": String(!cur), class: "flag-opt none" + (!cur ? " on" : ""),
+        onclick: () => { paint(""); onPick(""); } }, h("span", { class: "flag-none" }, "—"), h("span", { class: "flag-code" }, "Sin indicar")) : null,
+      ...COUNTRIES.map((c) => h("button", { type: "button", role: "radio", "aria-checked": String(cur === c.code), title: countryName(c.code),
+        class: "flag-opt" + (cur === c.code ? " on" : ""), onclick: () => { paint(c.code); onPick(c.code); } },
+        h("img", { src: "img/flags/" + c.code.toLowerCase() + ".png", alt: "", width: 36, height: 36, loading: "lazy" }),
+        h("span", { class: "flag-code" }, c.code))),
+    ].filter(Boolean));
+    paint(current || "");
+    return grid;
   }
 
   // La foto de perfil es una de las que trae Greeny, por numero (profiles.avatar).
@@ -453,7 +468,7 @@
     return [
       h("section", { class: "card row" }, avatar(profile, "big"),
         h("div", { class: "grow" },
-          h("h1", { style: "margin-bottom:2px" }, shownName(profile), " ", flag(profile.country, 30)),
+          h("h1", { style: "margin-bottom:2px" }, shownName(profile), " ", flag(profile.country, 36)),
           h("div", { class: "muted" }, "@" + profile.username, profile.discord_username ? " · Discord: " + profile.discord_username : ""),
           profile.caption ? h("p", { style: "margin:8px 0 0;font-size:1.1rem" }, "“" + profile.caption + "”") : null,
           profile.friend_code ? h("div", { class: "small", style: "margin-top:8px" }, "Código de amigo: ", h("code", {}, profile.friend_code), " ", copyButton(profile.friend_code)) : null,
@@ -655,6 +670,7 @@
       presets.map((p) => h("option", { value: p, selected: me.caption === p }, p)),
       h("option", { value: CUSTOM, selected: !isPreset }, "Escribir la mía…"));
 
+    const countryInput = h("input", { type: "hidden", name: "country", value: me.country || "" });
     const profileForm = form([
       h("label", {}, "Nombre de usuario", h("span", { class: "hint" }, "Si lo cambias, cambia el enlace de tu perfil."),
         h("input", { name: "username", required: true, minlength: 3, maxlength: 20, pattern: "[A-Za-z0-9_]{3,20}", value: me.username, autocapitalize: "none", spellcheck: "false" })),
@@ -662,9 +678,8 @@
         h("input", { name: "display_name", maxlength: 32, value: me.display_name || "" })),
       h("label", {}, "Frase de tu perfil", h("span", { class: "hint" }, "Elige una o escribe la tuya (hasta 60 caracteres)."), select),
       customWrap,
-      h("label", {}, "País", h("span", { class: "hint" }, "Opcional. Sale como bandera en tu perfil y en el ranking."),
-        h("select", { name: "country" }, h("option", { value: "" }, "Sin indicar"),
-          COUNTRIES.map((c) => h("option", { value: c.code, selected: me.country === c.code }, c.es)))),
+      h("div", { class: "field" }, h("span", { class: "field-label" }, "País"), h("span", { class: "hint" }, "Opcional. Sale como bandera en tu perfil y en el ranking."),
+        countryInput, flagGrid(me.country, (code) => { countryInput.value = code; }, true)),
     ], "Guardar perfil", async (fd) => {
       const choice = fd.get("caption_choice");
       const caption = (choice === CUSTOM ? String(fd.get("caption_custom")).trim() : choice) || null;
@@ -992,15 +1007,22 @@
       const apps = (await sb.from("applications").select("id,role,contact,message,status,created_at,profiles(username,display_name)").order("created_at", { ascending: false })).data || [];
       const setStatus = async (id, status) => { const r = await sb.from("applications").update({ status }).eq("id", id); if (r.error) alert(explain(r.error)); drawTeam(); };
       const remove = async (id) => { if (!confirm("¿Borrar esta postulación?")) return; const r = await sb.from("applications").delete().eq("id", id); if (r.error) alert(explain(r.error)); drawTeam(); };
+      const donors = (await sb.from("profiles").select("username,display_name,avatar").eq("donor", true).order("username")).data || [];
+      const setDonor = async (who, on) => { const r = await sb.rpc("set_donor", { who, is_donor: on }); if (r.error) { alert(explain(r.error)); return null; } drawTeam(); return r.data; };
       const donor = form([
-        h("label", {}, "Nombre de usuario", h("span", { class: "hint" }, "El que el donante escribió en la nota de PayPal."),
-          h("input", { name: "who", required: true, autocomplete: "off", style: "max-width:280px" })),
-        h("label", { style: "display:flex;gap:8px;align-items:center" }, h("input", { name: "on", type: "checkbox", checked: true, style: "width:auto" }), "Es donador"),
-      ], "Guardar", async (fd) => {
-        const on = fd.get("on") === "on";
-        const who = must(await sb.rpc("set_donor", { who: String(fd.get("who")).trim(), is_donor: on }));
-        return on ? "@" + who + " ya tiene la medalla de donador." : "@" + who + " ya no tiene la medalla.";
+        h("label", {}, "Correo o nombre de usuario", h("span", { class: "hint" }, "El correo que te dio PayPal sirve si es el mismo de su cuenta de Greeny."),
+          h("input", { name: "who", required: true, autocomplete: "off", style: "max-width:320px" })),
+      ], "Dar la medalla", async (fd) => {
+        const v = String(fd.get("who")).trim();
+        const who = must(v.includes("@") ? await sb.rpc("set_donor_email", { donor_email: v, is_donor: true }) : await sb.rpc("set_donor", { who: v, is_donor: true }));
+        setTimeout(drawTeam, 1200);
+        return "@" + who + " ya tiene la medalla de donador.";
       });
+      const donorList = donors.length
+        ? h("div", { class: "stack" }, donors.map((d) => h("div", { class: "card row" }, avatar(d, "tiny"),
+            h("strong", { class: "grow" }, "@" + d.username),
+            h("button", { type: "button", class: "btn danger mini", onclick: () => { if (confirm("¿Quitarle la medalla de donador a @" + d.username + "?")) setDonor(d.username, false); } }, "Quitar"))))
+        : h("p", { class: "muted" }, "Todavía nadie tiene la medalla.");
       teamPanel.replaceChildren(
         h("h2", { style: "margin-top:0" }, "Postulaciones"),
         apps.length ? h("div", { class: "stack" }, apps.map((a) => h("div", { class: "card stack" },
@@ -1015,8 +1037,10 @@
             h("button", { type: "button", class: "btn danger mini", onclick: () => remove(a.id) }, "Borrar")))))
           : h("p", { class: "card muted" }, "Todavía no hay postulaciones."),
         h("h2", {}, "Donadores"),
-        h("p", { class: "muted" }, "PayPal y Greeny no están unidos: cuando llegue una donación, mira el nombre de usuario en la nota y márcalo aquí."),
-        h("div", { class: "card" }, donor));
+        h("p", { class: "muted" }, "PayPal y Greeny no están unidos: con el correo del donante, busca su usuario y dale la medalla aquí."),
+        h("div", { class: "card" }, donor),
+        h("h3", { style: "margin-top:18px" }, "Tienen la medalla"),
+        donorList);
     }
     drawTeam();
 
@@ -1127,8 +1151,13 @@
     const scopes = [["global", "Global"], ["country", "Por país"], ["friends", "Amigos"]];
     const scopeBtns = scopes.map(([id, label]) => h("button", { type: "button", class: "tab" + (id === state.scope ? " on" : ""), "aria-pressed": String(id === state.scope),
       onclick: () => { state.scope = id; draw(); } }, label));
-    const countrySel = h("select", { "aria-label": "País", onchange: (ev) => { state.country = ev.target.value; draw(); } },
-      COUNTRIES.map((c) => h("option", { value: c.code, selected: c.code === state.country }, c.es)));
+    // pais del ranking: un boton con la bandera elegida que abre la cuadricula de banderas
+    const countryLabel = h("span", {});
+    const paintCountry = () => countryLabel.replaceChildren(flag(state.country, 26), " ", countryName(state.country));
+    paintCountry();
+    const countrySel = h("details", { class: "flag-drop" },
+      h("summary", {}, countryLabel, h("span", { class: "caret", "aria-hidden": "true" }, "▾")),
+      h("div", { class: "flag-drop-list" }, flagGrid(state.country, (code) => { state.country = code; countrySel.open = false; paintCountry(); draw(); }, false)));
     const gameSel = h("select", { "aria-label": "Clasificar por", onchange: (ev) => { state.title = ev.target.value; draw(); } },
       h("option", { value: "" }, "Puntos totales"), gameList.map((g) => h("option", { value: g.title_id }, "Juego: " + g.name)));
 
@@ -1138,7 +1167,7 @@
         h("span", { class: "rank-pos" + (r.position <= 3 ? " top" + r.position : "") }, "#" + r.position),
         avatar(r, ""),
         h("div", { class: "grow clip" },
-          h("strong", {}, shownName(r)), " ", flag(r.country),
+          h("strong", {}, shownName(r)), " ", flag(r.country, 26),
           h("div", { class: "muted small" }, "@" + r.username + " · Nivel " + lvl)),
         h("div", { class: "right" }, h("strong", { class: "rank-pts" }, fmtNum(r.points)), h("div", { class: "muted small" }, "puntos")));
     }

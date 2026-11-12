@@ -66,6 +66,17 @@ typedef struct {
     bool     holding;
     uint64_t true_since;
     lg_cond  cond[LG_MAX_COND];
+    /* Progreso de un logro bloqueado (ej. 40 de 99 monedas). prog_cond es la condicion que
+     * marca la meta (-1 = sin progreso); por defecto, la primera "x >= N" con N de 2 o mas.
+     * prog_value solo se acepta si el valor se mantiene igual 10 segundos y cumple los
+     * limites (<= y <) que el logro pone a esa misma direccion: asi no cuenta la basura que
+     * se lee en la pantalla de titulo. */
+    int8_t   prog_cond;
+    uint64_t prog_goal;
+    bool     prog_known;
+    uint64_t prog_value;
+    uint64_t prog_cand, prog_cand_since;
+    bool     prog_cand_ok;
 } lg_ach;
 
 /* Busqueda de punteros estaticos: recorre [addr.offset, addr.offset+len) de a 8
@@ -92,6 +103,7 @@ typedef struct {
     lg_scan scan[LG_MAX_SCAN];
     int    nach;
     lg_ach ach[LG_MAX_ACH];
+    bool   prog_dirty; /* algun progreso cambio desde la ultima vez que se guardo */
 } lg_game;
 
 typedef struct {
@@ -126,6 +138,10 @@ const char *lg_ach_desc(const lg_ach *a, bool english);
  * candidatos encontrados, que puede ser mayor que max_hits. */
 int lg_scan_run(const lg_scan *sc, const lg_bases *b, lg_read_fn rd, void *ctx,
                 lg_scan_hit *hits, int max_hits);
+
+/* Progreso de los logros bloqueados: una linea "id valor" por logro. Lo escribe el sysmodule y lo lee la app. */
+int lg_progress_save(lg_game *g, const char *path); /* 0 = ok; limpia prog_dirty */
+int lg_progress_load(lg_game *g, const char *path); /* devuelve cuantos leyo */
 
 /* Persistencia de desbloqueos: una linea "id|timestamp" por logro. */
 int lg_store_load(lg_game *g, const char *path);               /* devuelve cuantos marco */

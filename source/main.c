@@ -25,6 +25,7 @@
 #define CONFIG_PATH  DIR_ROOT "/config.ini"
 #define DIR_GAMES    DIR_ROOT "/games"
 #define DIR_UNLOCKED DIR_ROOT "/unlocked"
+#define DIR_PROGRESS DIR_ROOT "/progress" /* cuanto falta para cada logro bloqueado; lo lee la app */
 #define LOG_PATH     DIR_ROOT "/log.txt"
 #define LOG_MAX      (64 * 1024)
 #define DEFS_MAX     (64 * 1024)
@@ -187,6 +188,7 @@ static void combo_poll(u64 now) {
 }
 static bool g_loaded;
 static char g_unlocked_path[96];
+static char g_progress_path[96];
 
 static bool mem_read(void *ctx, uint64_t addr, void *out, size_t size) {
     (void)ctx;
@@ -397,6 +399,7 @@ int main(int argc, char *argv[]) {
     mkdir(DIR_ROOT, 0777);
     mkdir(DIR_GAMES, 0777);
     mkdir(DIR_UNLOCKED, 0777);
+    mkdir(DIR_PROGRESS, 0777);
 
     struct stat st;
     if (stat(LOG_PATH, &st) == 0 && st.st_size > LOG_MAX) remove(LOG_PATH);
@@ -404,7 +407,7 @@ int main(int argc, char *argv[]) {
     log_line("Greeny iniciado");
     if (migrated) log_line("progreso migrado desde config/logros");
 
-    u64 cur_pid = 0, cur_tid = 0, attach_at = 0, scan_at = 0, search_at = 0;
+    u64 cur_pid = 0, cur_tid = 0, attach_at = 0, scan_at = 0, search_at = 0, progress_at = 0;
     int retries = 0;
     bool pending = false, bad_defs = false, toast_fail_logged = false, sound_fail_logged = false;
 
@@ -448,6 +451,10 @@ int main(int argc, char *argv[]) {
                 if (r == ATTACH_OK) {
                     snprintf(g_unlocked_path, sizeof(g_unlocked_path), DIR_UNLOCKED "/%016lX.txt", cur_tid);
                     lg_store_load(&g_game, g_unlocked_path);
+                    snprintf(g_progress_path, sizeof(g_progress_path), DIR_PROGRESS "/%016lX.txt", cur_tid);
+                    lg_progress_load(&g_game, g_progress_path); /* lo de la ultima vez sigue valiendo hasta que haya algo nuevo */
+                    g_game.prog_dirty = false;
+                    progress_at = now + 5000;
                     g_loaded = true;
                     combo_init();
                     g_debug_lines = 0;
@@ -486,6 +493,7 @@ int main(int argc, char *argv[]) {
             for (int i = 0; i < n; i++) {
                 lg_ach *a = &g_game.ach[idx[i]];
                 u64 ts = g_has_time ? (u64)time(NULL) : 0;
+                g_game.prog_dirty = true; /* el progreso de ese logro ya no hace falta */
                 if (lg_store_append(g_unlocked_path, a->id, ts) != 0)
                     log_line("%016lX: no se pudo guardar el logro %s", cur_tid, a->id);
                 log_line("%016lX: LOGRO %s (%s)", cur_tid, a->id, a->name);
@@ -493,6 +501,10 @@ int main(int argc, char *argv[]) {
                 if (g_config.popup)
                     toast_push(TOAST_UNLOCK, (int)lg_ach_tier(a), a->points, g_cfg_dark, en ? "ACHIEVEMENT UNLOCKED" : "LOGRO DESBLOQUEADO", lg_ach_name(a, en), lg_ach_desc(a, en));
                 if (g_config.sound) sound_play(SOUND_UNLOCK);
+            }
+            if (g_game.prog_dirty && now >= progress_at) { /* como mucho cada 5 s: la SD no es para escribir sin parar */
+                progress_at = now + 5000;
+                if (lg_progress_save(&g_game, g_progress_path) != 0) g_game.prog_dirty = false;
             }
             combo_poll(now);
             if (now >= search_at) { /* ordenes del buscador de valores, una vez por segundo */

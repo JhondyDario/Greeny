@@ -240,7 +240,7 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fo
 
 /* ---- ranking y banderas ---- */
 .flag { vertical-align: middle; }
-.rank-filters { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin: 14px 0 18px; }
+.rank-filters { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin: 14px 0 18px; position: relative; z-index: 30; }
 .rank-filters select { max-width: 280px; }
 .rank-row { text-decoration: none; color: inherit; gap: 14px; }
 .rank-row:hover { box-shadow: inset 0 0 0 2px var(--green); }
@@ -400,3 +400,21 @@ textarea { font: inherit; padding: 10px 12px; width: 100%; resize: vertical; min
 .lang-toggle { border: 1px solid var(--line) !important; font-size: .85rem !important; padding: 6px 10px !important; letter-spacing: .04em; }
 @media (max-width: 820px) { .contrib { grid-template-columns: 1fr; } }
 @media (max-width: 520px) { .roles { grid-template-columns: 1fr; } }
+
+/* ---- banderas ---- */
+.flag { vertical-align: -4px; border-radius: 4px; }
+h1 .flag { vertical-align: -3px; }
+.field { display: grid; gap: 4px; }
+.field-label { font-weight: 600; }
+.flag-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 8px; max-width: 860px; margin-top: 6px; }
+.flag-opt { display: grid; justify-items: center; gap: 2px; padding: 8px 4px 6px; border-radius: 12px; border: 1.5px solid var(--line); background: rgba(255, 255, 255, .04); color: var(--muted); font: inherit; font-size: .75rem; font-weight: 700; cursor: pointer; }
+.flag-opt:hover { border-color: var(--green); color: var(--ink); }
+.flag-opt.on { border-color: var(--yellow); background: rgba(247, 201, 30, .12); color: var(--ink); }
+.flag-opt.none { grid-column: span 2; }
+.flag-none { font-size: 1.4rem; line-height: 36px; }
+.flag-drop { position: relative; }
+.flag-drop summary { list-style: none; display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px 14px; border-radius: 12px; border: 1.5px solid var(--line); background: rgba(0, 0, 0, .32); font-weight: 600; }
+.flag-drop summary::-webkit-details-marker { display: none; }
+.flag-drop[open] summary { border-color: var(--green); }
+.flag-drop-list { position: absolute; z-index: 40; top: calc(100% + 8px); left: 0; width: min(640px, 92vw); max-height: 360px; overflow: auto; padding: 12px; border-radius: 16px; background: #10231a; border: 1px solid var(--line); box-shadow: 0 16px 40px rgba(0, 0, 0, .45); }
+.flag-drop-list .flag-grid { margin: 0; }

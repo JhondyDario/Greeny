@@ -464,4 +464,25 @@ begin
     reset role;
 end $$;
 
+-- donador por correo: solo un administrador, y solo devuelve el usuario
+do $$
+declare who text; expect text; ok boolean := false;
+begin
+    select username into expect from public.profiles where id = '00000000-0000-0000-0000-00000000000b';
+    perform set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000b', true);
+    begin perform public.set_donor_email('ana@otro.com', true);
+    exception when raise_exception then ok := true; end;
+    assert ok, 'quien no es admin no da medallas';
+    perform set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000d', true);
+    who := public.set_donor_email('ANA@Otro.com', true);
+    assert who = expect, 'busca el correo sin importar mayusculas: ' || coalesce(who, 'null');
+    assert (select donor from public.profiles where username = expect), 'quedo como donador';
+    perform public.set_donor(expect, false);
+    assert not (select donor from public.profiles where username = expect), 'se le puede quitar';
+    ok := false;
+    begin perform public.set_donor_email('nadie@example.com', true);
+    exception when raise_exception then ok := true; end;
+    assert ok, 'un correo sin cuenta da error';
+end $$;
+
 select 'TODAS LAS PRUEBAS PASARON' as resultado;

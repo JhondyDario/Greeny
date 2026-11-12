@@ -29,6 +29,8 @@ static bool load_game(lg_game *g, const char *root, const char *tid, char *err, 
 
     snprintf(path, sizeof(path), "%s/unlocked/%s.txt", root, tid);
     lg_store_load(g, path);
+    snprintf(path, sizeof(path), "%s/progress/%s.txt", root, tid); /* lo escribe el sysmodule mientras juegas */
+    lg_progress_load(g, path);
     return true;
 }
 

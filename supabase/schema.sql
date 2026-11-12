@@ -713,6 +713,25 @@ begin
 end;
 $$;
 
+-- (administradores) Lo mismo, con el correo que da PayPal. El correo no sale de la base de datos:
+-- solo se devuelve el nombre de usuario de esa cuenta.
+create or replace function public.set_donor_email(donor_email text, is_donor boolean)
+returns text
+language plpgsql security definer set search_path = ''
+as $$
+declare
+    target record;
+begin
+    if not public.is_admin() then raise exception 'solo administradores'; end if;
+    select p.id, p.username into target
+      from auth.users u join public.profiles p on p.id = u.id
+     where lower(u.email) = lower(trim(donor_email));
+    if target.id is null then raise exception 'no hay ninguna cuenta con ese correo'; end if;
+    update public.profiles set donor = coalesce(is_donor, false) where id = target.id;
+    return target.username;
+end;
+$$;
+
 
 -- -----------------------------------------------------------------------------
 -- 8. SEGURIDAD POR FILA
@@ -807,6 +826,7 @@ grant execute on function public.device_set_avatar(text, int) to anon, authentic
 grant execute on function public.device_set_country(text, text) to anon, authenticated;
 grant execute on function public.device_set_caption(text, text) to anon, authenticated;
 grant execute on function public.set_donor(text, boolean) to authenticated;
+grant execute on function public.set_donor_email(text, boolean) to authenticated;
 grant execute on function public.device_follow_user(text, text) to anon, authenticated;
 revoke all on function public.ranking_for(uuid, text, text, text) from public, anon, authenticated;
 grant execute on function public.ranking(text, text, text) to anon, authenticated;

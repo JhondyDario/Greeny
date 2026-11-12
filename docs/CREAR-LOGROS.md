@@ -44,6 +44,7 @@ when = main+0x2F00A8->0x18->0x3C u8 & 0x04
 | `name`, `desc` | Nombre y cómo se consigue. |
 | `name.en`, `desc.en` | Traducción al inglés (opcional). |
 | `points` | Puntos, de 0 a 1000 (10 por defecto). |
+| `progress` | Qué condición `when` muestra el progreso del logro (1, 2…) mientras está bloqueado; `0` lo apaga. Si no lo pones, se usa la primera `>= N` con N de 2 o más. |
 | `tier` | Dificultad: `bronce`, `plata` u `oro`. Si no lo pones sale de los puntos: hasta 10 bronce, hasta 25 plata, más de 25 oro. También se cambia desde la web, en Desarrollador. |
 | `hold` | Milisegundos seguidos que deben cumplirse las condiciones (500 por defecto). |
 | `when` | Condición. Si hay varias, se tienen que cumplir todas a la vez. |

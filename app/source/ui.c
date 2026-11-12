@@ -198,12 +198,33 @@ void ui_background(gfx_canvas *c, float t) {
 
 static void user_chip(gfx_canvas *c);
 
+/* Fondo de la barra de arriba: verde oscuro a la izquierda que se aclara hacia la derecha, con
+ * un brillo arriba y sombra abajo, y una linea clara al pie. Como en la web. */
+static void header_fill(gfx_canvas *c) {
+    static const int stops[3][3] = { { 0x0E, 0x5A, 0x2C }, { 0x25, 0xA2, 0x3C }, { 0x86, 0xD9, 0x5C } };
+    for (int x = 0; x < UI_W && x < c->w; x++) {
+        int t = x * 512 / (UI_W - 1), k = t < 256 ? 0 : 1, f = t < 256 ? t : t - 256;
+        int base[3];
+        for (int i = 0; i < 3; i++) base[i] = (stops[k][i] * (256 - f) + stops[k + 1][i] * f) >> 8;
+        for (int y = 0; y < HEADER_H + 5 && y < c->h; y++) {
+            int col[3];
+            if (y >= HEADER_H) { /* la linea del pie: un poco mas clara que la barra */
+                for (int i = 0; i < 3; i++) col[i] = base[i] + (255 - base[i]) * 22 / 100;
+            } else {
+                /* de +14 % de luz arriba a -12 % abajo */
+                int shade = 14 - y * 26 / HEADER_H;
+                for (int i = 0; i < 3; i++) col[i] = shade >= 0 ? base[i] + (255 - base[i]) * shade / 100 : base[i] * (100 + shade) / 100;
+            }
+            c->px[y * c->stride + x] = GFX_RGB(col[0], col[1], col[2]);
+        }
+    }
+}
+
 /* cabecera: caratula del juego si la hay, si no la mascota */
 static void header(gfx_canvas *c, const ui_assets *a, const uint8_t *cover, const char *title, const char *sub) {
     g_buttons = a->buttons;
     g_a = a;
-    gfx_gradient(c, 0, 0, UI_W, HEADER_H, GFX_RGB(0x1F, 0x8F, 0x30), GFX_RGB(0x4C, 0xC2, 0x4A));
-    gfx_gradient(c, 0, HEADER_H, UI_W, 5, GFX_RGB(0x15, 0x66, 0x22), GFX_RGB(0x2A, 0x93, 0x34));
+    header_fill(c);
     /* a la izquierda solo va la caratula cuando la pantalla es de un juego; el logo ya no se repite */
     int tx = MARGIN;
     if (cover) {
@@ -540,6 +561,20 @@ static void unlock_date(const lg_ach *ac, char *buf, size_t cap) {
     if (localtime_r(&t, &tm)) strftime(buf, cap, "%d/%m/%Y  %H:%M", &tm);
 }
 
+/* Progreso de un logro bloqueado, si se sabe: "40 / 99" en `buf` y la fraccion de 0 a 1000. */
+static bool ach_progress(const lg_ach *ac, char *buf, size_t cap, int *permil) {
+    if (ac->unlocked || ac->prog_cond < 0 || !ac->prog_known || ac->prog_goal == 0) return false;
+    uint64_t v = ac->prog_value < ac->prog_goal ? ac->prog_value : ac->prog_goal;
+    snprintf(buf, cap, "%llu / %llu", (unsigned long long)v, (unsigned long long)ac->prog_goal);
+    *permil = (int)(v * 1000 / ac->prog_goal);
+    return true;
+}
+
+static void progress_bar(gfx_canvas *c, int x, int y, int w, int h, int permil) {
+    gfx_round_rect(c, x, y, w, h, h / 2, P->gray_lt);
+    if (permil > 0) gfx_round_rect(c, x, y, h + (w - h) * permil / 1000, h, h / 2, C_YELLOW);
+}
+
 /* a la derecha de cada logro: los puntos y un check o un candado */
 static void status_pills(gfx_canvas *c, const ui_assets *a, int right, int cy, const lg_ach *ac) {
     char buf[24];
@@ -569,7 +604,15 @@ static void detail_list(gfx_canvas *c, const ui_assets *a, const lg_game *gm, co
         const char *desc = lg_ach_desc(ac, g_en);
         gfx_text_fit(c, tx, y + 11, 26, ac->unlocked ? P->ink : P->gray, lg_ach_name(ac, g_en), tw);
         gfx_text_fit(c, tx, y + 46, 20, P->gray, desc[0] ? desc : T("Sin descripción", "No description"), tw);
-        status_pills(c, a, x + w - 22, y + h / 2, ac);
+        char pb[48];
+        int pm;
+        if (ach_progress(ac, pb, sizeof(pb), &pm)) {
+            /* bloqueado con progreso: arriba los puntos y el candado, abajo cuanto falta */
+            status_pills(c, a, x + w - 22, y + 26, ac);
+            int pw = gfx_text_width(17, pb);
+            gfx_text(c, x + w - 22 - pw, y + 51, 17, P->gray, pb);
+            progress_bar(c, x + w - 22 - pw - 12 - 120, y + 57, 120, 10, pm);
+        } else status_pills(c, a, x + w - 22, y + h / 2, ac);
     }
     scrollbar(c, 116, rows * (h + 8) - 8, top, rows, n);
 }
@@ -590,6 +633,13 @@ static void detail_grid(gfx_canvas *c, const ui_assets *a, const lg_game *gm, co
         gfx_text_fit(c, x + 94, y + 14, 23, ac->unlocked ? P->ink : P->gray, lg_ach_name(ac, g_en), w - 94 - 14);
         status_pills(c, a, x + w - 14, y + 62, ac);
         text_2lines(c, x + 18, y + 96, 19, P->gray, desc, w - 36, 26);
+        char pb[48];
+        int pm;
+        if (ach_progress(ac, pb, sizeof(pb), &pm)) {
+            int pw = gfx_text_width(16, pb);
+            progress_bar(c, x + 18, y + h - 20, w - 36 - pw - 12, 9, pm);
+            gfx_text(c, x + w - 18 - pw, y + h - 27, 16, P->gray, pb);
+        }
     }
     scrollbar(c, 116, l.rows * (h + gy) - gy, top, l.rows, (n + l.cols - 1) / l.cols);
 }
@@ -685,7 +735,12 @@ void ui_achievement(gfx_canvas *c, const ui_assets *a, const gr_model *m, int ga
         fact(c, a, tx, fy + 96, UI_IMG_stat_completados, T("Lo conseguiste el", "Earned on"),
              buf[0] ? buf : T("Fecha sin registrar", "Date not recorded"), P->ink);
     } else {
-        fact(c, a, tx, fy + 96, UI_IMG_stat_logros, T("Estado", "Status"), T("Aún no lo tienes", "Not earned yet"), P->gray);
+        char pb[48];
+        int pm;
+        if (ach_progress(ac, pb, sizeof(pb), &pm)) {
+            fact(c, a, tx, fy + 96, UI_IMG_stat_logros, T("Tu progreso", "Your progress"), pb, P->ink);
+            progress_bar(c, tx + 70, fy + 96 + 62, 300, 12, pm);
+        } else fact(c, a, tx, fy + 96, UI_IMG_stat_logros, T("Estado", "Status"), T("Aún no lo tienes", "Not earned yet"), P->gray);
     }
 
     footer_bar(c);
@@ -1519,6 +1574,11 @@ void ui_profile_screen(gfx_canvas *c, const ui_assets *a, const ui_profile *p) {
         bool earned = gr_badge_earned(&gr_badges[i], &p->stats);
         medal(c, mx, my, r, &gr_badges[i], earned);
         text_center(c, mx, my + r + 6, 15, earned ? P->ink : P->gray, T(gr_badges[i].name_es, gr_badges[i].name_en), cell - 6);
+    }
+    if (p->donor) { /* en el hueco que queda al final de la segunda fila */
+        int i = gr_badge_count, mx = rx + 24 + (i % per_row) * cell + cell / 2, my = by + 104 + (i / per_row) * 116;
+        img_fit(c, a, UI_IMG_badge_donador, mx - r, my - r, r * 2);
+        text_center(c, mx, my + r + 6, 15, P->ink, T("Donador", "Supporter"), cell - 6);
     }
 
     footer_bar(c);

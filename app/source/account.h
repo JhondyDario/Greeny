@@ -37,6 +37,7 @@ typedef struct {
     int  avatar;           /* foto de perfil elegida (1..); 0 = aun no se sabe */
     char country[4];       /* pais elegido, dos letras ("DO"); "" = sin indicar */
     char caption_en[64];   /* la frase en ingles, si es una de las de la lista */
+    bool donor;            /* dono: lleva la medalla de donador */
     bool admin;            /* la cuenta es de un administrador: ve las herramientas para crear logros */
 } gr_account;
 

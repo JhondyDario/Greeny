@@ -262,6 +262,7 @@ int lg_parse(lg_game *g, char *text, char *err, size_t errlen) {
             copy_str(cur->name, sizeof(cur->name), id);
             cur->hold_ms = LG_DEFAULT_HOLD_MS;
             cur->points = LG_DEFAULT_POINTS;
+            cur->prog_cond = -2; /* automatico, se decide al final */
             continue;
         }
 
@@ -305,6 +306,10 @@ int lg_parse(lg_game *g, char *text, char *err, size_t errlen) {
             uint64_t pts;
             if (!parse_u64(val, &pts) || pts > 1000) FAIL("points invalido (0..1000)");
             cur->points = (uint16_t)pts;
+        } else if (!strcmp(key, "progress")) {
+            uint64_t p;
+            if (!parse_u64(val, &p) || p > LG_MAX_COND) FAIL("progress invalido (0 = sin progreso, o el numero de la condicion when)");
+            cur->prog_cond = (int8_t)((int)p - 1);
         } else if (!strcmp(key, "tier")) {
             if (!strcmp(val, "bronce") || !strcmp(val, "bronze")) cur->tier = LG_TIER_BRONZE;
             else if (!strcmp(val, "plata") || !strcmp(val, "silver")) cur->tier = LG_TIER_SILVER;
@@ -315,12 +320,33 @@ int lg_parse(lg_game *g, char *text, char *err, size_t errlen) {
             const char *e = parse_cond(val, &cur->cond[cur->ncond]);
             if (e) FAIL(e);
             cur->ncond++;
-        } else FAIL("clave desconocida (name, desc, name.en, desc.en, points, tier, hold, when)");
+        } else FAIL("clave desconocida (name, desc, name.en, desc.en, points, tier, progress, hold, when)");
     }
 
     lineno++;
     if (cur && cur->ncond == 0) FAIL("el ultimo logro no tiene ninguna condicion when=");
     if (g->nach == 0 && g->nscan == 0) FAIL("el archivo no define ningun logro");
+
+    /* la meta de cada logro, para mostrar su progreso */
+    for (int i = 0; i < g->nach; i++) {
+        lg_ach *a = &g->ach[i];
+        if (a->prog_cond == -2) {
+            a->prog_cond = -1;
+            for (int k = 0; k < a->ncond && a->prog_cond < 0; k++) {
+                const lg_cond *q = &a->cond[k];
+                if (type_is_float(q->type)) continue;
+                uint64_t n = type_is_signed(q->type) ? (q->s < 0 ? 0 : (uint64_t)q->s) : q->u;
+                if ((q->op == LG_GE && n >= 2) || (q->op == LG_GT && n >= 1)) a->prog_cond = (int8_t)k;
+            }
+        }
+        if (a->prog_cond >= a->ncond) FAIL("progress apunta a una condicion que no existe");
+        if (a->prog_cond >= 0) {
+            const lg_cond *q = &a->cond[a->prog_cond];
+            uint64_t n = type_is_signed(q->type) ? (q->s < 0 ? 0 : (uint64_t)q->s) : q->u;
+            if (type_is_float(q->type) || (q->op != LG_GE && q->op != LG_GT)) FAIL("progress tiene que apuntar a una condicion >= o >");
+            a->prog_goal = q->op == LG_GT ? n + 1 : n;
+        }
+    }
     return 0;
 }
 
@@ -408,6 +434,51 @@ bool lg_eval_cond(lg_cond *c, const lg_bases *b, lg_read_fn rd, void *ctx) {
     }
 }
 
+static bool same_address(const lg_cond *x, const lg_cond *y) {
+    if (x->region != y->region || x->offset != y->offset || x->nderef != y->nderef || x->type != y->type) return false;
+    for (int i = 0; i < x->nderef; i++)
+        if (x->deref[i] != y->deref[i]) return false;
+    return true;
+}
+
+/* Anota el progreso del logro: el valor de su condicion meta, si se mantiene 10 segundos
+ * y respeta los limites que el mismo logro pone a esa direccion. */
+static void track_progress(lg_game *g, lg_ach *a, uint64_t now_ms) {
+    const lg_cond *pc = &a->cond[a->prog_cond];
+    bool ok = pc->dbg_ok;
+    uint64_t v = pc->dbg_raw;
+    if (ok && type_is_signed(pc->type)) {
+        int64_t s;
+        switch (pc->type) {
+            case LG_S8:  s = (int8_t)v;  break;
+            case LG_S16: s = (int16_t)v; break;
+            case LG_S32: s = (int32_t)v; break;
+            default:     s = (int64_t)v; break;
+        }
+        v = s < 0 ? 0 : (uint64_t)s;
+    }
+    for (int k = 0; ok && k < a->ncond; k++) {
+        const lg_cond *q = &a->cond[k];
+        if (k == a->prog_cond || !same_address(q, pc) || type_is_float(q->type)) continue;
+        uint64_t lim = type_is_signed(q->type) ? (q->s < 0 ? 0 : (uint64_t)q->s) : q->u;
+        if (q->op == LG_LE && v > lim) ok = false;
+        if (q->op == LG_LT && v >= lim) ok = false;
+    }
+    if (!ok) { a->prog_cand_ok = false; return; }
+    if (!a->prog_cand_ok || a->prog_cand != v) {
+        a->prog_cand_ok = true;
+        a->prog_cand = v;
+        a->prog_cand_since = now_ms;
+        return;
+    }
+    if (now_ms - a->prog_cand_since < 10000) return;
+    if (!a->prog_known || a->prog_value != v) {
+        a->prog_known = true;
+        a->prog_value = v;
+        g->prog_dirty = true;
+    }
+}
+
 int lg_tick(lg_game *g, const lg_bases *b, lg_read_fn rd, void *ctx,
             uint64_t now_ms, int *out, int max_out) {
     int n = 0;
@@ -416,8 +487,13 @@ int lg_tick(lg_game *g, const lg_bases *b, lg_read_fn rd, void *ctx,
         if (a->unlocked) continue;
 
         bool all = a->ncond > 0;
-        for (int k = 0; k < a->ncond && (all || g->debug); k++)
+        int evaluated = 0;
+        for (int k = 0; k < a->ncond && (all || g->debug); k++, evaluated++)
             if (!lg_eval_cond(&a->cond[k], b, rd, ctx)) all = false;
+        if (a->prog_cond >= 0) {
+            if (a->prog_cond >= evaluated) lg_eval_cond(&a->cond[a->prog_cond], b, rd, ctx);
+            track_progress(g, a, now_ms);
+        }
 
         if (!all) { a->holding = false; continue; }
         if (!a->holding) { a->holding = true; a->true_since = now_ms; }
@@ -501,6 +577,33 @@ int lg_store_load(lg_game *g, const char *path) {
         }
         lg_ach *a = lg_find(g, trim(line));
         if (a && !a->unlocked) { a->unlocked = true; a->unlocked_at = ts; n++; }
+    }
+    fclose(f);
+    return n;
+}
+
+int lg_progress_save(lg_game *g, const char *path) {
+    FILE *f = fopen(path, "w");
+    if (!f) return -1;
+    int ok = 1;
+    for (int i = 0; i < g->nach && ok; i++) {
+        const lg_ach *a = &g->ach[i];
+        if (!a->unlocked && a->prog_known) ok = fprintf(f, "%s %llu\n", a->id, (unsigned long long)a->prog_value) > 0;
+    }
+    if (fclose(f) != 0) ok = 0;
+    if (ok) g->prog_dirty = false;
+    return ok ? 0 : -1;
+}
+
+int lg_progress_load(lg_game *g, const char *path) {
+    FILE *f = fopen(path, "r");
+    if (!f) return 0;
+    char id[LG_ID_LEN + 8];
+    unsigned long long v;
+    int n = 0;
+    while (fscanf(f, "%39s %llu", id, &v) == 2) {
+        lg_ach *a = lg_find(g, id);
+        if (a && a->prog_cond >= 0) { a->prog_known = true; a->prog_value = v; n++; }
     }
     fclose(f);
     return n;

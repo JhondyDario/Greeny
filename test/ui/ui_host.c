@@ -120,7 +120,7 @@ int main(int argc, char **argv) {
         bool dark = v & 1, en = v & 2;
         char sfx[32];
         snprintf(sfx, sizeof(sfx), "%s%s", dark ? "_dark" : "", en ? "_en" : "");
-        static ui_profile chip = { .name = "Jhondy", .username = "megaJHONDY", .caption = "", .linked = true, .avatar = 4, .country = "DO", .stats = { 1, 7, 0, 180 } };
+        static ui_profile chip = { .name = "Jhondy", .username = "megaJHONDY", .caption = "", .linked = true, .donor = true, .avatar = 4, .country = "DO", .stats = { 1, 7, 0, 180 } };
         ui_set_profile(&chip);
         ui_set_dark(dark);
         ui_set_background(bg[dark]);

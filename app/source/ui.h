@@ -13,7 +13,7 @@
 #define UI_COVER_BIG  150  /* caratula en la cuadricula */
 
 #define UI_APP_NAME    "Greeny"
-#define UI_APP_VERSION "0.1.6"
+#define UI_APP_VERSION "0.1.7"
 
 /* opciones, agrupadas en pestañas que se cambian con L y R */
 enum {
@@ -111,6 +111,7 @@ typedef struct {
     const char *caption;
     const char *friend_code; /* "" si aun no se sabe */
     const char *country;    /* pais, dos letras; "" = sin indicar */
+    bool donor;             /* lleva la medalla de donador */
     int avatar;             /* foto de perfil elegida, de 1 a UI_AVATAR_COUNT; 0 = la inicial del nombre */
     bool linked;
     bool social_known;      /* false = todavia no se sabe cuantos seguidores tiene */

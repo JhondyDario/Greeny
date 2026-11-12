@@ -46,6 +46,7 @@ config/greeny/sounds/                   sonidos que usa el sysmodule
 config/greeny/toast/                    dibujos del aviso dentro del juego
 config/greeny/music/                    canciones descargadas
 config/greeny/played/                   cuándo se abrió cada juego por última vez
+config/greeny/progress/                 cuánto falta para cada logro bloqueado
 config/greeny/account.ini               llave de esta consola, si la vinculaste (no es tu contraseña)
 config/greeny/cache/                    iconos de logros ya descargados
 config/greeny/config.ini                opciones
@@ -152,6 +153,7 @@ make -C test
 | App: filtro rápido de logros (X), sonidos de la app configurables | Revisado en PC; falta probarlo en consola |
 | Web en español e inglés; página Contribuir (donar y postularse al equipo); medalla de donador | Probado en navegador con servidor simulado |
 | Catálogo: 8 juegos más en "sin empezar", con un logro de 2 minutos de juego (`supabase/juegos_iniciales.sql`) | SQL probado en Postgres |
+| Progreso de los logros bloqueados (ej. 18 / 30) en la app | Revisado en PC; falta probarlo en consola |
 | Menú dentro del juego (overlay de Tesla), nombres de juegos desde una base pública | Pendiente |
 | Iconos por logro, música y animaciones en la app | Pendiente ([docs/RECURSOS.md](docs/RECURSOS.md)) |
 

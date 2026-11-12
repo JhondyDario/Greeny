@@ -157,6 +157,7 @@ void gr_account_load(gr_account *a, const char *path) {
         else if (!strcmp(line, "friend_code")) snprintf(a->friend_code, sizeof(a->friend_code), "%s", v);
         else if (!strcmp(line, "avatar")) a->avatar = atoi(v);
         else if (!strcmp(line, "admin")) a->admin = v[0] == '1';
+        else if (!strcmp(line, "donor")) a->donor = v[0] == '1';
         else if (!strcmp(line, "country")) snprintf(a->country, sizeof(a->country), "%.2s", v);
         else if (!strcmp(line, "caption_en")) snprintf(a->caption_en, sizeof(a->caption_en), "%s", v);
     }
@@ -174,6 +175,7 @@ int gr_account_save(const gr_account *a, const char *path) {
     if (ok && a->friend_code[0]) ok = fprintf(f, "friend_code=%s\n", a->friend_code) > 0;
     if (ok && a->avatar > 0) ok = fprintf(f, "avatar=%d\n", a->avatar) > 0;
     if (ok && a->admin) ok = fprintf(f, "admin=1\n") > 0;
+    if (ok && a->donor) ok = fprintf(f, "donor=1\n") > 0;
     if (ok && a->country[0]) ok = fprintf(f, "country=%s\n", a->country) > 0;
     if (ok && a->caption_en[0]) ok = fprintf(f, "caption_en=%s\n", a->caption_en) > 0;
     if (fclose(f) != 0) ok = 0;
@@ -238,6 +240,8 @@ gr_net_result gr_fetch_social(gr_http_fn http, gr_account *a) {
     if (gr_json_int(resp, "avatar", &avatar) && avatar > 0) a->avatar = avatar;
     bool admin;
     if (gr_json_bool(resp, "admin", &admin)) a->admin = admin;
+    bool donor;
+    if (gr_json_bool(resp, "donor", &donor)) a->donor = donor;
     char country[8] = "";
     gr_json_string(resp, "country", country, sizeof(country)); /* null = sin pais */
     snprintf(a->country, sizeof(a->country), "%.2s", country);
