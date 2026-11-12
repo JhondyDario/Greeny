@@ -268,6 +268,136 @@
     admin = a.data === true;
   }
 
+  // ---------- avisos (notificaciones) ----------
+  const BELL = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22Zm7-6V11a7 7 0 0 0-5.5-6.84V3.5a1.5 1.5 0 0 0-3 0v.66A7 7 0 0 0 5 11v5l-1.7 1.7A1 1 0 0 0 4 19.4h16a1 1 0 0 0 .7-1.7Z"/></svg>';
+  const HEART = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.8 4.5c2.1 0 3.6 1.2 5.2 3 1.6-1.8 3.1-3 5.2-3 3.8 0 5.9 3.9 4.4 7.3C19.5 16.4 12 21 12 21Z"/></svg>';
+  let notifs = { unread: 0, items: [] };
+  let notifTimer = null;
+  function svgEl(markup) { const t = document.createElement("template"); t.innerHTML = markup; return t.content.firstChild; } // solo SVG fijos de aqui, nunca texto de usuarios
+
+  function bellLink() {
+    const label = uiLang() === "en" ? "Notifications" : "Avisos";
+    const a = h("a", { href: "#/avisos", class: "bell", "data-nav": "avisos", "data-label": label, "aria-label": label + (notifs.unread ? " (" + notifs.unread + ")" : "") }, svgEl(BELL));
+    if (notifs.unread) a.append(h("span", { class: "bell-count" }, notifs.unread > 99 ? "99+" : String(notifs.unread)));
+    return a;
+  }
+  async function loadNotifs(redraw) {
+    if (!session) return;
+    const res = await sb.rpc("my_notifications");
+    if (res.error || !res.data) return;
+    const before = notifs.unread;
+    notifs = { unread: Number(res.data.unread) || 0, items: res.data.items || [] };
+    if (redraw || before !== notifs.unread) renderNav();
+  }
+  function startNotifs() {
+    clearInterval(notifTimer);
+    if (!session) return;
+    loadNotifs(true);
+    notifTimer = setInterval(() => { if (!document.hidden) loadNotifs(false); }, 60000); // cada minuto, solo con la pestaña a la vista
+  }
+  const badgeName = (id) => { const b = window.GreenyProgress.badges({}).find((x) => x.id === id); return b ? b.name : id; };
+  function notifText(n) {
+    const en = uiLang() === "en", who = n.actor_name || n.actor || "?";
+    const game = n.game || n.title_id || "";
+    switch (n.kind) {
+      case "like": return en ? who + " liked your comment on " + game : "A " + who + " le gustó tu comentario en " + game;
+      case "follow": return en ? who + " started following you" : who + " empezó a seguirte";
+      case "achievement": return en ? "You unlocked \u201c" + (n.ach_name_en || n.ach_name) + "\u201d in " + game : "Desbloqueaste \u201c" + n.ach_name + "\u201d en " + game;
+      case "badge": return en ? "New badge: " + badgeName(n.badge) : "Nueva medalla: " + badgeName(n.badge);
+      default: return "";
+    }
+  }
+  function notifIcon(n) {
+    const box = h("span", { class: "notif-icon", "aria-hidden": "true" });
+    if (n.kind === "like") box.append(svgEl(HEART));
+    else if (n.kind === "follow") box.append(n.actor_avatar ? h("img", { src: avatarSrc(n.actor_avatar), alt: "" }) : h("img", { src: "img/stat_seguidores.png", alt: "" }));
+    else if (n.kind === "badge") box.append(h("img", { src: "img/badges/" + n.badge + ".png", alt: "" }));
+    else box.append(h("img", { src: "img/trophy.png", alt: "" }));
+    return box;
+  }
+  function notifTarget(n) {
+    if (n.kind === "follow" && n.actor) return "#/u/" + encodeURIComponent(n.actor);
+    if (n.kind === "badge" && me) return "#/u/" + encodeURIComponent(me.username);
+    if (n.title_id) return "#/juego/" + n.title_id;
+    return "#/avisos";
+  }
+  async function markRead(id) {
+    const q = sb.from("notifications").update({ read_at: new Date().toISOString() }).is("read_at", null);
+    await (id == null ? q.eq("user_id", session.user.id) : q.eq("id", id));
+  }
+
+  async function viewNotifications() {
+    if (!session) { location.hash = "#/entrar"; return []; }
+    await loadNotifs(true);
+    const list = notifs.items;
+    const allBtn = h("button", { class: "btn alt mini", type: "button", disabled: !notifs.unread, onclick: async () => {
+      allBtn.disabled = true; await markRead(null); await loadNotifs(true); render();
+    } }, "Marcar todo como leído");
+    return [
+      h("div", { class: "row", style: "align-items:center" }, h("h1", { class: "grow" }, "Avisos"), allBtn),
+      list.length
+        ? more(list.map((n) => h("a", { class: "card notif" + (n.read ? "" : " unread"), href: notifTarget(n), onclick: async (ev) => {
+            if (n.read) return;
+            ev.preventDefault();
+            await markRead(n.id);
+            await loadNotifs(true);
+            location.hash = notifTarget(n);
+          } }, notifIcon(n),
+            h("div", { class: "grow" }, h("div", {}, notifText(n)), h("div", { class: "muted small" }, fmtDate(n.created_at))))), 15, "stack")
+        : h("div", { class: "card", style: "text-align:center" }, h("img", { src: "img/m_durmiendo.png", alt: "", width: 120, height: 120 }),
+            h("p", { class: "muted" }, "No tienes avisos todavía. Aquí sale cuando alguien te sigue, le da me gusta a tu comentario o consigues algo nuevo.")),
+    ];
+  }
+
+  // ---------- idioma ----------
+  const LANGS = [["es", "Español"], ["en", "English"]]; // para añadir uno: agregarlo aqui y en i18n.js
+  function renderLang() {
+    const box = document.getElementById("lang-menu");
+    if (!box || !window.GreenyI18n) return;
+    const cur = window.GreenyI18n.lang;
+    box.replaceChildren(
+      h("summary", { "aria-label": "Idioma / Language" },
+        h("span", { class: "lang-short" }, cur.toUpperCase()),
+        h("span", { class: "lang-long" }, "Idioma · Language"),
+        h("span", { class: "caret", "aria-hidden": "true" }, "▾")),
+      h("div", { class: "lang-list" }, LANGS.map(([code, name]) => h("button", { type: "button", lang: code, "aria-current": String(code === cur), onclick: () => {
+        box.open = false;
+        if (code === window.GreenyI18n.lang) return;
+        window.GreenyI18n.set(code); renderLang(); renderNav(); renderFooter(); render();
+      } }, name))));
+  }
+
+  // ---------- pie de pagina ----------
+  const SOCIAL = {
+    discord: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.3 4.4A19.6 19.6 0 0 0 15.4 3l-.6 1.3a18 18 0 0 0-5.6 0L8.6 3a19.5 19.5 0 0 0-4.9 1.5C.6 9 0 13.6.3 18.1A19.8 19.8 0 0 0 6.3 21l1.3-2a12.7 12.7 0 0 1-2-1l.5-.4a14 14 0 0 0 11.8 0l.5.4c-.6.4-1.3.7-2 1l1.3 2a19.7 19.7 0 0 0 6-3c.4-5.2-.7-9.8-3.4-13.6ZM8.5 15.3c-1.2 0-2.1-1.1-2.1-2.4s.9-2.4 2.1-2.4 2.1 1.1 2.1 2.4-.9 2.4-2.1 2.4Zm7 0c-1.2 0-2.1-1.1-2.1-2.4s.9-2.4 2.1-2.4 2.1 1.1 2.1 2.4-.9 2.4-2.1 2.4Z"/></svg>',
+    github: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 .5a11.5 11.5 0 0 0-3.6 22.4c.6.1.8-.3.8-.6v-2c-3.2.7-3.9-1.5-3.9-1.5-.5-1.3-1.3-1.7-1.3-1.7-1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.7-1.6-2.6-.3-5.3-1.3-5.3-5.7 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.2 1.2a11 11 0 0 1 5.8 0C17.3 4.7 18.3 5 18.3 5c.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.4-2.7 5.4-5.3 5.7.4.4.8 1.1.8 2.2v3.2c0 .3.2.7.8.6A11.5 11.5 0 0 0 12 .5Z"/></svg>',
+  };
+  let discordUrl = "";
+  function renderFooter() {
+    const foot = document.getElementById("foot");
+    if (!foot) return;
+    const link = (href, text, ext) => h("a", ext ? { href, target: "_blank", rel: "noopener" } : { href }, text);
+    foot.replaceChildren(h("div", { class: "wrap" }, h("div", { class: "foot-card" },
+      h("div", { class: "foot-top" },
+        h("div", {},
+          h("a", { class: "foot-brand", href: "#/" }, h("img", { src: "img/icon.png", alt: "", width: 38, height: 38 }), "Greeny"),
+          h("p", { class: "foot-about" }, "El primer sistema de logros no oficial para la Switch. Gratis, de fans y de código abierto.")),
+        h("nav", { class: "foot-col", "aria-label": "Proyecto" }, h("h4", {}, "Proyecto"),
+          link("#/como-funciona", "Cómo funciona"), link("#/juegos", "Juegos"), link("#/ranking", "Ranking"),
+          link(cfg.repoUrl, "Descargar", true), link("#/contribuir", "Contribuir")),
+        h("nav", { class: "foot-col", "aria-label": "Ayuda" }, h("h4", {}, "Ayuda"),
+          link("#/preguntas", "Preguntas frecuentes"), discordUrl ? link(discordUrl, "Comunidad en Discord", true) : null,
+          link(cfg.repoUrl + "/issues", "Reportar un problema", true), link("#/terminos", "Términos del servicio"), link("#/privacidad", "Política de privacidad")),
+        h("nav", { class: "foot-col", "aria-label": "Cuenta" }, h("h4", {}, "Cuenta"),
+          session ? [me ? link("#/u/" + encodeURIComponent(me.username), "Mi perfil") : null, link("#/avisos", "Avisos"), link("#/cuenta", "Ajustes")]
+                  : [link("#/registro", "Crear cuenta"), link("#/entrar", "Entrar")])),
+      h("div", { class: "foot-bottom" },
+        h("p", { class: "foot-legal" }, "© " + new Date().getFullYear() + " Greeny. Proyecto de fans independiente, no afiliado ni avalado por Nintendo. «Nintendo Switch» es una marca de Nintendo. Greeny no proporciona juegos ni archivos de Nintendo."),
+        h("div", { class: "foot-social" }, h("span", {}, "Síguenos"),
+          discordUrl ? h("a", { href: discordUrl, target: "_blank", rel: "noopener", "aria-label": "Discord" }, svgEl(SOCIAL.discord)) : null,
+          h("a", { href: cfg.repoUrl, target: "_blank", rel: "noopener", "aria-label": "GitHub" }, svgEl(SOCIAL.github)))))));
+  }
+
   function renderNav() {
     const slot = document.getElementById("nav-user");
     if (session) {
@@ -282,6 +412,7 @@
       document.addEventListener("click", (ev) => { if (!menu.contains(ev.target)) menu.open = false; });
       slot.replaceChildren(...[
         admin ? h("a", { href: "#/desarrollador", "data-nav": "desarrollador" }, "Desarrollador") : null,
+        bellLink(),
         menu,
       ].filter(Boolean));
     } else {
@@ -301,11 +432,12 @@
 
   async function viewHome() {
     const count = (table) => sb.from(table).select("*", { count: "exact", head: true });
-    const [players, unlocks, games, recent] = await Promise.all([
+    const [players, unlocks, games, recent, live] = await Promise.all([
       count("profiles"), count("unlocks"), count("games"),
       sb.from("unlocks")
         .select("unlocked_at,title_id,ach_id,profiles(username,display_name,avatar),achievements(*,games(name))")
         .order("unlocked_at", { ascending: false }).limit(10),
+      sb.rpc("activity_now"),
     ]);
 
     const hero = h("section", { class: "hero" },
@@ -321,9 +453,15 @@
       h("img", { class: "hero-mascot", src: "img/m_saludando.png", alt: "Greeny, la mascota: una plantita verde saludando", width: 260, height: 260 }));
 
     const stats = h("section", { class: "stats three", "aria-label": "Números de Greeny" },
-      h("div", { class: "card stat" }, h("b", {}, fmtNum(players.count)), h("span", {}, "jugadores")),
-      h("div", { class: "card stat" }, h("b", {}, fmtNum(unlocks.count)), h("span", {}, "logros desbloqueados")),
-      h("div", { class: "card stat" }, h("b", {}, fmtNum(games.count)), h("span", {}, "juegos con logros")));
+      h("div", { class: "card stat" }, h("b", { "data-count": players.count || 0 }, "0"), h("span", {}, "jugadores")),
+      h("div", { class: "card stat" }, h("b", { "data-count": unlocks.count || 0 }, "0"), h("span", {}, "logros desbloqueados")),
+      h("div", { class: "card stat" }, h("b", { "data-count": games.count || 0 }, "0"), h("span", {}, "juegos con logros")));
+
+    // en vivo: el bombillito verde que late. "Hoy" = abrieron la app o subieron logros en 24 horas.
+    const act = (live && !live.error && live.data) || null;
+    const liveCard = act ? h("div", { class: "card live", "aria-live": "polite" }, h("span", { class: "live-dot", "aria-hidden": "true" }),
+      h("div", {}, h("b", { "data-count": act.today || 0 }, "0"), h("span", {}, "jugadores activos hoy"),
+        act.online ? h("span", { class: "live-sub" }, fmtNum(act.online) + " con Greeny abierto ahora") : null)) : null;
 
     const rows = (recent.data || []).filter((u) => u.profiles && u.achievements).map((u) =>
       h("div", { class: "card row" },
@@ -337,6 +475,10 @@
 
     return [
       hero,
+      liveCard ? h("div", { class: "home-top" }, liveCard, h("div", { class: "card", style: "display:flex;align-items:center;gap:14px" },
+        h("img", { src: "img/m_celebrando.png", alt: "", width: 64, height: 64 }),
+        h("div", {}, h("strong", {}, "¿Nuevo por aquí?"), h("div", { class: "muted small" }, "Mira en un minuto qué es Greeny y cómo empezar."),
+          h("a", { href: "#/como-funciona", style: "font-weight:700" }, "Cómo funciona →")))) : null,
       h("h2", {}, "Greeny en números"), stats,
       h("h2", {}, "Últimos logros"),
       rows.length ? h("div", { class: "stack" }, rows)
@@ -347,6 +489,7 @@
         h("li", {}, "Juega. Los logros salen en pantalla y se guardan en la consola."),
         h("li", {}, "Crea tu cuenta aquí y vincula tu consola con un código."),
         h("li", {}, "Tu progreso aparece en tu perfil para que lo compartas."))),
+      window.GreenyPages.faq(h, 5),
     ];
   }
 
@@ -511,7 +654,7 @@
     const stats = { achievements: 0, points: 0, games: 0, platinums: 0, followers: 0, following: 0, ...(statRes.data || {}) };
     const unlocks = (unlockRes.data || []).filter((u) => u.achievements);
     const lvl = window.GreenyProgress.level(stats.points);
-    const badgeList = window.GreenyProgress.badges(stats);
+    const badgeList = window.GreenyProgress.badges(stats).sort((a, b) => Number(b.earned) - Number(a.earned)); // las conseguidas primero
     const earned = badgeList.filter((b) => b.earned).length;
     const titles = [...new Set(unlocks.map((u) => u.title_id))];
     const [gameRes, allAch] = titles.length
@@ -892,7 +1035,22 @@
               ev.target.disabled = true;
               const { error } = await sb.auth.linkIdentity({ provider: "discord", options: { redirectTo: here } });
               if (error) { alert(explain(error)); ev.target.disabled = false; }
-            } }, "Vincular Discord"))] },
+            } }, "Vincular Discord")),
+          h("h2", {}, "Borrar mi cuenta"),
+      h("div", { class: "card row" },
+        h("div", { class: "grow" }, h("strong", {}, "Borra todo de una vez"),
+          h("div", { class: "muted small" }, "Tu perfil, tus logros subidos, consolas, comentarios, me gusta, seguidores y avisos. No se puede deshacer. Lo que está en tu tarjeta SD no se toca.")),
+        h("button", { class: "btn danger", type: "button", onclick: async (ev) => {
+          const name = me ? me.username : "";
+          const typed = prompt("Para confirmar, escribe tu nombre de usuario: " + name);
+          if (typed == null) return;
+          if (typed.trim().toLowerCase() !== name.toLowerCase()) { alert("El nombre no coincide. No se borró nada."); return; }
+          ev.target.disabled = true;
+          const res = await sb.rpc("delete_my_account");
+          if (res.error) { alert(explain(res.error)); ev.target.disabled = false; return; }
+          await sb.auth.signOut();
+          location.hash = "#/";
+        } }, "Borrar mi cuenta"))] },
       ])
     ];
   }
@@ -1351,13 +1509,16 @@
   async function render() {
     const id = ++renderId;
     const parts = location.hash.replace(/^#\/?/, "").split("/").map(decodeURIComponent);
-    const routes = { "": viewHome, contribuir: viewContribute, ranking: viewRanking, juegos: viewGames, juego: viewGame, u: viewProfile, entrar: viewLogin, registro: viewRegister, recuperar: viewForgot, "nueva-clave": viewNewPassword, cuenta: viewAccount, admin: viewAdmin, desarrollador: viewAdmin };
+    const P = window.GreenyPages;
+    const routes = { avisos: viewNotifications, "como-funciona": () => P.howItWorks(h, cfg), preguntas: () => P.faqPage(h),
+      terminos: () => P.terms(h, cfg), privacidad: () => P.privacy(h, cfg), "": viewHome, contribuir: viewContribute, ranking: viewRanking, juegos: viewGames, juego: viewGame, u: viewProfile, entrar: viewLogin, registro: viewRegister, recuperar: viewForgot, "nueva-clave": viewNewPassword, cuenta: viewAccount, admin: viewAdmin, desarrollador: viewAdmin };
     const view = routes[parts[0]];
     renderNav();
     try {
       const nodes = view ? await view(parts[1] || "") : notFound();
       if (id !== renderId) return; // el usuario ya navego a otra parte
       main.replaceChildren(...nodes.filter(Boolean));
+      if (window.GreenyFx) window.GreenyFx.scan(main);
     } catch (err) {
       if (id !== renderId) return;
       main.replaceChildren(h("h1", {}, "Algo salió mal"), h("p", { class: "msg err" }, explain(err)),
@@ -1370,16 +1531,15 @@
     if (!location.hash || location.hash.startsWith("#/")) { render(); main.focus({ preventScroll: true }); window.scrollTo(0, 0); }
   });
 
-  document.getElementById("repo-link").href = cfg.repoUrl;
   // Invitacion de Discord: sale de links.json (la app de la consola lee el mismo archivo).
-  let discordUrl = "";
   fetch("links.json", { cache: "no-cache" }).then((r) => (r.ok ? r.json() : {})).then((j) => {
     const u = String((j && j.discord) || "");
     if (!/^https:\/\/(discord\.gg|discord\.com\/invite)\//.test(u)) return;
     discordUrl = u;
-    const nav = document.getElementById("nav-discord"), foot = document.getElementById("foot-discord");
-    nav.href = foot.href = u;
-    nav.hidden = foot.hidden = false;
+    const nav = document.getElementById("nav-discord");
+    nav.href = u;
+    nav.hidden = false;
+    renderFooter();
     if (/^#\/contribuir/.test(location.hash)) render();
   }).catch(() => {});
   const top = document.querySelector(".top"), menuBtn = document.getElementById("menu-toggle");
@@ -1390,17 +1550,8 @@
   });
   window.addEventListener("hashchange", closeMenu);
   document.addEventListener("click", (ev) => { if (!top.contains(ev.target)) closeMenu(); });
-  const langBtn = document.getElementById("lang-toggle");
-  if (langBtn && window.GreenyI18n) {
-    const paint = () => {
-      const en = window.GreenyI18n.lang === "en";
-      // corto en la barra de la computadora; en el menu del celular, el nombre del idioma
-      langBtn.replaceChildren(h("span", { class: "short" }, en ? "ES" : "EN"), h("span", { class: "long" }, en ? "Ver en español" : "View in English"));
-      langBtn.setAttribute("aria-label", en ? "Ver en español" : "View in English");
-    };
-    paint();
-    langBtn.addEventListener("click", () => { window.GreenyI18n.set(window.GreenyI18n.lang === "en" ? "es" : "en"); paint(); render(); });
-  }
+  renderLang();
+  renderFooter();
 
   let signedInAs = undefined; // para no redibujar cuando Supabase solo refresca el token
   sb.auth.onAuthStateChange((event, s) => {
@@ -1411,6 +1562,6 @@
     if (who === signedInAs) return;
     signedInAs = who;
     // fuera del callback: supabase-js no deja hacer consultas dentro de el
-    setTimeout(async () => { await loadMe(); render(); }, 0);
+    setTimeout(async () => { await loadMe(); render(); renderFooter(); startNotifs(); }, 0);
   });
 })();

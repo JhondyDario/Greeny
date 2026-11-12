@@ -1132,3 +1132,216 @@ $$;
 
 revoke all on function public.device_login_password(text, text, text) from public;
 grant execute on function public.device_login_password(text, text, text) to anon, authenticated;
+
+
+-- -----------------------------------------------------------------------------
+-- 13. NOTIFICACIONES
+-- -----------------------------------------------------------------------------
+-- Las crea la base de datos sola: un me gusta, alguien que te sigue, un logro que subio
+-- tu consola o una medalla nueva. La app y la web solo las leen y las marcan como leidas.
+create table if not exists public.notifications (
+    id         bigint generated always as identity primary key,
+    user_id    uuid not null references public.profiles (id) on delete cascade,
+    kind       text not null check (kind in ('like', 'follow', 'achievement', 'badge')),
+    actor_id   uuid references public.profiles (id) on delete cascade, -- quien dio el me gusta o te siguio
+    title_id   text,
+    ach_id     text,
+    badge      text,
+    created_at timestamptz not null default now(),
+    read_at    timestamptz
+);
+create index if not exists notifications_user_idx on public.notifications (user_id, created_at desc);
+alter table public.notifications enable row level security;
+drop policy if exists notifications_own on public.notifications;
+create policy notifications_own on public.notifications for select using ((select auth.uid()) = user_id);
+drop policy if exists notifications_read_own on public.notifications;
+create policy notifications_read_own on public.notifications for update
+    using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
+drop policy if exists notifications_delete_own on public.notifications;
+create policy notifications_delete_own on public.notifications for delete using ((select auth.uid()) = user_id);
+revoke all on public.notifications from anon;
+grant select, delete on public.notifications to authenticated;
+grant update (read_at) on public.notifications to authenticated;
+
+-- Medallas ya avisadas, para no repetir el aviso. Las mismas reglas que common/progress.c.
+create table if not exists public.badge_awards (
+    user_id uuid not null references public.profiles (id) on delete cascade,
+    badge   text not null,
+    at      timestamptz not null default now(),
+    primary key (user_id, badge)
+);
+alter table public.badge_awards enable row level security; -- sin reglas: solo la usan las funciones
+
+create or replace function public.check_badges(uid uuid, notify boolean default true)
+returns void
+language plpgsql security definer set search_path = ''
+as $$
+declare
+    s record;
+    b record;
+begin
+    select achievements, points, games, platinums into s from public.profile_stats where id = uid;
+    if not found then return; end if;
+    for b in select * from (values
+        ('primer_logro', s.achievements >= 1), ('logros_10', s.achievements >= 10), ('logros_50', s.achievements >= 50),
+        ('logros_200', s.achievements >= 200), ('primer_platino', s.platinums >= 1), ('platinos_5', s.platinums >= 5),
+        ('juegos_3', s.games >= 3), ('juegos_10', s.games >= 10), ('puntos_100', s.points >= 100),
+        ('puntos_500', s.points >= 500), ('puntos_2000', s.points >= 2000)) as t(badge, earned)
+    loop
+        if b.earned then
+            insert into public.badge_awards (user_id, badge) values (uid, b.badge) on conflict do nothing;
+            if found and notify then
+                insert into public.notifications (user_id, kind, badge) values (uid, 'badge', b.badge);
+            end if;
+        end if;
+    end loop;
+end;
+$$;
+revoke all on function public.check_badges(uuid, boolean) from public, anon, authenticated;
+
+-- Las medallas que ya tenia cada uno al crear esto quedan anotadas sin aviso.
+do $$
+declare r record;
+begin
+    for r in select p.id from public.profiles p
+              where not exists (select 1 from public.badge_awards a where a.user_id = p.id) loop
+        perform public.check_badges(r.id, false);
+    end loop;
+end $$;
+
+create or replace function public.notify_like()
+returns trigger
+language plpgsql security definer set search_path = ''
+as $$
+declare v record;
+begin
+    select user_id, title_id into v from public.reviews where id = new.review_id;
+    if v.user_id is not null and v.user_id <> new.user_id then
+        -- un solo aviso por persona y comentario, aunque quite y vuelva a dar me gusta
+        if not exists (select 1 from public.notifications n where n.user_id = v.user_id and n.kind = 'like'
+                         and n.actor_id = new.user_id and n.title_id = v.title_id) then
+            insert into public.notifications (user_id, kind, actor_id, title_id) values (v.user_id, 'like', new.user_id, v.title_id);
+        end if;
+        perform public.check_badges(v.user_id);
+    end if;
+    return new;
+end;
+$$;
+drop trigger if exists review_likes_notify on public.review_likes;
+create trigger review_likes_notify after insert on public.review_likes for each row execute function public.notify_like();
+
+create or replace function public.notify_follow()
+returns trigger
+language plpgsql security definer set search_path = ''
+as $$
+begin
+    if not exists (select 1 from public.notifications n where n.user_id = new.followed_id and n.kind = 'follow' and n.actor_id = new.follower_id) then
+        insert into public.notifications (user_id, kind, actor_id) values (new.followed_id, 'follow', new.follower_id);
+    end if;
+    return new;
+end;
+$$;
+drop trigger if exists follows_notify on public.follows;
+create trigger follows_notify after insert on public.follows for each row execute function public.notify_follow();
+
+-- Un logro avisa solo si es reciente: al vincular una consola con logros viejos no llueven avisos.
+create or replace function public.notify_unlock()
+returns trigger
+language plpgsql security definer set search_path = ''
+as $$
+begin
+    if new.unlocked_at > now() - interval '2 days' then
+        insert into public.notifications (user_id, kind, title_id, ach_id) values (new.user_id, 'achievement', new.title_id, new.ach_id);
+    end if;
+    perform public.check_badges(new.user_id);
+    return new;
+end;
+$$;
+drop trigger if exists unlocks_notify on public.unlocks;
+create trigger unlocks_notify after insert on public.unlocks for each row execute function public.notify_unlock();
+
+-- La lista para mostrar, con los nombres ya puestos. Las ultimas 50.
+create or replace function public.notifications_for(uid uuid)
+returns jsonb
+language sql stable security definer set search_path = ''
+as $$
+    select jsonb_build_object(
+        'unread', (select count(*) from public.notifications n where n.user_id = uid and n.read_at is null),
+        'items', coalesce((select jsonb_agg(x order by x.created_at desc) from (
+            select n.id, n.kind, n.title_id, n.ach_id, n.badge, n.created_at, n.read_at is not null as read,
+                   a.username as actor, coalesce(a.display_name, a.username) as actor_name, a.avatar as actor_avatar,
+                   g.name as game, coalesce(ac.name_es, n.ach_id) as ach_name, coalesce(ac.name_en, ac.name_es, n.ach_id) as ach_name_en
+              from public.notifications n
+              left join public.profiles a on a.id = n.actor_id
+              left join public.games g on g.title_id = n.title_id
+              left join public.achievements ac on ac.title_id = n.title_id and ac.ach_id = n.ach_id
+             where n.user_id = uid
+             order by n.created_at desc limit 50) x), '[]'::jsonb));
+$$;
+revoke all on function public.notifications_for(uuid) from public, anon, authenticated;
+
+create or replace function public.my_notifications()
+returns jsonb language sql stable security definer set search_path = ''
+as $$ select public.notifications_for((select auth.uid())); $$;
+grant execute on function public.my_notifications() to authenticated;
+
+create or replace function public.device_notifications(device_token text)
+returns jsonb language sql stable security definer set search_path = ''
+as $$
+    select public.notifications_for((select d.user_id from public.devices d where d.token_hash = public.hash_token(device_token)));
+$$;
+grant execute on function public.device_notifications(text) to anon, authenticated;
+
+-- Marca como leida una (id) o todas (id null).
+create or replace function public.device_notifications_read(device_token text, id bigint default null)
+returns boolean
+language plpgsql security definer set search_path = ''
+as $$
+declare v_uid uuid;
+begin
+    select d.user_id into v_uid from public.devices d where d.token_hash = public.hash_token(device_token);
+    if v_uid is null then raise exception 'consola sin vincular'; end if;
+    update public.notifications n set read_at = now()
+     where n.user_id = v_uid and n.read_at is null and (device_notifications_read.id is null or n.id = device_notifications_read.id);
+    return true;
+end;
+$$;
+grant execute on function public.device_notifications_read(text, bigint) to anon, authenticated;
+
+
+-- -----------------------------------------------------------------------------
+-- 14. BORRAR MI CUENTA Y ACTIVIDAD PUBLICA
+-- -----------------------------------------------------------------------------
+-- Borra el perfil y todo lo que cuelga de el (logros subidos, consolas, comentarios,
+-- me gusta, seguidores, avisos) y luego el usuario de Auth.
+create or replace function public.delete_my_account()
+returns boolean
+language plpgsql security definer set search_path = ''
+as $$
+declare v_uid uuid := (select auth.uid());
+begin
+    if v_uid is null then raise exception 'hay que iniciar sesion'; end if;
+    delete from public.profiles where id = v_uid;
+    begin
+        delete from auth.users where id = v_uid;
+    exception when insufficient_privilege then
+        null; -- si Auth no deja, al menos los datos de Greeny ya no estan
+    end;
+    return true;
+end;
+$$;
+revoke all on function public.delete_my_account() from public, anon;
+grant execute on function public.delete_my_account() to authenticated;
+
+-- Solo numeros, para el contador en vivo de la portada.
+create or replace function public.activity_now()
+returns jsonb
+language sql stable security definer set search_path = ''
+as $$
+    select jsonb_build_object(
+        'online', (select count(distinct d.user_id) from public.devices d where d.user_id is not null and d.last_seen_at > now() - interval '15 minutes'),
+        'today', (select count(distinct x.uid) from (
+                    select d.user_id as uid from public.devices d where d.user_id is not null and d.last_seen_at > now() - interval '24 hours'
+                    union select u.user_id from public.unlocks u where u.synced_at > now() - interval '24 hours') x));
+$$;
+grant execute on function public.activity_now() to anon, authenticated;

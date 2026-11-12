@@ -1,0 +1,194 @@
+// Paginas de texto de la web: como funciona, preguntas frecuentes, terminos y privacidad.
+// Escritas para cualquier persona, sin palabras tecnicas. Reciben h() de app.js.
+(function () {
+  "use strict";
+
+  const UPDATED = "12 de noviembre de 2026";
+
+  function step(h, n, title, ...body) {
+    return h("div", { class: "card how-step reveal" },
+      h("span", { class: "how-num", "aria-hidden": "true" }, String(n)),
+      h("div", {}, h("h3", {}, title), ...body));
+  }
+  const p = (h, ...t) => h("p", {}, ...t);
+  const li = (h, ...t) => h("li", {}, ...t);
+
+  // ---------- preguntas frecuentes ----------
+  const FAQ = [
+    ["¿Qué es Greeny?",
+      "Un sistema de logros para la Switch, hecho por fans. Mientras juegas, Greeny se fija en lo que haces (monedas, vidas, estrellas…) y cuando cumples un reto te avisa con un mensaje y un sonido, como en otras consolas."],
+    ["¿Está Greeny afiliado a Nintendo?",
+      "No. Es un proyecto de fans, gratis y sin ánimo de lucro. No está afiliado ni avalado por Nintendo, y no usa nada de Nintendo: los dibujos, la mascota y los sonidos son propios."],
+    ["¿Qué necesito para usarlo?",
+      "Una Switch con Atmosphère (el sistema personalizado más usado), una tarjeta SD y el juego. Internet solo hace falta si quieres subir tus logros a la web, ver el ranking o bajar logros de juegos nuevos."],
+    ["¿Greeny me da juegos o los modifica?",
+      "No. Greeny no trae juegos ni los cambia: solo mira, sin tocar nada, y anota cuando consigues algo. Tienes que tener tus propios juegos."],
+    ["¿Puedo usarlo jugando en línea?",
+      "Te recomendamos que no. Juega sin conexión cuando uses una consola con sistema personalizado. Greeny no hace trampas, pero el sistema personalizado en sí puede dar problemas en línea."],
+    ["¿Y si un juego no tiene logros todavía?",
+      "En la sección Juegos ves cuáles los tienen y en qué punto van. Si quieres ayudar a hacer los de tu juego favorito, mira la página Contribuir."],
+    ["¿Se pierden mis logros si no tengo internet?",
+      "No. Se guardan en tu tarjeta SD. Cuando vuelvas a tener internet, la app los sube a tu cuenta."],
+    ["¿Necesito una cuenta?",
+      "No para jugar. La cuenta es para tener tu perfil en la web, salir en el ranking, comentar juegos y seguir a otros jugadores."],
+    ["¿Qué se hace con mis datos?",
+      "Solo lo necesario para que funcione tu perfil: tu usuario, tu correo para entrar y los logros que subes. No hay anuncios y no vendemos nada. Lo explicamos en la página de privacidad, y puedes borrar tu cuenta cuando quieras."],
+    ["¿Cómo puedo ayudar?",
+      "Probando la app, buscando los valores de los juegos para crear logros, con arte o música, o con una donación. Todo está en la página Contribuir."],
+  ];
+
+  function faq(h, limit) {
+    const items = (limit ? FAQ.slice(0, limit) : FAQ).map(([q, a]) =>
+      h("details", { class: "faq-item" }, h("summary", {}, h("span", {}, q), h("span", { class: "faq-plus", "aria-hidden": "true" }, "+")),
+        h("p", {}, a)));
+    return h("section", { class: "card faq reveal", id: "preguntas" }, h("h2", {}, "Preguntas frecuentes"), ...items,
+      limit ? h("p", { style: "margin:14px 0 0" }, h("a", { href: "#/preguntas" }, "Ver todas las preguntas")) : null);
+  }
+
+  // ---------- como funciona ----------
+  function howItWorks(h, cfg) {
+    return [
+      h("h1", {}, "Cómo funciona"),
+      h("p", { class: "lead muted" }, "Todo lo que hace Greeny, explicado sin palabras raras. Son tres partes que trabajan juntas: algo que vigila tus juegos, una app en tu Switch y esta página web."),
+
+      h("section", { class: "how-parts" },
+        h("div", { class: "card how-part reveal" }, h("img", { src: "img/m_buscando.png", alt: "", width: 96, height: 96, loading: "lazy" }),
+          h("h3", {}, "El vigilante"), h("p", { class: "muted" }, "Trabaja escondido mientras juegas. Cuando cumples un reto, te avisa arriba a la derecha y suena.")),
+        h("div", { class: "card how-part reveal" }, h("img", { src: "img/m_celebrando.png", alt: "", width: 96, height: 96, loading: "lazy" }),
+          h("h3", {}, "La app"), h("p", { class: "muted" }, "Se abre desde el menú de homebrew. Ahí ves todos tus juegos, tus logros, tu progreso y tu perfil.")),
+        h("div", { class: "card how-part reveal" }, h("img", { src: "img/m_saludando.png", alt: "", width: 96, height: 96, loading: "lazy" }),
+          h("h3", {}, "La web"), h("p", { class: "muted" }, "Tu perfil público, el ranking, los comentarios de cada juego y la cuenta para guardar tus logros."))),
+
+      h("h2", {}, "1. Instalarlo"),
+      step(h, 1, "Lo que necesitas",
+        p(h, "Una Switch con Atmosphère, una tarjeta SD y una computadora o celular para copiar archivos. Si ya usas homebrew, ya tienes casi todo.")),
+      step(h, 2, "Copia Greeny a la tarjeta",
+        p(h, "Descarga ", h("a", { href: cfg.repoUrl, rel: "noopener" }, "greeny.zip"), " y descomprímelo en la raíz de la tarjeta SD (que las carpetas ", h("code", {}, "atmosphere"), " y ", h("code", {}, "switch"), " se junten con las que ya tienes).")),
+      step(h, 3, "Reinicia la consola",
+        p(h, "Apágala y préndela de nuevo (no basta con suspenderla). Así arranca el vigilante.")),
+      step(h, 4, "Abre la app una vez",
+        p(h, "Busca Greeny en el menú de homebrew. La primera vez te enseña cómo se usa y revisa que todo esté bien. Si algo falla, en Opciones → Ayuda → Diagnóstico te dice qué es y cómo arreglarlo.")),
+
+      h("h2", {}, "2. Jugar"),
+      step(h, 1, "Abre un juego que tenga logros",
+        p(h, "Arriba a la derecha sale \"Logros activos\" con cuántos llevas. Si te molesta ese aviso, lo puedes quitar en Opciones → En el juego.")),
+      step(h, 2, "Juega normal",
+        p(h, "Cuando consigues un logro sale un aviso con su medalla (bronce, plata u oro) y un sonido. No tienes que hacer nada más: queda guardado en la tarjeta, con o sin internet."),
+        p(h, "Greeny solo mira: no cambia nada del juego ni de tus partidas.")),
+      step(h, 3, "¿Quieres verlos sin salir del juego?",
+        p(h, "Si tienes Tesla instalado (un menú que se abre encima del juego), activa \"Ver logros en el juego\" en Opciones → En el juego. Luego, jugando, abres Tesla y eliges Greeny. Es opcional: sin Tesla todo lo demás funciona igual.")),
+
+      h("h2", {}, "3. La app en tu Switch"),
+      h("div", { class: "card reveal" },
+        h("ul", { class: "how-list" },
+          li(h, h("strong", {}, "Mis juegos: "), "tus juegos con su carátula, cuántos logros llevas y tus puntos. Con − cambias entre lista y cuadrícula."),
+          li(h, h("strong", {}, "Dentro de un juego: "), "cada logro, cómo se consigue y, si vas por la mitad, cuánto te falta (por ejemplo 40 de 99 monedas). Con X filtras los que tienes o te faltan."),
+          li(h, h("strong", {}, "Buscar (L): "), "todos los juegos con logros en Greeny, aunque no los tengas. Ahí ves cuándo se actualizaron sus logros."),
+          li(h, h("strong", {}, "Comentarios (Y): "), "lo que opina la gente de cada juego. Puedes dar me gusta y escribir el tuyo."),
+          li(h, h("strong", {}, "Perfil (R): "), "tu nivel, tus puntos, tus medallas, tus seguidores y el ranking."),
+          li(h, h("strong", {}, "Avisos (ZL o ZR): "), "cuando alguien te sigue, le da me gusta a tu comentario o consigues una medalla. Se abren desde cualquier pantalla."),
+          li(h, h("strong", {}, "Opciones (X): "), "idioma, tema claro u oscuro, sonidos, música, tu cuenta y la ayuda."))),
+
+      h("h2", {}, "4. Tu cuenta y la web"),
+      step(h, 1, "Crea tu cuenta",
+        p(h, "Aquí en la web, con tu correo o con Discord. Es gratis.")),
+      step(h, 2, "Vincula tu consola",
+        p(h, "En la app: Opciones → Cuenta → Vincular. La consola te muestra un código de 6 letras; lo escribes en la web, en Ajustes, y listo. También puedes entrar con tu correo y contraseña desde la consola.")),
+      step(h, 3, "Tus logros suben solos",
+        p(h, "Cada vez que abres la app con internet, sube los logros nuevos. Tu perfil se pone al día y apareces en el ranking.")),
+      step(h, 4, "Comparte y compite",
+        p(h, "Cada perfil tiene un código de amigo (GR-123456). Con él sigues a tus amigos y los ves en el ranking de amigos. También hay ranking mundial y por país.")),
+
+      h("h2", {}, "5. Puntos, niveles y medallas"),
+      h("div", { class: "card reveal" },
+        h("ul", { class: "how-list" },
+          li(h, h("strong", {}, "Puntos: "), "cada logro da puntos según lo difícil que es. Bronce los fáciles, plata los medianos y oro los difíciles."),
+          li(h, h("strong", {}, "Platino: "), "cuando consigues todos los logros de un juego."),
+          li(h, h("strong", {}, "Niveles: "), "con los puntos subes de nivel. Cada nivel pide un poco más que el anterior."),
+          li(h, h("strong", {}, "Medallas: "), "premios por metas: tu primer logro, 10 logros, tu primer platino, jugar 3 juegos distintos…"),
+          li(h, h("strong", {}, "Me gusta: "), "cada me gusta que recibe un comentario tuyo te da 2 puntos (hasta 20 por comentario)."))),
+
+      h("h2", {}, "6. ¿En qué punto va cada juego?"),
+      h("div", { class: "card reveal" },
+        h("ul", { class: "how-list" },
+          li(h, h("strong", {}, "Sin empezar: "), "todavía no tiene logros útiles."),
+          li(h, h("strong", {}, "En prueba: "), "tiene logros, pero pueden fallar o cambiar."),
+          li(h, h("strong", {}, "Jugable: "), "funciona bien; faltan logros por añadir."),
+          li(h, h("strong", {}, "Perfecto: "), "lista completa y probada.")),
+        p(h, "Los logros sirven para una versión concreta del juego. Si tu juego tiene otra versión, Greeny te lo dice en vez de darte logros por error.")),
+
+      faq(h, 5),
+    ];
+  }
+
+  // ---------- terminos ----------
+  function terms(h, cfg) {
+    return [
+      h("h1", {}, "Términos del servicio"),
+      h("p", { class: "muted" }, "Última actualización: " + UPDATED),
+      h("div", { class: "card legal" },
+        h("h2", {}, "1. Qué es Greeny"),
+        p(h, "Greeny es un proyecto de fans, gratuito y de código abierto, que agrega un sistema de logros a la Nintendo Switch con Atmosphère. No está afiliado, patrocinado ni avalado por Nintendo. \"Nintendo Switch\" es una marca de Nintendo. Al usar Greeny aceptas estos términos."),
+        h("h2", {}, "2. Uso bajo tu responsabilidad"),
+        p(h, "El software se entrega \"tal cual\", sin garantías. Usar un sistema personalizado en tu consola es decisión tuya. No nos hacemos responsables de daños, pérdida de datos ni sanciones en servicios en línea. Te recomendamos jugar sin conexión."),
+        h("h2", {}, "3. Nada de piratería"),
+        p(h, "Greeny no trae ni comparte juegos, claves ni archivos de Nintendo. Está prohibido usar la web, los comentarios o la comunidad para compartir o pedir copias ilegales."),
+        h("h2", {}, "4. Tu cuenta"),
+        p(h, "Eres responsable de tu cuenta y de lo que publicas con ella. Escoge un nombre de usuario respetuoso. Puedes borrar tu cuenta cuando quieras desde Ajustes → Seguridad."),
+        h("h2", {}, "5. Juego limpio"),
+        p(h, "Desbloquear logros a mano, editar archivos o usar trucos para subir en el ranking va contra el espíritu del proyecto. Podemos quitar del ranking o suspender cuentas que hagan trampa."),
+        h("h2", {}, "6. Comentarios"),
+        p(h, "No se permiten insultos, acoso, odio, spam, publicidad ni datos personales de otras personas. Podemos borrar comentarios que incumplan esto."),
+        h("h2", {}, "7. Donaciones"),
+        p(h, "Las donaciones son voluntarias, se hacen por PayPal y no se devuelven. No dan ventajas en el juego ni en el ranking; solo la medalla de donador."),
+        h("h2", {}, "8. Licencia"),
+        p(h, "El código de Greeny es software libre bajo la licencia GPLv2. Puedes verlo y mejorarlo en ", h("a", { href: cfg.repoUrl, rel: "noopener" }, "GitHub"), "."),
+        h("h2", {}, "9. Cambios"),
+        p(h, "Podemos cambiar estos términos. La fecha de arriba dice cuándo fue el último cambio. Si el cambio es importante, lo anunciaremos en la web o en Discord."),
+        h("h2", {}, "10. Contacto"),
+        p(h, "Para cualquier duda, abre un tema en ", h("a", { href: cfg.repoUrl + "/issues", rel: "noopener" }, "GitHub"), " o escríbenos en Discord.")),
+    ];
+  }
+
+  // ---------- privacidad ----------
+  function privacy(h, cfg) {
+    return [
+      h("h1", {}, "Política de privacidad"),
+      h("p", { class: "muted" }, "Última actualización: " + UPDATED),
+      h("div", { class: "card legal" },
+        p(h, "Greeny guarda lo mínimo para que funcione tu perfil. No hay anuncios, no vendemos datos y no usamos rastreadores de publicidad."),
+        h("h2", {}, "Qué guardamos"),
+        h("ul", {},
+          li(h, h("strong", {}, "Tu cuenta: "), "correo, nombre de usuario y, si lo pones, nombre visible, frase, foto de perfil (de las de Greeny) y país."),
+          li(h, h("strong", {}, "Si entras con Discord: "), "tu nombre de usuario de Discord, que sale en tu perfil."),
+          li(h, h("strong", {}, "Tus logros: "), "qué logros tienes, de qué juego y cuándo los conseguiste."),
+          li(h, h("strong", {}, "Tus consolas: "), "el nombre de cada consola que vinculas y cuándo se conectó por última vez. La consola guarda una llave propia, no tu contraseña."),
+          li(h, h("strong", {}, "Lo que haces en la web: "), "tus comentarios, tus me gusta, a quién sigues y tus avisos.")),
+        h("h2", {}, "Qué es público"),
+        p(h, "Tu perfil (usuario, nombre, foto, país, frase, código de amigo, logros, medallas y seguidores), tus comentarios y tu puesto en el ranking. Tu correo nunca es público."),
+        h("h2", {}, "Lo que se queda en tu consola"),
+        p(h, "Tu progreso, tus opciones y el registro de errores se guardan en tu tarjeta SD. Solo se suben los logros, y solo si vinculas tu consola."),
+        h("h2", {}, "Servicios que usamos"),
+        h("ul", {},
+          li(h, h("strong", {}, "Supabase: "), "guarda las cuentas y la base de datos."),
+          li(h, h("strong", {}, "GitHub Pages: "), "sirve esta web."),
+          li(h, h("strong", {}, "Cloudflare Turnstile: "), "la casilla de \"no soy un robot\" al entrar o registrarte."),
+          li(h, h("strong", {}, "Discord: "), "solo si eliges entrar con Discord."),
+          li(h, h("strong", {}, "PayPal: "), "procesa las donaciones. Con el correo que te da PayPal buscamos tu cuenta para darte la medalla, y no lo guardamos; solo queda marcado que donaste.")),
+        h("h2", {}, "En tu navegador"),
+        p(h, "La web guarda tu sesión y el idioma que elegiste en el almacenamiento del navegador. No usamos cookies de publicidad."),
+        h("h2", {}, "Borrar tus datos"),
+        p(h, "En Ajustes → Seguridad → Borrar mi cuenta se borra todo: tu perfil, tus logros subidos, tus consolas, comentarios, me gusta, seguidores y avisos. No se puede deshacer. Lo que hay en tu tarjeta SD no se toca."),
+        h("h2", {}, "Menores"),
+        p(h, "Si eres menor de edad, pide permiso a tu madre, padre o tutor antes de crear una cuenta."),
+        h("h2", {}, "Contacto"),
+        p(h, "Para preguntas sobre tus datos, abre un tema en ", h("a", { href: cfg.repoUrl + "/issues", rel: "noopener" }, "GitHub"), " o escríbenos en Discord.")),
+    ];
+  }
+
+  function faqPage(h) {
+    return [h("h1", {}, "Preguntas frecuentes"), faq(h)];
+  }
+
+  window.GreenyPages = { howItWorks, terms, privacy, faq, faqPage };
+})();

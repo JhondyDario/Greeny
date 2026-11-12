@@ -159,6 +159,16 @@
       "Everyone who donates gets this badge on their profile. So we know who to give it to, write your Greeny username in the donation note.",
     "La medalla se pone a mano, así que puede tardar un poco en aparecer.": "The badge is added by hand, so it may take a little while to show up.",
     "Donar es opcional: no desbloquea logros ni da ventajas.": "Donating is optional: it does not unlock achievements or give any advantage.",
+    "Proyecto": "Project", "Ayuda": "Help", "Cuenta": "Account", "Cómo funciona": "How it works", "Descargar": "Download",
+    "Preguntas frecuentes": "FAQ", "Comunidad en Discord": "Discord community", "Reportar un problema": "Report a problem",
+    "Términos del servicio": "Terms of service", "Política de privacidad": "Privacy policy", "Avisos": "Notifications", "Síguenos": "Follow us",
+    "El primer sistema de logros no oficial para la Switch. Gratis, de fans y de código abierto.": "The first unofficial achievement system for the Switch. Free, fan-made and open source.",
+    "Marcar todo como leído": "Mark all as read", "jugadores activos hoy": "players active today", "¿Nuevo por aquí?": "New here?",
+    "Mira en un minuto qué es Greeny y cómo empezar.": "See what Greeny is and how to start, in a minute.", "Cómo funciona →": "How it works →",
+    "Ver todas las preguntas": "See all questions", "Borrar mi cuenta": "Delete my account", "Borra todo de una vez": "Delete everything at once",
+    "No tienes avisos todavía. Aquí sale cuando alguien te sigue, le da me gusta a tu comentario o consigues algo nuevo.": "No notifications yet. They show up when someone follows you, likes your comment or you earn something new.",
+    "¿Qué es Greeny?": "What is Greeny?", "¿Está Greeny afiliado a Nintendo?": "Is Greeny affiliated with Nintendo?", "¿Qué necesito para usarlo?": "What do I need?",
+    "¿Greeny me da juegos o los modifica?": "Does Greeny give me games or change them?", "¿Puedo usarlo jugando en línea?": "Can I use it while playing online?",
     "Comentarios": "Comments", "Tu comentario": "Your comment", "Escribe un comentario": "Write a comment", "Publicar": "Post",
     "Guardar": "Save", "Borrar": "Delete", "Listo.": "Done.", "Entra": "Sign in", " para comentar y dar me gusta.": " to comment and like.",
     "Nadie ha comentado este juego todavía. ¡Sé el primero!": "Nobody has commented on this game yet. Be the first!",
@@ -179,7 +189,7 @@
     [/ logros · /g, " achievements · "], [/ logros$/g, " achievements"], [/ jugador\(es\) en esta clasificación\./g, " player(s) in this ranking."],
     [/ jugadores/g, " players"], [/ jugador\b/g, " player"], [/Nivel (\d+)/g, "Level $1"], [/(\d+)% lo tiene/g, "$1% have it"],
     [/^Foto (\d+)$/g, "Picture $1"], [/^Ver todos \((\d+)\)$/g, "See all ($1)"], [/^Logros actualizados el /g, "Achievements updated on "],
-    [/ pts · /g, " pts · "], [/ · editado$/g, " · edited"],
+    [/ pts · /g, " pts · "], [/ · editado$/g, " · edited"], [/ con Greeny abierto ahora$/g, " with Greeny open right now"],
   ];
 
   let lang = "es";

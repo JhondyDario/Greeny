@@ -542,4 +542,57 @@ begin
     assert ok, 'nadie lee los intentos';
 end $$;
 
+-- notificaciones: me gusta, seguir, logro reciente y medalla; leer y marcar
+do $$
+declare a uuid := '00000000-0000-0000-0000-00000000000b'; b uuid := '00000000-0000-0000-0000-00000000000d';
+        j jsonb; n0 int; tok text; ok boolean := false;
+begin
+    delete from public.notifications;
+    -- seguir avisa una sola vez
+    delete from public.follows where follower_id = b and followed_id = a;
+    insert into public.follows (follower_id, followed_id) values (b, a);
+    delete from public.follows where follower_id = b and followed_id = a;
+    insert into public.follows (follower_id, followed_id) values (b, a);
+    assert (select count(*) from public.notifications where user_id = a and kind = 'follow') = 1, 'seguir avisa una vez';
+    -- un logro reciente avisa; uno viejo no
+    delete from public.unlocks where user_id = b;
+    insert into public.unlocks (user_id, title_id, ach_id, unlocked_at)
+        select b, title_id, ach_id, now() from public.achievements where title_id = '010028600EBDA000' limit 1;
+    insert into public.unlocks (user_id, title_id, ach_id, unlocked_at)
+        select b, title_id, ach_id, now() - interval '30 days' from public.achievements where title_id = '010028600EBDA000' offset 1 limit 1;
+    assert (select count(*) from public.notifications where user_id = b and kind = 'achievement') = 1, 'solo el logro reciente avisa';
+    assert exists (select 1 from public.notifications where user_id = b and kind = 'badge' and badge = 'primer_logro'), 'medalla primer logro';
+    n0 := (select count(*) from public.notifications where user_id = b and kind = 'badge');
+    perform public.check_badges(b);
+    assert (select count(*) from public.notifications where user_id = b and kind = 'badge') = n0, 'la medalla no se repite';
+    -- la lista y marcar como leido desde la consola
+    tok := 'llave-de-prueba-notificaciones-0000000000000';
+    insert into public.devices (token_hash, user_id, name) values (public.hash_token(tok), a, 'S');
+    j := public.device_notifications(tok);
+    assert (j ->> 'unread')::int >= 1 and j -> 'items' -> 0 ->> 'actor' is not null, 'lista: ' || j::text;
+    perform public.device_notifications_read(tok, ((j -> 'items' -> 0 ->> 'id')::bigint));
+    assert (public.device_notifications(tok) ->> 'unread')::int = (j ->> 'unread')::int - 1, 'marcar una';
+    perform public.device_notifications_read(tok, null);
+    assert (public.device_notifications(tok) ->> 'unread')::int = 0, 'marcar todas';
+    -- nadie lee las de otro
+    perform set_config('request.jwt.claim.sub', b::text, true);
+    set local role authenticated;
+    assert (select count(*) from public.notifications where user_id = a) = 0, 'no se ven las de otro';
+    reset role;
+end $$;
+
+do $$
+declare j jsonb; z uuid := '00000000-0000-0000-0000-0000000000ee';
+begin
+    j := public.activity_now();
+    assert j ? 'online' and j ? 'today', 'actividad';
+    insert into auth.users (id, email, raw_user_meta_data) values (z, 'borrar@greeny.test', '{"username":"borrame"}');
+    assert exists (select 1 from public.profiles where id = z), 'perfil creado';
+    perform set_config('request.jwt.claim.sub', z::text, true);
+    set local role authenticated;
+    perform public.delete_my_account();
+    reset role;
+    assert not exists (select 1 from public.profiles where id = z) and not exists (select 1 from auth.users where id = z), 'cuenta borrada';
+end $$;
+
 select 'TODAS LAS PRUEBAS PASARON' as resultado;
