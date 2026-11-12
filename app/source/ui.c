@@ -128,6 +128,7 @@ static bool g_chip_opens_profile; /* solo en el inicio, donde R abre el perfil *
 static void begin(gfx_canvas *c) {
     gfx_clear_transparent(c);
     g_nzones = 0;
+    g_sel_set = false;
     g_chip_opens_profile = false;
 }
 
@@ -278,9 +279,21 @@ static void progress(gfx_canvas *c, int x, int y, int w, int done, int total) {
     if (total > 0 && done > 0) gfx_round_rect(c, x, y, 14 + (w - 14) * done / total, 14, 7, C_GREEN);
 }
 
+static bool g_ext_cursor, g_sel_set;
+static int g_sel_x, g_sel_y, g_sel_w, g_sel_h;
+void ui_set_external_cursor(bool on) { g_ext_cursor = on; }
+bool ui_selected_rect(int *x, int *y, int *w, int *h) {
+    if (!g_sel_set) return false;
+    *x = g_sel_x; *y = g_sel_y; *w = g_sel_w; *h = g_sel_h;
+    return true;
+}
+
 static void card(gfx_canvas *c, int x, int y, int w, int h, bool selected) {
     if (selected) {
-        gfx_round_rect(c, x - 5, y - 5, w + 10, h + 10, 19, C_YELLOW);
+        g_sel_set = true;
+        g_sel_x = x - 5; g_sel_y = y - 5; g_sel_w = w + 10; g_sel_h = h + 10;
+        /* con animaciones, el aro amarillo lo pone main.c y se desliza; sin ellas va fijo aqui */
+        if (!g_ext_cursor) gfx_round_rect(c, x - 5, y - 5, w + 10, h + 10, 19, C_YELLOW);
         gfx_round_rect(c, x, y, w, h, 14, P->card_sel);
     } else {
         gfx_round_rect(c, x, y + 3, w, h, 14, P->shadow);
@@ -1068,7 +1081,7 @@ void ui_settings(gfx_canvas *c, const ui_assets *a, const gr_config *cfg, int ta
                 break;
             case UI_OPT_ANIM:
                 option_row(c, y, sel, T("Animaciones", "Animations"),
-                           T("El fondo se mueve despacio y las pantallas entran con una transición.", "The background drifts slowly and screens slide in."),
+                           T("Fondo en movimiento, pantallas que se deslizan y un cursor que se mueve suave.", "Moving background, sliding screens and a cursor that glides."),
                            cfg->animated_bg ? on : off, cfg->animated_bg ? C_GREEN : C_NEUTRAL);
                 break;
             case UI_OPT_GAMES_VIEW:

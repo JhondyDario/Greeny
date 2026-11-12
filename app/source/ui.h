@@ -13,7 +13,7 @@
 #define UI_COVER_BIG  150  /* caratula en la cuadricula */
 
 #define UI_APP_NAME    "Greeny"
-#define UI_APP_VERSION "0.1.1"
+#define UI_APP_VERSION "0.1.2"
 
 /* opciones, agrupadas en pestañas que se cambian con L y R */
 enum {
@@ -91,6 +91,12 @@ void ui_set_music(const ui_song *songs, int count, int busy);
 
 /* true = la cuenta vinculada es de un administrador: Opciones muestra el buscador de valores. */
 void ui_set_admin(bool admin);
+/* Con el cursor externo, la tarjeta elegida no pinta su aro amarillo: solo avisa donde esta, y quien
+ * llama dibuja un aro que se desliza de un elemento a otro (main.c). */
+void ui_set_external_cursor(bool on);
+/* El recuadro del elemento elegido en la pantalla recien dibujada. false si no hay ninguno. */
+bool ui_selected_rect(int *x, int *y, int *w, int *h);
+
 /* ¿Estan encendidos los logros dentro de los juegos (existe boot2.flag)? Lo muestra Opciones. */
 void ui_set_ingame(bool on);
 void ui_set_english(bool english);

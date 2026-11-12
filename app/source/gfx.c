@@ -75,23 +75,52 @@ void gfx_rect(gfx_canvas *c, int x, int y, int w, int h, gfx_color col) {
         for (int xx = x0; xx < x1; xx++) c->px[yy * c->stride + xx] = col | 0xFF000000u;
 }
 
-void gfx_compose_fx(gfx_canvas *dst, const gfx_canvas *layer, int dy, unsigned alpha) {
+void gfx_compose_fx(gfx_canvas *dst, const gfx_canvas *layer, int dx, int dy, unsigned alpha) {
     int w = dst->w < layer->w ? dst->w : layer->w, h = dst->h < layer->h ? dst->h : layer->h;
     if (alpha > 256) alpha = 256;
-    for (int y = dy > 0 ? dy : 0; y < h; y++) {
+    int x0 = dx > 0 ? dx : 0, x1 = dx < 0 ? w + dx : w;
+    for (int y = 0; y < h; y++) {
         int sy = y - dy;
         if (sy < 0 || sy >= h) continue;
-        const uint32_t *s = &layer->px[sy * layer->stride];
+        const uint32_t *s = &layer->px[sy * layer->stride] - dx;
         uint32_t *d = &dst->px[y * dst->stride];
-        for (int x = 0; x < w; x++) {
+        for (int x = x0; x < x1; x++) {
             uint32_t p = s[x];
             unsigned a = ((p >> 24) * alpha) >> 8;
             if (!a) continue;
             uint32_t q = d[x];
-            unsigned r = ((p & 0xFF) * a + (q & 0xFF) * (255 - a)) / 255;
-            unsigned g = (((p >> 8) & 0xFF) * a + ((q >> 8) & 0xFF) * (255 - a)) / 255;
-            unsigned b = (((p >> 16) & 0xFF) * a + ((q >> 16) & 0xFF) * (255 - a)) / 255;
-            d[x] = r | (g << 8) | (b << 16) | 0xFF000000u;
+            unsigned ia = 255 - a;
+            unsigned r = ((p & 0xFF) * a + (q & 0xFF) * ia + 128) >> 8;
+            unsigned gg = (((p >> 8) & 0xFF) * a + ((q >> 8) & 0xFF) * ia + 128) >> 8;
+            unsigned b = (((p >> 16) & 0xFF) * a + ((q >> 16) & 0xFF) * ia + 128) >> 8;
+            d[x] = r | (gg << 8) | (b << 16) | 0xFF000000u;
+        }
+    }
+}
+
+void gfx_ring(gfx_canvas *c, int x, int y, int w, int h, int r, int thick, gfx_color col, unsigned alpha) {
+    if (w <= 0 || h <= 0 || alpha == 0) return;
+    if (alpha > 256) alpha = 256;
+    float hw = w / 2.0f, hh = h / 2.0f, cx = x + hw, cy = y + hh;
+    unsigned cr = col & 0xFF, cg = (col >> 8) & 0xFF, cb = (col >> 16) & 0xFF;
+    for (int py = y < 0 ? 0 : y; py < y + h && py < c->h; py++) {
+        bool edge_row = py < y + r + thick || py >= y + h - r - thick;
+        for (int px = x < 0 ? 0 : x; px < x + w && px < c->w; px++) {
+            /* por dentro del borde no hay nada que pintar: saltar de un lado al otro */
+            if (!edge_row && px == x + thick + 1 && w > 2 * (thick + 1)) px = x + w - thick - 1;
+            float qx = fabsf(px + 0.5f - cx) - (hw - r), qy = fabsf(py + 0.5f - cy) - (hh - r);
+            float ox = qx > 0 ? qx : 0, oy = qy > 0 ? qy : 0;
+            float in = qx > qy ? qx : qy;
+            float d = sqrtf(ox * ox + oy * oy) + (in < 0 ? in : 0) - r; /* <0 dentro del rectangulo redondeado */
+            float cov = (0.5f - d) < (d + thick + 0.5f) ? (0.5f - d) : (d + thick + 0.5f);
+            if (cov <= 0) continue;
+            if (cov > 1) cov = 1;
+            unsigned a = (unsigned)(cov * alpha);
+            if (a > 255) a = 255;
+            uint32_t *dp = &c->px[py * c->stride + px], q = *dp;
+            unsigned ia = 255 - a;
+            *dp = ((cr * a + (q & 0xFF) * ia + 128) >> 8) | (((cg * a + ((q >> 8) & 0xFF) * ia + 128) >> 8) << 8) |
+                  (((cb * a + ((q >> 16) & 0xFF) * ia + 128) >> 8) << 16) | 0xFF000000u;
         }
     }
 }

@@ -139,7 +139,8 @@ when = main+0x1386C00->0x18->0x0->0x228->0x90 u32 == 7
 #
 # OJO: fuera de la partida (titulo, pantallas de carga) esas cadenas pueden apuntar a otra
 # cosa y dar un numero cualquiera: asi salto "Constelacion" con 14 estrellas. Por eso cada
-# logro pide tres cosas a la vez, durante 3 segundos seguidos:
+# logro pide tres cosas a la vez, durante 15 segundos seguidos (en la pantalla de titulo esas
+# cadenas dan un numero distinto cada instante, de 0 a 36; nunca aguantan mas de 2 segundos):
 #   1. que haya una partida cargada (el contador de vidas se puede leer y tiene sentido),
 #   2. que DOS cadenas distintas den un total que cumpla, y
 #   3. que ese total no pase del maximo del juego (380 estrellas, 85 sellos).
@@ -150,7 +151,7 @@ desc = Consigue tus primeras 5 Estrellas Verdes
 name.en = First steps
 desc.en = Collect your first 5 Green Stars
 points = 10
-hold = 3000
+hold = 15000
 when = main+0x1386C00->0x18->0x0->0x78->0x20 u32 >= 1
 when = main+0x1386C00->0x18->0x0->0x78->0x20 u32 <= 1110
 when = main+0x180A4A0->0x28->0x684 u32 >= 5
@@ -164,7 +165,7 @@ desc = Junta 30 Estrellas Verdes en total
 name.en = Constellation
 desc.en = Collect 30 Green Stars in total
 points = 25
-hold = 3000
+hold = 15000
 when = main+0x1386C00->0x18->0x0->0x78->0x20 u32 >= 1
 when = main+0x1386C00->0x18->0x0->0x78->0x20 u32 <= 1110
 when = main+0x180A4A0->0x28->0x684 u32 >= 30
@@ -178,7 +179,7 @@ desc = Junta 127 Estrellas Verdes: un tercio de todas
 name.en = Starry sky
 desc.en = Collect 127 Green Stars: a third of them all
 points = 50
-hold = 3000
+hold = 15000
 when = main+0x1386C00->0x18->0x0->0x78->0x20 u32 >= 1
 when = main+0x1386C00->0x18->0x0->0x78->0x20 u32 <= 1110
 when = main+0x180A4A0->0x28->0x684 u32 >= 127
@@ -192,7 +193,7 @@ desc = Colecciona 5 sellos
 name.en = First stamps
 desc.en = Collect 5 stamps
 points = 10
-hold = 3000
+hold = 15000
 when = main+0x1386C00->0x18->0x0->0x78->0x20 u32 >= 1
 when = main+0x1386C00->0x18->0x0->0x78->0x20 u32 <= 1110
 when = main+0x1386C00->0x90->0x10 u32 >= 5
@@ -206,7 +207,7 @@ desc = Colecciona 10 sellos
 name.en = Full album
 desc.en = Collect 10 stamps
 points = 15
-hold = 3000
+hold = 15000
 when = main+0x1386C00->0x18->0x0->0x78->0x20 u32 >= 1
 when = main+0x1386C00->0x18->0x0->0x78->0x20 u32 <= 1110
 when = main+0x1386C00->0x90->0x10 u32 >= 10
@@ -220,7 +221,7 @@ desc = Colecciona 28 sellos: un tercio de todos
 name.en = Stamp collector
 desc.en = Collect 28 stamps: a third of them all
 points = 30
-hold = 3000
+hold = 15000
 when = main+0x1386C00->0x18->0x0->0x78->0x20 u32 >= 1
 when = main+0x1386C00->0x18->0x0->0x78->0x20 u32 <= 1110
 when = main+0x1386C00->0x90->0x10 u32 >= 28
