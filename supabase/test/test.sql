@@ -39,7 +39,7 @@ end $$;
 
 -- catalogo (como superusuario, igual que lo hara el panel de Supabase)
 insert into public.games (title_id, name, version, definition, published) values
- ('010028600EBDA000', 'Super Mario 3D World', '1.1.0', 'game = x', true),
+ ('010028600EBDA000', 'Super Mario 3D World + Bowser''s Fury', '1.1.0', 'game = x', true),
  ('0100AAAAAAAAA000', 'Oculto', '1.0.0', 'game = y', false);
 insert into public.achievements (title_id, ach_id, name_es, points) values
  ('010028600EBDA000', 'monedas_5', 'Cinco cheles', 5),

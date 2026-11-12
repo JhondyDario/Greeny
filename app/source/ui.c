@@ -201,6 +201,7 @@ void ui_background(gfx_canvas *c, float t) {
 static void user_chip(gfx_canvas *c);
 static int badge_order(const gr_stats *st, int *out);
 static void heart(gfx_canvas *c, int cx, int cy, int size, gfx_color col);
+static void text_wrap(gfx_canvas *c, int x, int y, int size, int line_h, gfx_color col, const char *s, int max_w, int max_lines);
 
 /* Fondo de la barra de arriba: verde oscuro a la izquierda que se aclara hacia la derecha, con
  * un brillo arriba y sombra abajo, y una linea clara al pie. Como en la web. */
@@ -967,6 +968,71 @@ void ui_browse_game(gfx_canvas *c, const ui_assets *a, const gr_cat_game *game, 
     hint(c, hx, "+", T("Salir", "Exit"));
 }
 
+/* ---------- actualizar la app ---------- */
+
+static int g_upd_state;
+static char g_upd_label[48];
+void ui_set_update(int state, const char *version) {
+    g_upd_state = state;
+    snprintf(g_upd_label, sizeof(g_upd_label), "%s %s", T("Nueva:", "New:"), version ? version : "");
+}
+
+void ui_update(gfx_canvas *c, const ui_assets *a, int state, const char *version, const char *notes, long done, long total) {
+    begin(c);
+    char sub[96];
+    snprintf(sub, sizeof(sub), T("Tienes la versión %s", "You have version %s"), UI_APP_VERSION);
+    header(c, a, NULL, T("Actualizar Greeny", "Update Greeny"), sub);
+    card(c, MARGIN, 120, CONTENT_W, 520, false);
+    int pic = state == UI_UPD_AVAILABLE ? UI_IMG_m_sorprendido : state == UI_UPD_DOWNLOADING || state == UI_UPD_CHECKING ? UI_IMG_m_buscando
+            : state == UI_UPD_CURRENT ? UI_IMG_m_celebrando : UI_IMG_m_triste;
+    img(c, a, pic, MARGIN + 30, 150);
+    const int tx = MARGIN + 320, tw = CONTENT_W - 360;
+    char line[160];
+    switch (state) {
+        case UI_UPD_CHECKING:
+            gfx_text(c, tx, 170, 34, P->ink, T("Buscando versiones…", "Checking for updates…"));
+            break;
+        case UI_UPD_CURRENT:
+            gfx_text(c, tx, 170, 34, P->ink, T("Ya tienes la última versión", "You have the latest version"));
+            gfx_text_fit(c, tx, 226, 22, P->gray, T("Cuando salga una nueva, te avisamos al abrir la app.", "When a new one comes out, the app will tell you."), tw);
+            break;
+        case UI_UPD_NONE:
+            gfx_text(c, tx, 170, 34, P->ink, T("Todavía no hay versiones publicadas", "No versions published yet"));
+            gfx_text_fit(c, tx, 226, 22, P->gray, T("Cuando se publique la primera, se podrá instalar desde aquí.", "Once the first one is out, you can install it from here."), tw);
+            break;
+        case UI_UPD_OFFLINE:
+            gfx_text(c, tx, 170, 34, P->ink, T("No se pudo buscar", "Could not check"));
+            gfx_text_fit(c, tx, 226, 22, P->gray, T("Revisa la conexión a internet e inténtalo de nuevo.", "Check the internet connection and try again."), tw);
+            break;
+        case UI_UPD_AVAILABLE:
+        case UI_UPD_DOWNLOADING:
+            snprintf(line, sizeof(line), T("Versión %s disponible", "Version %s available"), version);
+            gfx_text(c, tx, 160, 34, P->ink, line);
+            if (notes && notes[0]) {
+                gfx_text(c, tx, 214, 18, P->gray, T("QUÉ TRAE", "WHAT'S NEW"));
+                text_wrap(c, tx, 240, 20, 29, P->ink, notes, tw, state == UI_UPD_DOWNLOADING ? 7 : 9);
+            }
+            if (state == UI_UPD_DOWNLOADING) {
+                int permil = total > 0 ? (int)(done * 1000 / total) : 0;
+                gfx_round_rect(c, tx, 548, tw, 20, 10, P->gray_lt);
+                if (permil > 0) gfx_round_rect(c, tx, 548, 20 + (tw - 20) * permil / 1000, 20, 10, C_GREEN);
+                snprintf(line, sizeof(line), T("Descargando…  %ld de %ld MB", "Downloading…  %ld of %ld MB"), done >> 20, (total > 0 ? total : done) >> 20);
+                gfx_text(c, tx, 580, 20, P->gray, line);
+            } else {
+                gfx_text_fit(c, tx, 572, 19, P->gray, T("Se descarga la app nueva y reemplaza a esta. Tus logros y opciones no se tocan.",
+                                                       "The new app is downloaded and replaces this one. Your achievements and options stay."), tw);
+            }
+            break;
+        default: break;
+    }
+    footer_bar(c);
+    int hx = MARGIN;
+    if (state == UI_UPD_AVAILABLE) hx = hint(c, hx, "A", T("Descargar e instalar", "Download and install"));
+    if (state == UI_UPD_OFFLINE || state == UI_UPD_CURRENT || state == UI_UPD_NONE) hx = hint(c, hx, "Y", T("Buscar otra vez", "Check again"));
+    if (state != UI_UPD_DOWNLOADING) hx = hint(c, hx, "B", state == UI_UPD_AVAILABLE ? T("Ahora no", "Not now") : T("Volver", "Back"));
+    if (state != UI_UPD_DOWNLOADING) hint(c, hx, "+", T("Salir", "Exit"));
+}
+
 /* ---------- avisos ---------- */
 
 void ui_notif_text(const gr_notif *n, char *out, size_t cap) {
@@ -1231,12 +1297,12 @@ static const struct { const char *es, *en; int n; int opt[5]; } k_tabs[UI_TABS] 
     { "En el juego", "In-game",  5, { UI_OPT_INGAME, UI_OPT_SOUND, UI_OPT_POPUP, UI_OPT_STARTPOP, UI_OPT_OVERLAY } },
     { "Música",      "Music",    0, { 0 } },  /* una fila para encender y una por cancion */
     { "Cuenta",      "Account",  0, { 0 } },  /* sus filas dependen de si la consola esta vinculada */
-    { "Ayuda",       "Help",     3, { UI_OPT_DIAG, UI_OPT_ABOUT, UI_OPT_SEARCH } }, /* la ultima solo la ve un administrador */
+    { "Ayuda",       "Help",     4, { UI_OPT_DIAG, UI_OPT_UPDATE, UI_OPT_ABOUT, UI_OPT_SEARCH } }, /* la ultima solo la ve un administrador */
 };
 
 int ui_tab_count(int tab, bool linked) {
     if (tab == UI_TAB_MUSIC) return 1 + g_nsongs;
-    if (tab == UI_TABS - 1) return g_admin ? 3 : 2;
+    if (tab == UI_TABS - 1) return g_admin ? 4 : 3;
     if (tab == UI_TAB_ACCOUNT) return linked ? 5 : 2;
     return k_tabs[tab].n;
 }
@@ -1460,6 +1526,12 @@ void ui_settings(gfx_canvas *c, const ui_assets *a, const gr_config *cfg, int ta
                 option_row(c, y, sel, T("Buscador de valores", "Value finder"),
                            T("Para crear logros: encuentra dónde guarda el juego un número.", "For making achievements: finds where the game keeps a number."),
                            open, C_NEUTRAL);
+                break;
+            case UI_OPT_UPDATE:
+                option_row(c, y, sel, T("Actualizar Greeny", "Update Greeny"),
+                           T("Busca una versión nueva y la instala sin pasar por la computadora.", "Finds a new version and installs it, no computer needed."),
+                           g_upd_state == UI_UPD_AVAILABLE ? g_upd_label : g_upd_state == UI_UPD_CURRENT ? T("Al día", "Up to date") : T("Buscar", "Check"),
+                           g_upd_state == UI_UPD_AVAILABLE ? C_YELLOW : g_upd_state == UI_UPD_CURRENT ? C_GREEN : C_NEUTRAL);
                 break;
             case UI_OPT_DIAG:
                 option_row(c, y, sel, T("Diagnóstico", "Diagnostics"),

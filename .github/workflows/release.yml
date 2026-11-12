@@ -1,0 +1,40 @@
+# Publica una version de Greeny al subir una etiqueta vX.Y.Z (ver docs/PUBLICAR-VERSION.md).
+# Compila todo dentro de la imagen de devkitPro y sube greeny.zip y greeny.nro a la release.
+# La app busca greeny.nro en la ultima release para actualizarse sola.
+name: Publicar version
+
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    container: devkitpro/devkita64:latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: La etiqueta coincide con la version de la app
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          app=$(sed -n 's/^#define UI_APP_VERSION "\(.*\)"/\1/p' app/source/ui.h)
+          echo "etiqueta $tag, app $app"
+          [ "$tag" = "$app" ] || { echo "La etiqueta v$tag no coincide con UI_APP_VERSION $app (app/source/ui.h)"; exit 1; }
+
+      - name: Compilar
+        run: |
+          apt-get update -qq && apt-get install -y -qq zip >/dev/null
+          ./scripts/build.sh
+          ./scripts/dist.sh
+          cp app/greeny.nro greeny.nro
+
+      - name: Publicar la release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            greeny.zip
+            greeny.nro
+          generate_release_notes: true

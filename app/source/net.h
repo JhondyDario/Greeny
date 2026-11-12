@@ -13,3 +13,6 @@ int net_http(const char *url, const char *bearer, const char *json_body, char *o
 
 /* Tiene la forma de gr_get_fn (ver icons.h). Sirve para bajar imagenes. */
 int net_get(const char *url, void *out, size_t cap, size_t *len, long *status);
+/* Baja `url` a un archivo (siguiendo redirecciones), sin mandar llaves de Greeny.
+ * *done y *total se van llenando para mostrar el avance (total 0 = desconocido). 0 = ok. */
+int net_download(const char *url, const char *path, volatile long *done, volatile long *total);

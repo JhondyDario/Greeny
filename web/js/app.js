@@ -1406,7 +1406,7 @@
 
         h("div", { class: "card contrib-card" },
           h("h2", { style: "margin-top:0" }, "Únete al equipo"),
-          h("div", { class: "row team-now" }, h("img", { src: "img/avatars/01.png", alt: "", width: 44, height: 44 }),
+          h("div", { class: "row team-now" }, h("img", { src: "img/fundador.jpg", alt: "", width: 44, height: 44, style: "border-radius:50%;object-fit:cover" }),
             h("div", {}, h("strong", {}, "Jhondy"), h("div", { class: "muted small" }, "Fundador y programador"))),
           h("div", { class: "roles" }, ROLES.map((r) =>
             h("div", { class: "role" + (r.hot ? " hot" : "") },

@@ -293,6 +293,10 @@ int main(int argc, char **argv) {
             save(&c, out, "avisos", sfx);
             ui_notifs(&c, &a, nt, 0, 0, 0, 0, 3);
             save(&c, out, "avisos_sin_cuenta", sfx);
+            ui_update(&c, &a, UI_UPD_AVAILABLE, "1.0.0", "- Avisos dentro de la app (ZL o ZR)\n- Comentarios con me gusta en cada juego\n- Actualizar sin computadora", 0, 0);
+            save(&c, out, "actualizar", sfx);
+            ui_update(&c, &a, UI_UPD_DOWNLOADING, "1.0.0", "- Avisos dentro de la app (ZL o ZR)", 3 << 20, 7 << 20);
+            save(&c, out, "actualizar_bajando", sfx);
             ui_ranking(&c, &a, rows, 3, &yo, 14, "Mi país", "My country", "Super Mario 3D World", 0, 1);
             save(&c, out, "ranking_pais", sfx);
             ui_ranking(&c, &a, rows, 0, &yo, 0, "Mi país", "My country", "Puntos totales", 0, 3);

@@ -37,6 +37,7 @@
 #include "toast_plata_bin.h"
 #include "sysmodule_bin.h"
 #include "overlay_bin.h"
+#include "update.h"
 #include "mascot_big_bin.h"
 #include "mascot_small_bin.h"
 
@@ -58,7 +59,7 @@
 
 typedef enum {
     SCREEN_HOME, SCREEN_DETAIL, SCREEN_SETTINGS, SCREEN_DIAG, SCREEN_ABOUT, SCREEN_INTRO, SCREEN_LINK, SCREEN_MSG,
-    SCREEN_PROFILE, SCREEN_BADGES, SCREEN_ACH, SCREEN_AVATARS, SCREEN_BROWSE, SCREEN_BROWSE_GAME, SCREEN_SEARCH, SCREEN_RANKING, SCREEN_USER, SCREEN_COUNTRY, SCREEN_CAPTION, SCREEN_REVIEWS, SCREEN_NOTIF
+    SCREEN_PROFILE, SCREEN_BADGES, SCREEN_ACH, SCREEN_AVATARS, SCREEN_BROWSE, SCREEN_BROWSE_GAME, SCREEN_SEARCH, SCREEN_RANKING, SCREEN_USER, SCREEN_COUNTRY, SCREEN_CAPTION, SCREEN_REVIEWS, SCREEN_NOTIF, SCREEN_UPDATE
 } screen_t;
 
 static gr_model g_model;
@@ -512,13 +513,77 @@ static void device_name(char *out, size_t cap) {
 
 /* Hilo de fondo. Nunca bloquea la interfaz. Hace dos cosas, las dos opcionales:
  * baja los archivos de logros de los juegos instalados y, si hay cuenta, sube los logros. */
+/* ---------- actualizar la app ---------- */
+static gr_release g_rel;
+static volatile int g_upd = UI_UPD_UNKNOWN;
+static bool g_upd_prompt;              /* hay version nueva: mostrarla una vez al volver al inicio */
+static char g_self_path[256] = "sdmc:/switch/greeny.nro"; /* donde esta esta app; sale de argv[0] */
+static volatile long g_dl_done, g_dl_total;
+static volatile int g_dl_result;       /* 0 bajando, 1 listo, -1 fallo */
+static Thread g_dl_thread;
+static bool g_dl_live;
+
+/* Pregunta a GitHub por la ultima version. Bloquea un momento: llamarla desde el hilo o a peticion. */
+static void update_check(void) {
+    static char json[96 * 1024];
+    size_t len = 0;
+    long status = 0;
+    if (!net_online()) { g_upd = UI_UPD_OFFLINE; return; }
+    if (net_get(GR_UPDATE_API, json, sizeof(json) - 1, &len, &status) != 0) { g_upd = UI_UPD_OFFLINE; return; }
+    json[len] = 0;
+    if (status == 404) { g_upd = UI_UPD_NONE; return; } /* aun no hay ninguna release */
+    gr_release r;
+    if (status != 200 || !gr_parse_release(json, &r)) { g_upd = status == 200 ? UI_UPD_NONE : UI_UPD_OFFLINE; return; }
+    g_rel = r;
+    g_upd = gr_version_newer(r.version, UI_APP_VERSION) ? UI_UPD_AVAILABLE : UI_UPD_CURRENT;
+    trace("actualizar: ultima %s, esta %s", r.version, UI_APP_VERSION);
+}
+
+static void download_thread(void *arg) {
+    (void)arg;
+    char tmp[280];
+    snprintf(tmp, sizeof(tmp), "%s.new", g_self_path);
+    int ok = net_download(g_rel.nro_url, tmp, &g_dl_done, &g_dl_total) == 0;
+    if (ok) { /* que sea un NRO de verdad antes de reemplazar la app */
+        unsigned char head[0x20] = {0};
+        struct stat st;
+        FILE *f = fopen(tmp, "rb");
+        size_t n = f ? fread(head, 1, sizeof(head), f) : 0;
+        if (f) fclose(f);
+        ok = stat(tmp, &st) == 0 && gr_nro_valid(head, n, (long)st.st_size) && (g_rel.size <= 0 || st.st_size == g_rel.size);
+    }
+    if (ok) {
+        char old[280];
+        snprintf(old, sizeof(old), "%s.old", g_self_path);
+        remove(old);
+        rename(g_self_path, old);                 /* por si algo sale mal, la anterior queda guardada */
+        ok = rename(tmp, g_self_path) == 0;
+        if (ok) remove(old);
+        else rename(old, g_self_path);
+    }
+    if (!ok) remove(tmp);
+    g_dl_result = ok ? 1 : -1;
+}
+
+static bool download_start(void) {
+    g_dl_done = g_dl_total = 0;
+    g_dl_result = 0;
+    if (R_SUCCEEDED(threadCreate(&g_dl_thread, download_thread, NULL, NULL, 0x40000, 0x2C, -2)) && R_SUCCEEDED(threadStart(&g_dl_thread))) {
+        g_dl_live = true;
+        return true;
+    }
+    return false;
+}
+
 /* ---------- avisos ---------- */
 static gr_notif g_notifs[GR_NOTIFS_MAX], g_sync_notifs[GR_NOTIFS_MAX];
 static int g_nnotif, g_unread, g_sync_nnotif, g_sync_unread;
 static bool g_sync_notifs_ok;
 static u64 g_last_sync_tick; /* para volver a sincronizar cada 5 minutos */
 
+static bool g_upd_checked;
 static void sync_thread(void *arg) {
+    if (!g_upd_checked) { g_upd_checked = true; update_check(); if (g_upd == UI_UPD_AVAILABLE) g_upd_prompt = true; }
     (void)arg;
     g_cat_downloaded = 0;
     gr_catalog_sync(net_get, ROOT, g_titles, g_ntitles, &g_cat_downloaded);
@@ -584,6 +649,7 @@ static bool sync_collect(void) {
         g_unread = g_sync_unread;
     }
     ui_set_unread(g_account.token[0] && g_account.linked ? g_unread : -1);
+    ui_set_update(g_upd, g_rel.version);
     if (g_cat_downloaded > 0) rescan();  /* llegaron juegos nuevos: que aparezcan en la lista */
     else refresh_greeting();
     return true;
@@ -942,6 +1008,8 @@ static void follow(int cursor, int *top, ui_layout l) {
 }
 
 int main(int argc, char *argv[]) {
+    if (argc > 0 && argv[0] && !strncmp(argv[0], "sdmc:/", 6) && strstr(argv[0], ".nro"))
+        snprintf(g_self_path, sizeof(g_self_path), "%s", argv[0]);
     (void)argc;
     (void)argv;
 
@@ -1041,7 +1109,7 @@ int main(int argc, char *argv[]) {
           g_ns_ok ? "si" : "no", g_env.applet_mode ? "applet" : "aplicacion");
 
     int cursor = 0, top = 0, dcursor = 0, dtop = 0, stab = 0, srow = 0, intro_page = 0, acursor = 0, bcursor = 0, btop = 0, browse_pending = 0, song_pending = 0, song_wait = 0, vcursor = 0, vtop = 0, ncursor = 0, ntop = 0, notif_state = 0;
-    screen_t notif_return = SCREEN_HOME;
+    screen_t notif_return = SCREEN_HOME, upd_return = SCREEN_HOME;
     bool song_all = false;
     int ccursor = 0, rcursor = 0, rank_scope = 0, rank_mode = 0, rank_state = 0, kcursor = 0, ktop = 0;
     bool lang_changed = false;
@@ -1131,12 +1199,12 @@ int main(int argc, char *argv[]) {
                 else { (cursor_var) = tap_item; dirty = true; sfx_play(SFX_NAV); } \
             } } while (0)
 
-        if (down & HidNpadButton_Plus) { plus_pressed = true; break; }
+        if ((down & HidNpadButton_Plus) && !g_dl_live) { plus_pressed = true; break; } /* no salir a mitad de una actualizacion */
 
         bool moved = false, accepted = false, accepted_alt = false, opened = false, opened_rare = false, back = false;
 
         /* ZL o ZR abren los avisos desde cualquier pantalla; B vuelve a donde estabas */
-        if ((down & (HidNpadButton_ZL | HidNpadButton_ZR)) && screen != SCREEN_NOTIF && screen != SCREEN_INTRO && screen != SCREEN_MSG) {
+        if ((down & (HidNpadButton_ZL | HidNpadButton_ZR)) && screen != SCREEN_NOTIF && screen != SCREEN_INTRO && screen != SCREEN_MSG && !g_dl_live) {
             notif_return = screen;
             notif_state = notifs_load();
             ncursor = ntop = 0;
@@ -1147,7 +1215,46 @@ int main(int argc, char *argv[]) {
         /* cada 5 minutos, sincronizar otra vez (sube logros nuevos y trae avisos) */
         if (!g_sync_thread_live && g_account.linked && armTicksToNs(armGetSystemTick() - g_last_sync_tick) > 300000000000ULL) sync_start();
 
-        if (screen == SCREEN_NOTIF) {
+        /* hay version nueva: se ofrece una vez, al estar en el inicio */
+        if (g_upd_prompt && screen == SCREEN_HOME && !g_sync_thread_live) {
+            g_upd_prompt = false;
+            upd_return = SCREEN_HOME;
+            screen = SCREEN_UPDATE;
+            dirty = true;
+        }
+
+        if (screen == SCREEN_UPDATE) {
+            if (g_dl_live) {
+                dirty = true; /* para que avance la barra */
+                if (g_dl_result != 0) {
+                    threadWaitForExit(&g_dl_thread);
+                    threadClose(&g_dl_thread);
+                    g_dl_live = false;
+                    if (g_dl_result > 0) {
+                        char l1[160];
+                        snprintf(l1, sizeof(l1), "Se instaló la versión %s. Cierra Greeny con + y ábrela otra vez para usarla.", g_rel.version);
+                        show_message(true, "¡Actualizada!", l1, "Si la versión trae un sysmodule nuevo, la app te pedirá reiniciar la consola.");
+                        g_upd = UI_UPD_CURRENT;
+                    } else {
+                        show_message(false, "No se pudo actualizar", "La descarga falló o el archivo no era válido. Tu app sigue igual.", "Revisa la conexión e inténtalo de nuevo.");
+                    }
+                    ui_set_update(g_upd, g_rel.version);
+                    g_msg_return = SCREEN_HOME;
+                    screen = SCREEN_MSG;
+                }
+            } else {
+                if ((down & HidNpadButton_A) && g_upd == UI_UPD_AVAILABLE) {
+                    if (!download_start()) {
+                        show_message(false, "No se pudo actualizar", "No se pudo empezar la descarga.", NULL);
+                        g_msg_return = upd_return;
+                        screen = SCREEN_MSG;
+                    }
+                    accepted = true;
+                }
+                if ((down & HidNpadButton_Y) && g_upd != UI_UPD_AVAILABLE) { update_check(); ui_set_update(g_upd, g_rel.version); accepted_alt = true; }
+                if (down & HidNpadButton_B) { screen = upd_return; back = true; }
+            }
+        } else if (screen == SCREEN_NOTIF) {
             if (ncursor >= g_nnotif) ncursor = g_nnotif ? g_nnotif - 1 : 0;
             if (notif_state == 1 && g_nnotif > 0) { TAP_SELECT(ncursor, g_nnotif); moved = move_cursor(&ncursor, g_nnotif, 1, nav); }
             if (ncursor < ntop) ntop = ncursor;
@@ -1506,6 +1613,12 @@ int main(int argc, char *argv[]) {
                     case UI_OPT_START:      g_config.start_page = (g_config.start_page + 1) % GR_START_COUNT; break;
                     case UI_OPT_ABOUT:      links_load(); screen = SCREEN_ABOUT; opened_rare = true; break;
                     case UI_OPT_DIAG:       run_diag(); screen = SCREEN_DIAG; break;
+                    case UI_OPT_UPDATE:
+                        if (g_upd != UI_UPD_AVAILABLE) update_check();
+                        ui_set_update(g_upd, g_rel.version);
+                        upd_return = SCREEN_SETTINGS;
+                        screen = SCREEN_UPDATE;
+                        break;
                     case UI_OPT_SEARCH:     run_diag(); search_read(); frow = 0; screen = SCREEN_SEARCH; break;
                     case UI_OPT_ACC_LINK: {
                         char name[64], err[160] = "";
@@ -1817,6 +1930,7 @@ int main(int argc, char *argv[]) {
                 const char *mode = rank_mode > 0 && rank_mode <= ngames ? g_model.games[gidx[rank_mode - 1]].name : (g_ui_en ? "Total points" : "Puntos totales");
                 ui_ranking(&layer, &g_assets, g_rank, g_nrank, &g_rank_me, g_rank_total, sc_es[rank_scope], sc_en[rank_scope], mode, rcursor, rank_state);
             }
+            else if (screen == SCREEN_UPDATE) ui_update(&layer, &g_assets, g_dl_live ? UI_UPD_DOWNLOADING : g_upd, g_rel.version, g_rel.notes, g_dl_done, g_dl_total);
             else if (screen == SCREEN_NOTIF) ui_notifs(&layer, &g_assets, g_notifs, g_nnotif, g_unread, ncursor, ntop, notif_state);
             else if (screen == SCREEN_REVIEWS) ui_reviews(&layer, &g_assets, g_rev_name, g_reviews, g_nrev, vcursor, vtop, g_rev_state, g_account.linked);
             else if (screen == SCREEN_USER) ui_user(&layer, &g_assets, &g_rank_view, strcasecmp(g_rank_view.username, g_account.username) != 0);

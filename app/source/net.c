@@ -116,3 +116,45 @@ int net_get(const char *url, void *out, size_t cap, size_t *len, long *status) {
     curl_easy_cleanup(c);
     return rc == CURLE_OK ? 0 : -1;
 }
+
+/* ---------- descargas grandes a archivo (actualizar la app) ---------- */
+typedef struct { volatile long *done, *total; } dl_progress;
+
+static size_t on_file(void *data, size_t size, size_t n, void *f) {
+    return fwrite(data, size, n, (FILE *)f);
+}
+
+static int on_progress(void *p, curl_off_t dltotal, curl_off_t dlnow, curl_off_t ul, curl_off_t ulnow) {
+    (void)ul; (void)ulnow;
+    dl_progress *d = p;
+    *d->done = (long)dlnow;
+    if (dltotal > 0) *d->total = (long)dltotal;
+    return 0;
+}
+
+int net_download(const char *url, const char *path, volatile long *done, volatile long *total) {
+    *done = 0;
+    if (!net_online()) return -1;
+    FILE *f = fopen(path, "wb");
+    if (!f) return -1;
+    CURL *c = curl_easy_init();
+    if (!c) { fclose(f); return -1; }
+    dl_progress d = { done, total };
+    curl_easy_setopt(c, CURLOPT_URL, url);
+    curl_easy_setopt(c, CURLOPT_WRITEFUNCTION, on_file);
+    curl_easy_setopt(c, CURLOPT_WRITEDATA, f);
+    curl_easy_setopt(c, CURLOPT_USERAGENT, "Greeny/" UI_APP_VERSION);
+    curl_easy_setopt(c, CURLOPT_FOLLOWLOCATION, 1L);
+    curl_easy_setopt(c, CURLOPT_CONNECTTIMEOUT, 10L);
+    curl_easy_setopt(c, CURLOPT_TIMEOUT, 600L);
+    curl_easy_setopt(c, CURLOPT_NOSIGNAL, 1L);
+    curl_easy_setopt(c, CURLOPT_NOPROGRESS, 0L);
+    curl_easy_setopt(c, CURLOPT_XFERINFOFUNCTION, on_progress);
+    curl_easy_setopt(c, CURLOPT_XFERINFODATA, &d);
+    CURLcode rc = curl_easy_perform(c);
+    long status = 0;
+    if (rc == CURLE_OK) curl_easy_getinfo(c, CURLINFO_RESPONSE_CODE, &status);
+    curl_easy_cleanup(c);
+    if (fclose(f) != 0) rc = CURLE_WRITE_ERROR;
+    return rc == CURLE_OK && status == 200 ? 0 : -1;
+}

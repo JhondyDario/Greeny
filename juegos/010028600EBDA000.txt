@@ -11,7 +11,7 @@
 #
 # Para depurar pon debug = 1: anota en log.txt el valor que lee cada condicion.
 
-game    = Super Mario 3D World
+game    = Super Mario 3D World + Bowser's Fury
 version = 1.1.0
 build   = 891687F016A18F17
 

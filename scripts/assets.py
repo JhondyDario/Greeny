@@ -65,7 +65,9 @@ icon.save(os.path.join(ROOT, "app", "icon.jpg"), quality=92, subsampling=2, prog
 
 # imagenes de la web
 web = os.path.join(ROOT, "web", "img")
-fit(logo, 192, 192).save(os.path.join(web, "icon.png"), optimize=True)
+# en la web: el icono simple (la mascota guiñando en un circulo), que se ve bien pequeño
+simple = Image.open(os.path.join(ROOT, "assets", "icono-simple.png")).convert("RGBA")
+fit(simple, 192, 192).save(os.path.join(web, "icon.png"), optimize=True)
 fit(face, 420, 420).save(os.path.join(web, "mascot.png"), optimize=True)
 for name in ("usuario", "salir", "menu"):
     im = Image.open(os.path.join(ROOT, "assets", "icons", name + ".png")).convert("RGBA")
@@ -156,7 +158,7 @@ web_copy("relleno_logro.png", "ach_fill.png", 128, 128)
 web_copy("trofeo.png", "trophy.png", 96, 96)
 web_copy("logo-greeny-detalles.png", "logo.png", 600, 304)
 web_copy("logo-greeny.png", "logo_simple.png", 360, 164)
-web_copy("app-icon.png", "favicon.png", 192, 192)
+web_copy("icono-simple.png", "favicon.png", 64, 64)
 
 # ---------- imagenes del aviso dentro del juego ----------
 # RGBA crudo de 60x60 (TOAST_BADGE en source/toast_draw.h). Van a la SD (no dentro del sysmodule, que debe pesar poco); la app los lleva y los instala.

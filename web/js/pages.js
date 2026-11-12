@@ -4,6 +4,8 @@
   "use strict";
 
   const UPDATED = "12 de noviembre de 2026";
+  const UPDATED_EN = "November 12, 2026";
+  const isEn = () => window.GreenyI18n && window.GreenyI18n.lang === "en";
 
   function step(h, n, title, ...body) {
     return h("div", { class: "card how-step reveal" },
@@ -37,12 +39,26 @@
       "Probando la app, buscando los valores de los juegos para crear logros, con arte o música, o con una donación. Todo está en la página Contribuir."],
   ];
 
+  const FAQ_EN = [
+    ["What is Greeny?", "A fan-made achievement system for the Switch. While you play, Greeny watches what you do (coins, lives, stars…) and when you complete a challenge it lets you know with a pop-up and a sound, like on other consoles."],
+    ["Is Greeny affiliated with Nintendo?", "No. It is a free, non-profit fan project. It is not affiliated with or endorsed by Nintendo, and it uses nothing from Nintendo: the art, the mascot and the sounds are our own."],
+    ["What do I need to use it?", "A Switch with Atmosphère (the most used custom firmware), an SD card and the game. You only need internet to upload your achievements to the website, see the ranking or download achievements for new games."],
+    ["Does Greeny give me games or change them?", "No. Greeny does not include or change games: it only watches, without touching anything, and writes down when you earn something. You need your own games."],
+    ["Can I use it while playing online?", "We recommend you don't. Play offline when using a console with custom firmware. Greeny does not cheat, but custom firmware itself can cause trouble online."],
+    ["What if a game has no achievements yet?", "The Games section shows which ones have them and how far along they are. If you want to help make achievements for your favorite game, check the Contribute page."],
+    ["Do I lose my achievements without internet?", "No. They are saved on your SD card. When you are back online, the app uploads them to your account."],
+    ["Do I need an account?", "Not to play. The account is for having your profile on the website, appearing in the ranking, commenting on games and following other players."],
+    ["What happens with my data?", "Only what is needed for your profile to work: your username, your email to sign in and the achievements you upload. There are no ads and we sell nothing. It is all explained on the privacy page, and you can delete your account at any time."],
+    ["How can I help?", "By testing the app, finding game values to create achievements, with art or music, or with a donation. It is all on the Contribute page."],
+  ];
+
   function faq(h, limit) {
-    const items = (limit ? FAQ.slice(0, limit) : FAQ).map(([q, a]) =>
+    const list = isEn() ? FAQ_EN : FAQ;
+    const items = (limit ? list.slice(0, limit) : list).map(([q, a]) =>
       h("details", { class: "faq-item" }, h("summary", {}, h("span", {}, q), h("span", { class: "faq-plus", "aria-hidden": "true" }, "+")),
         h("p", {}, a)));
     return h("section", { class: "card faq reveal", id: "preguntas" }, h("h2", {}, "Preguntas frecuentes"), ...items,
-      limit ? h("p", { style: "margin:14px 0 0" }, h("a", { href: "#/preguntas" }, "Ver todas las preguntas")) : null);
+      limit ? h("p", { class: "faq-more" }, h("a", { href: "#/preguntas" }, "Ver todas las preguntas")) : null);
   }
 
   // ---------- como funciona ----------
@@ -123,6 +139,7 @@
 
   // ---------- terminos ----------
   function terms(h, cfg) {
+    if (isEn()) return termsEn(h, cfg);
     return [
       h("h1", {}, "Términos del servicio"),
       h("p", { class: "muted" }, "Última actualización: " + UPDATED),
@@ -152,6 +169,7 @@
 
   // ---------- privacidad ----------
   function privacy(h, cfg) {
+    if (isEn()) return privacyEn(h, cfg);
     return [
       h("h1", {}, "Política de privacidad"),
       h("p", { class: "muted" }, "Última actualización: " + UPDATED),
@@ -187,7 +205,70 @@
   }
 
   function faqPage(h) {
-    return [h("h1", {}, "Preguntas frecuentes"), faq(h)];
+    return [h("h1", {}, isEn() ? "Frequently asked questions" : "Preguntas frecuentes"), faq(h)];
+  }
+
+  function termsEn(h, cfg) {
+    return [
+      h("h1", {}, "Terms of Service"),
+      h("p", { class: "muted" }, "Last updated: " + UPDATED_EN),
+      h("div", { class: "card legal" },
+        h("h2", {}, "1. What Greeny is"),
+        p(h, "Greeny is a free, open-source fan project that adds an achievement system to the Nintendo Switch running Atmosphère. It is not affiliated with, sponsored or endorsed by Nintendo. \"Nintendo Switch\" is a trademark of Nintendo. By using Greeny you accept these terms."),
+        h("h2", {}, "2. Use at your own risk"),
+        p(h, "The software is provided \"as is\", without warranty of any kind. Running custom firmware on your console is your own decision. We are not responsible for damage, data loss or penalties on online services. We recommend playing offline."),
+        h("h2", {}, "3. No piracy"),
+        p(h, "Greeny does not include or share games, keys or Nintendo files. Using the website, the comments or the community to share or request illegal copies is forbidden."),
+        h("h2", {}, "4. Your account"),
+        p(h, "You are responsible for your account and for what you post with it. Choose a respectful username. You can delete your account at any time from Settings → Security."),
+        h("h2", {}, "5. Fair play"),
+        p(h, "Unlocking achievements by hand, editing files or using cheats to climb the ranking goes against the spirit of the project. We may remove cheating accounts from the ranking or suspend them."),
+        h("h2", {}, "6. Comments"),
+        p(h, "Insults, harassment, hate, spam, advertising and other people's personal data are not allowed. We may delete comments that break these rules."),
+        h("h2", {}, "7. Donations"),
+        p(h, "Donations are voluntary, made through PayPal and non-refundable. They give no advantage in the game or the ranking; only the supporter badge."),
+        h("h2", {}, "8. License"),
+        p(h, "Greeny's code is free software under the GPLv2 license. You can read and improve it on ", h("a", { href: cfg.repoUrl, rel: "noopener" }, "GitHub"), "."),
+        h("h2", {}, "9. Changes"),
+        p(h, "We may change these terms. The date above shows the last change. If a change is important, we will announce it on the website or on Discord."),
+        h("h2", {}, "10. Contact"),
+        p(h, "For any question, open an issue on ", h("a", { href: cfg.repoUrl + "/issues", rel: "noopener" }, "GitHub"), " or write to us on Discord.")),
+    ];
+  }
+
+  function privacyEn(h, cfg) {
+    return [
+      h("h1", {}, "Privacy Policy"),
+      h("p", { class: "muted" }, "Last updated: " + UPDATED_EN),
+      h("div", { class: "card legal" },
+        p(h, "Greeny keeps the minimum needed for your profile to work. There are no ads, we do not sell data and we do not use advertising trackers."),
+        h("h2", {}, "What we store"),
+        h("ul", {},
+          li(h, h("strong", {}, "Your account: "), "email, username and, if you add them, display name, caption, profile picture (one of Greeny's) and country."),
+          li(h, h("strong", {}, "If you sign in with Discord: "), "your Discord username, which is shown on your profile."),
+          li(h, h("strong", {}, "Your achievements: "), "which achievements you have, from which game and when you earned them."),
+          li(h, h("strong", {}, "Your consoles: "), "the name of each console you link and when it last connected. The console stores its own key, not your password."),
+          li(h, h("strong", {}, "What you do on the website: "), "your comments, your likes, who you follow and your notifications.")),
+        h("h2", {}, "What is public"),
+        p(h, "Your profile (username, name, picture, country, caption, friend code, achievements, badges and followers), your comments and your place in the ranking. Your email is never public."),
+        h("h2", {}, "What stays on your console"),
+        p(h, "Your progress, your options and the error log are saved on your SD card. Only achievements are uploaded, and only if you link your console."),
+        h("h2", {}, "Services we use"),
+        h("ul", {},
+          li(h, h("strong", {}, "Supabase: "), "stores the accounts and the database."),
+          li(h, h("strong", {}, "GitHub Pages: "), "serves this website."),
+          li(h, h("strong", {}, "Cloudflare Turnstile: "), "the \"I'm not a robot\" check when signing in or signing up."),
+          li(h, h("strong", {}, "Discord: "), "only if you choose to sign in with Discord."),
+          li(h, h("strong", {}, "PayPal: "), "processes donations. We use the email PayPal gives us to find your account and award the badge, and we do not keep it; only the fact that you donated is stored.")),
+        h("h2", {}, "In your browser"),
+        p(h, "The website stores your session and your chosen language in the browser's storage. We do not use advertising cookies."),
+        h("h2", {}, "Deleting your data"),
+        p(h, "Settings → Security → Delete my account erases everything: your profile, uploaded achievements, consoles, comments, likes, followers and notifications. It cannot be undone. Nothing on your SD card is touched."),
+        h("h2", {}, "Minors"),
+        p(h, "If you are a minor, ask your parent or guardian for permission before creating an account."),
+        h("h2", {}, "Contact"),
+        p(h, "For questions about your data, open an issue on ", h("a", { href: cfg.repoUrl + "/issues", rel: "noopener" }, "GitHub"), " or write to us on Discord.")),
+    ];
   }
 
   window.GreenyPages = { howItWorks, terms, privacy, faq, faqPage };
