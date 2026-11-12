@@ -242,12 +242,18 @@
   function renderNav() {
     const slot = document.getElementById("nav-user");
     if (session) {
+      // con sesion: tu nombre, y al abrirlo tu perfil, los ajustes y salir
+      const menu = h("details", { class: "user-menu" },
+        h("summary", {}, avatar(me, "tiny"), h("span", { class: "user-name" }, me ? shownName(me) : "Mi cuenta"), h("span", { class: "caret", "aria-hidden": "true" }, "▾")),
+        h("div", { class: "user-menu-list" },
+          me ? h("a", { href: "#/u/" + encodeURIComponent(me.username) }, "Mi perfil") : null,
+          h("a", { href: "#/cuenta" }, "Ajustes"),
+          h("button", { type: "button", onclick: async () => { await sb.auth.signOut(); location.hash = "#/"; } }, "Salir")));
+      menu.addEventListener("click", (ev) => { if (ev.target.closest(".user-menu-list")) menu.open = false; });
+      document.addEventListener("click", (ev) => { if (!menu.contains(ev.target)) menu.open = false; });
       slot.replaceChildren(...[
-        me ? h("a", { href: "#/u/" + encodeURIComponent(me.username) }, h("img", { src: "img/usuario.png", alt: "", width: 22, height: 22 }), "Mi perfil") : null,
-        h("a", { href: "#/cuenta", "data-nav": "cuenta" }, "Ajustes"),
         admin ? h("a", { href: "#/desarrollador", "data-nav": "desarrollador" }, "Desarrollador") : null,
-        h("button", { type: "button", onclick: async () => { await sb.auth.signOut(); location.hash = "#/"; } },
-          h("img", { src: "img/salir.png", alt: "", width: 22, height: 22 }), "Salir"),
+        menu,
       ].filter(Boolean));
     } else {
       slot.replaceChildren(
@@ -510,9 +516,21 @@
     } }, "Continuar con Discord");
   }
 
+  // Entrar y crear cuenta: un panel de bienvenida a la izquierda y el formulario a la derecha.
+  function authShell(title, lead, steps, nodes) {
+    return h("div", { class: "auth" },
+      h("section", { class: "auth-hero" },
+        h("img", { src: "img/logo.png", alt: "Greeny", width: 220, height: 111 }),
+        h("p", { class: "auth-title" }, title),
+        h("p", { class: "auth-lead" }, lead),
+        h("ol", { class: "auth-steps" }, steps.map((t, i) => h("li", { class: i === 0 ? "on" : "" }, h("span", {}, String(i + 1)), t))),
+        h("img", { class: "auth-mascot", src: "img/m_saludando.png", alt: "", width: 150, height: 150 })),
+      h("section", { class: "auth-form card" }, nodes));
+  }
+
   function viewLogin() {
     if (session) { location.hash = "#/cuenta"; return []; }
-    return [
+    return [authShell("Hola de nuevo", "Entra para ver tus logros, tu nivel y tu puesto en el ranking.", ["Entra a tu cuenta", "Vincula tu consola", "Juega y desbloquea logros"], [
       h("h1", {}, "Entrar"),
       form([
         h("label", {}, "Correo", h("input", { name: "email", type: "email", autocomplete: "email", required: true })),
@@ -525,12 +543,12 @@
       h("p", { class: "or", style: "margin:18px 0" }, "o"),
       discordButton(),
       h("p", { class: "muted", style: "margin-top:22px" }, "¿No tienes cuenta? ", h("a", { href: "#/registro" }, "Créala aquí"), "."),
-    ];
+    ])];
   }
 
   function viewRegister() {
     if (session) { location.hash = "#/cuenta"; return []; }
-    return [
+    return [authShell("Únete a Greeny", "Crea tu cuenta gratis y lleva la cuenta de tus logros de Switch.", ["Crea tu cuenta", "Vincula tu consola", "Juega y desbloquea logros"], [
       h("h1", {}, "Crear cuenta"),
       form([
         h("label", {}, "Nombre de usuario", h("span", { class: "hint" }, "Letras, números y _ (de 3 a 20). Es el de tu perfil público."),
@@ -550,7 +568,7 @@
       h("p", { class: "or", style: "margin:18px 0" }, "o"),
       discordButton(),
       h("p", { class: "muted", style: "margin-top:22px" }, "¿Ya tienes cuenta? ", h("a", { href: "#/entrar" }, "Entra aquí"), "."),
-    ];
+    ])];
   }
 
   // Paso 1: pedir el correo con el enlace para cambiar la contraseña.
