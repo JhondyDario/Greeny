@@ -44,8 +44,9 @@
     return st ? h("span", { class: "pill st-" + status + " with-icon", title: st.help }, h("img", { src: "img/st_" + status + ".png", alt: "", width: 18, height: 18 }), st.label) : null;
   }
 
-  const fmtDate = (iso) => new Date(iso).toLocaleDateString("es", { day: "numeric", month: "short", year: "numeric" });
-  const fmtNum = (n) => Number(n || 0).toLocaleString("es");
+  const uiLang = () => (window.GreenyI18n && window.GreenyI18n.lang) || "es";
+  const fmtDate = (iso) => new Date(iso).toLocaleDateString(uiLang(), { day: "numeric", month: "short", year: "numeric" });
+  const fmtNum = (n) => Number(n || 0).toLocaleString(uiLang());
   const imgUrl = (bucket, path) => (path ? sb.storage.from(bucket).getPublicUrl(path).data.publicUrl : null);
   const shownName = (p) => (p && (p.display_name || p.username)) || "?";
 
@@ -472,7 +473,11 @@
         h("div", { class: "card stat with-icon" }, h("img", { src: "img/stat_seguidores.png", alt: "", width: 44, height: 44 }), h("div", {}, h("b", {}, fmtNum(stats.followers)), h("span", {}, "seguidores"))),
         h("div", { class: "card stat with-icon" }, h("img", { src: "img/stat_siguiendo.png", alt: "", width: 44, height: 44 }), h("div", {}, h("b", {}, fmtNum(stats.following)), h("span", {}, "siguiendo")))),
       h("h2", {}, "Medallas ", h("span", { class: "muted small" }, earned + " de " + badgeList.length)),
-      h("div", { class: "badges" }, badgeList.map((b) =>
+      h("div", { class: "badges" }, profile.donor ? h("div", { class: "card badge earned donor" },
+          h("img", { class: "medal-img", src: "img/badges/donador.png", alt: "", width: 64, height: 64, loading: "lazy" }),
+          h("div", {}, h("strong", {}, "Donador"), h("div", { class: "muted small" }, "Apoya a Greeny con una donación."),
+            h("span", { class: "pill ok" }, "Conseguida"))) : null,
+        badgeList.map((b) =>
         h("div", { class: "card badge" + (b.earned ? " earned" : "") },
           h("img", { class: "medal-img", src: "img/badges/" + (b.earned ? b.id : "bloqueada") + ".png", alt: "", width: 64, height: 64, loading: "lazy" }),
           h("div", {},
@@ -981,6 +986,40 @@
       return "Frase añadida.";
     });
 
+    // Postulaciones al equipo y donadores.
+    const teamPanel = h("div", { class: "stack" });
+    async function drawTeam() {
+      const apps = (await sb.from("applications").select("id,role,contact,message,status,created_at,profiles(username,display_name)").order("created_at", { ascending: false })).data || [];
+      const setStatus = async (id, status) => { const r = await sb.from("applications").update({ status }).eq("id", id); if (r.error) alert(explain(r.error)); drawTeam(); };
+      const remove = async (id) => { if (!confirm("¿Borrar esta postulación?")) return; const r = await sb.from("applications").delete().eq("id", id); if (r.error) alert(explain(r.error)); drawTeam(); };
+      const donor = form([
+        h("label", {}, "Nombre de usuario", h("span", { class: "hint" }, "El que el donante escribió en la nota de PayPal."),
+          h("input", { name: "who", required: true, autocomplete: "off", style: "max-width:280px" })),
+        h("label", { style: "display:flex;gap:8px;align-items:center" }, h("input", { name: "on", type: "checkbox", checked: true, style: "width:auto" }), "Es donador"),
+      ], "Guardar", async (fd) => {
+        const on = fd.get("on") === "on";
+        const who = must(await sb.rpc("set_donor", { who: String(fd.get("who")).trim(), is_donor: on }));
+        return on ? "@" + who + " ya tiene la medalla de donador." : "@" + who + " ya no tiene la medalla.";
+      });
+      teamPanel.replaceChildren(
+        h("h2", { style: "margin-top:0" }, "Postulaciones"),
+        apps.length ? h("div", { class: "stack" }, apps.map((a) => h("div", { class: "card stack" },
+          h("div", { class: "row" },
+            h("strong", { class: "grow" }, (a.profiles ? "@" + a.profiles.username : "?") + " · " + (ROLES.find((r) => r.id === a.role) || { name: a.role }).name),
+            h("span", { class: "pill " + (a.status === "aceptada" ? "ok" : "no") }, STATUS_APP[a.status] || a.status)),
+          h("div", { class: "small" }, "Contacto: ", h("code", {}, a.contact), " · " + fmtDate(a.created_at)),
+          a.message ? h("p", { class: "muted small", style: "margin:0;white-space:pre-wrap" }, a.message) : null,
+          h("div", { class: "row", style: "flex-wrap:wrap;gap:8px" },
+            h("button", { type: "button", class: "btn alt mini", onclick: () => setStatus(a.id, "aceptada") }, "Aceptar"),
+            h("button", { type: "button", class: "btn alt mini", onclick: () => setStatus(a.id, "rechazada") }, "Rechazar"),
+            h("button", { type: "button", class: "btn danger mini", onclick: () => remove(a.id) }, "Borrar")))))
+          : h("p", { class: "card muted" }, "Todavía no hay postulaciones."),
+        h("h2", {}, "Donadores"),
+        h("p", { class: "muted" }, "PayPal y Greeny no están unidos: cuando llegue una donación, mira el nombre de usuario en la nota y márcalo aquí."),
+        h("div", { class: "card" }, donor));
+    }
+    drawTeam();
+
     // Pestañas: cada tarea en la suya, para no tener todo en una sola columna larga.
     const tabs = [
       { id: "nuevo", label: "Publicar juego", body: [
@@ -991,6 +1030,7 @@
         h("h2", {}, "Logros: dificultad e iconos"), h("div", { class: "card" }, icons),
         h("h2", {}, "Carátula"), h("div", { class: "card" }, coverForm)]
         : [h("p", { class: "card muted" }, "Primero publica un juego.")] },
+      { id: "equipo", label: "Equipo y donadores", body: [teamPanel] },
       { id: "frases", label: "Frases de perfil", body: [
         h("p", { class: "muted" }, "Son las que salen en el desplegable de Ajustes. Tu propia frase la cambias en Ajustes → Perfil."),
         h("div", { class: "card stack" }, presetList, presetForm)] },
@@ -999,6 +1039,75 @@
       h("h1", {}, "Desarrollador"),
       h("p", { class: "muted" }, "Publicar de nuevo un juego actualiza sus textos y puntos. No borra logros que ya no estén en el archivo, porque eso borraría el progreso de la gente."),
       tabbed("greeny-dev-tab", tabs),
+    ];
+  }
+
+  // ---------- contribuir: donar y unirse al equipo ----------
+
+  const ROLES = [
+    { id: "beta_tester", name: "Beta tester", hot: true,
+      what: "Prueba la app y busca los valores de memoria con los que se hacen los logros. Es lo que más falta hace ahora mismo." },
+    { id: "moderador", name: "Moderador de Discord", what: "Cuida la comunidad de Discord: responde dudas y mantiene el orden." },
+    { id: "arte", name: "Diseño y arte", what: "Iconos de logros, medallas, mascotas y todo lo que se ve en la app y la web." },
+    { id: "musica", name: "Música", what: "Canciones de fondo y sonidos para la app." },
+  ];
+  const STATUS_APP = { nueva: "En revisión", aceptada: "Aceptada", rechazada: "No esta vez" };
+
+  async function viewContribute() {
+    const mine = session ? (await sb.from("applications").select("role,status,created_at").eq("user_id", session.user.id)).data || [] : [];
+    const roleName = (id) => (ROLES.find((r) => r.id === id) || { name: id }).name;
+
+    const apply = session
+      ? form([
+          h("label", {}, "Rol", h("select", { name: "role", required: true }, ROLES.map((r) => h("option", { value: r.id }, r.name)))),
+          h("label", {}, "Cómo contactarte", h("span", { class: "hint" }, "Tu usuario de Discord, o un correo si lo prefieres."),
+            h("input", { name: "contact", required: true, minlength: 2, maxlength: 80, autocomplete: "off" })),
+          h("label", {}, "Cuéntanos de ti", h("span", { class: "hint" }, "Opcional. Qué juegos tienes, qué sabes hacer, cuánto tiempo puedes dedicarle."),
+            h("textarea", { name: "message", maxlength: 1000, rows: 4 })),
+        ], "Enviar postulación", async (fd, el) => {
+          must(await sb.from("applications").insert({ user_id: session.user.id, role: fd.get("role"),
+            contact: String(fd.get("contact")).trim(), message: String(fd.get("message") || "").trim() }));
+          el.reset();
+          setTimeout(render, 1500);
+          return "¡Gracias! Te escribiremos por el contacto que dejaste.";
+        })
+      : h("p", { class: "muted", style: "margin:0" }, "Para postularte tienes que ", h("a", { href: "#/entrar" }, "entrar"), " con tu cuenta de Greeny.");
+
+    return [
+      h("h1", {}, "Contribuir"),
+      h("p", { class: "lead muted" }, "Greeny es gratis y lo va a seguir siendo. Lo hace una sola persona en su tiempo libre: hay dos formas de echar una mano."),
+
+      h("section", { class: "contrib" },
+        h("div", { class: "card contrib-card" },
+          h("h2", { style: "margin-top:0" }, "Apoya a Greeny"),
+          h("p", {}, "Con tu donación se puede:"),
+          h("ul", { class: "contrib-list" },
+            h("li", {}, "Tener una página web con dominio propio."),
+            h("li", {}, "Ampliar el catálogo de juegos con logros."),
+            h("li", {}, "Mejorar la comunidad de Discord."),
+            h("li", {}, "Darle mantenimiento a todo el proyecto.")),
+          h("a", { class: "btn donate", href: cfg.donateUrl, target: "_blank", rel: "noopener" }, "Donar con PayPal"),
+          h("div", { class: "row donor-note" },
+            h("img", { src: "img/badges/donador.png", alt: "", width: 72, height: 72 }),
+            h("div", {},
+              h("strong", {}, "Medalla de donador"),
+              h("p", { class: "muted small", style: "margin:4px 0 0" }, "Quien dona recibe esta medalla en su perfil. Para que sepamos a quién dársela, escribe tu nombre de usuario de Greeny en la nota de la donación."),
+              h("p", { class: "muted small", style: "margin:4px 0 0" }, "La medalla se pone a mano, así que puede tardar un poco en aparecer."))),
+          h("p", { class: "muted small", style: "margin:12px 0 0" }, "Donar es opcional: no desbloquea logros ni da ventajas.")),
+
+        h("div", { class: "card contrib-card" },
+          h("h2", { style: "margin-top:0" }, "Únete al equipo"),
+          h("div", { class: "row team-now" }, h("img", { src: "img/avatars/01.png", alt: "", width: 44, height: 44 }),
+            h("div", {}, h("strong", {}, "Jhondy"), h("div", { class: "muted small" }, "Fundador y programador"))),
+          h("div", { class: "roles" }, ROLES.map((r) =>
+            h("div", { class: "role" + (r.hot ? " hot" : "") },
+              h("strong", {}, r.name), r.hot ? h("span", { class: "pill pts" }, "Se busca") : null,
+              h("p", { class: "muted small", style: "margin:4px 0 0" }, r.what)))),
+          mine.length ? h("div", { class: "stack", style: "margin:14px 0" }, h("strong", {}, "Tus postulaciones"),
+            mine.map((m) => h("div", { class: "row small" }, h("span", { class: "grow" }, roleName(m.role)),
+              h("span", { class: "pill " + (m.status === "aceptada" ? "ok" : "no") }, STATUS_APP[m.status] || m.status)))) : null,
+          h("h3", { style: "margin-top:18px" }, "Postúlate"),
+          apply)),
     ];
   }
 
@@ -1081,7 +1190,7 @@
   async function render() {
     const id = ++renderId;
     const parts = location.hash.replace(/^#\/?/, "").split("/").map(decodeURIComponent);
-    const routes = { "": viewHome, ranking: viewRanking, juegos: viewGames, juego: viewGame, u: viewProfile, entrar: viewLogin, registro: viewRegister, recuperar: viewForgot, "nueva-clave": viewNewPassword, cuenta: viewAccount, admin: viewAdmin, desarrollador: viewAdmin };
+    const routes = { "": viewHome, contribuir: viewContribute, ranking: viewRanking, juegos: viewGames, juego: viewGame, u: viewProfile, entrar: viewLogin, registro: viewRegister, recuperar: viewForgot, "nueva-clave": viewNewPassword, cuenta: viewAccount, admin: viewAdmin, desarrollador: viewAdmin };
     const view = routes[parts[0]];
     renderNav();
     try {
@@ -1101,6 +1210,16 @@
   });
 
   document.getElementById("repo-link").href = cfg.repoUrl;
+  const langBtn = document.getElementById("lang-toggle");
+  if (langBtn && window.GreenyI18n) {
+    const paint = () => {
+      const en = window.GreenyI18n.lang === "en";
+      langBtn.textContent = en ? "ES" : "EN";
+      langBtn.setAttribute("aria-label", en ? "Ver en español" : "View in English");
+    };
+    paint();
+    langBtn.addEventListener("click", () => { window.GreenyI18n.set(window.GreenyI18n.lang === "en" ? "es" : "en"); paint(); render(); });
+  }
 
   let signedInAs = undefined; // para no redibujar cuando Supabase solo refresca el token
   sb.auth.onAuthStateChange((event, s) => {

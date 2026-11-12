@@ -4,4 +4,5 @@ window.GREENY_CONFIG = {
   supabaseUrl: "https://mlwzlirkjgpyyldbtoci.supabase.co",
   supabaseKey: "sb_publishable_r4Y8LjTEzu7A2Z9ecr2hEw_Jr-OT8RC",
   repoUrl: "https://github.com/JhondyDario/Greeny",
+  donateUrl: "https://www.paypal.com/donate/?hosted_button_id=B82PT4TEHBG3G",
 };

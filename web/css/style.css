@@ -378,3 +378,25 @@ code { background: rgba(255, 255, 255, .1); color: #c8f5cf; }
 .auth-form .or { max-width: none; }
 @media (max-width: 820px) { .auth { grid-template-columns: 1fr; } .auth-hero { min-height: 0; padding: 28px 24px; } .auth-mascot { width: 92px; } }
 @media (max-width: 620px) { .top-row { border-radius: 22px; } }
+
+/* ---- contribuir ---- */
+textarea { font: inherit; padding: 10px 12px; width: 100%; resize: vertical; min-height: 96px; }
+.lead { font-size: 1.1rem; max-width: 62ch; }
+.contrib { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 20px; align-items: start; margin-top: 18px; }
+.contrib-card { padding: 26px 26px; }
+.contrib-list { margin: 0 0 18px; padding-left: 20px; display: grid; gap: 6px; }
+.btn.donate { width: 100%; padding: 13px 18px; background: linear-gradient(180deg, #ffd84a, #f2b90c); color: #1e2a1f; box-shadow: 0 6px 18px rgba(242, 185, 12, .3); }
+.btn.donate:hover { background: linear-gradient(180deg, #ffe169, #f7c91e); }
+.donor-note { margin-top: 18px; align-items: flex-start; }
+.donor-note img { flex: none; }
+.team-now { padding: 10px 12px; border-radius: 14px; background: rgba(255, 255, 255, .06); margin-bottom: 12px; }
+.team-now img { border-radius: 50%; }
+.roles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.role { padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line); background: rgba(0, 0, 0, .18); }
+.role .pill { margin-left: 8px; }
+.role.hot { border-color: rgba(247, 201, 30, .7); background: rgba(247, 201, 30, .08); }
+.badge.donor { border-color: rgba(247, 201, 30, .6); }
+.nav .nav-help { color: #ffe169; }
+.lang-toggle { border: 1px solid var(--line) !important; font-size: .85rem !important; padding: 6px 10px !important; letter-spacing: .04em; }
+@media (max-width: 820px) { .contrib { grid-template-columns: 1fr; } }
+@media (max-width: 520px) { .roles { grid-template-columns: 1fr; } }

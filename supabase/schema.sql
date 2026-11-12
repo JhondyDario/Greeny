@@ -870,3 +870,41 @@ create policy greeny_images_admin_delete on storage.objects for delete
 --
 -- Sin ese paso nadie puede publicar juegos ni subir imagenes.
 -- =============================================================================
+
+
+-- -----------------------------------------------------------------------------
+-- 10. POSTULACIONES AL EQUIPO
+-- Cualquiera con cuenta puede postularse a un rol (una vez por rol). Cada quien ve
+-- las suyas; los administradores las ven todas y las aceptan o rechazan.
+-- -----------------------------------------------------------------------------
+create table if not exists public.applications (
+    id         bigint generated always as identity primary key,
+    user_id    uuid not null references public.profiles (id) on delete cascade,
+    role       text not null,
+    contact    text not null,
+    message    text not null default '',
+    status     text not null default 'nueva',
+    created_at timestamptz not null default now(),
+    unique (user_id, role),
+    constraint applications_role_valid check (role in ('beta_tester', 'moderador', 'arte', 'musica')),
+    constraint applications_contact_len check (char_length(contact) between 2 and 80),
+    constraint applications_message_len check (char_length(message) <= 1000),
+    constraint applications_status_valid check (status in ('nueva', 'aceptada', 'rechazada'))
+);
+alter table public.applications enable row level security;
+
+drop policy if exists applications_insert_own on public.applications;
+create policy applications_insert_own on public.applications for insert
+    with check ((select auth.uid()) = user_id and status = 'nueva');
+drop policy if exists applications_read on public.applications;
+create policy applications_read on public.applications for select
+    using ((select auth.uid()) = user_id or public.is_admin());
+drop policy if exists applications_admin_update on public.applications;
+create policy applications_admin_update on public.applications for update
+    using (public.is_admin()) with check (public.is_admin());
+drop policy if exists applications_delete on public.applications;
+create policy applications_delete on public.applications for delete
+    using ((select auth.uid()) = user_id or public.is_admin());
+
+grant select, insert, delete on public.applications to authenticated;
+grant update (status) on public.applications to authenticated;

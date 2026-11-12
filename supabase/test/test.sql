@@ -429,11 +429,38 @@ declare who uuid; ok boolean := false;
 begin
     select id into who from public.profiles limit 1;
     assert not (select donor from public.profiles where id = who), 'nadie nace donador';
-    perform set_config('request.jwt.claims', json_build_object('sub', who, 'role', 'authenticated')::text, true);
+    perform set_config('request.jwt.claim.sub', who::text, true);
     perform set_config('role', 'authenticated', true);
     begin update public.profiles set donor = true where id = who;
     exception when insufficient_privilege then ok := true; end;
     assert ok, 'un usuario no puede marcarse como donador';
+    reset role;
+end $$;
+
+-- postulaciones: cada quien la suya, una por rol; no puede aceptarse a si mismo
+do $$
+declare who uuid; ok boolean := false; n int;
+begin
+    select id into who from public.profiles where id <> '00000000-0000-0000-0000-00000000000d' limit 1;
+    perform set_config('request.jwt.claim.sub', who::text, true);
+    perform set_config('role', 'authenticated', true);
+    insert into public.applications (user_id, role, contact, message) values (who, 'beta_tester', 'ana#1234', 'tengo una switch');
+    begin insert into public.applications (user_id, role, contact) values (who, 'beta_tester', 'otra vez');
+    exception when unique_violation then ok := true; end;
+    assert ok, 'una sola postulacion por rol';
+    ok := false;
+    begin insert into public.applications (user_id, role, contact) values ('00000000-0000-0000-0000-00000000000d', 'arte', 'suplantar');
+    exception when insufficient_privilege then ok := true; end;
+    assert ok, 'no se postula en nombre de otro';
+    update public.applications set status = 'aceptada' where user_id = who;
+    get diagnostics n = row_count;
+    assert n = 0, 'no puede aceptarse a si mismo';
+    reset role;
+    perform set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000d', true);
+    perform set_config('role', 'authenticated', true);
+    update public.applications set status = 'aceptada' where user_id = who;
+    get diagnostics n = row_count;
+    assert n = 1, 'el administrador la acepta';
     reset role;
 end $$;
 

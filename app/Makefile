@@ -40,7 +40,7 @@ include $(DEVKITPRO)/libnx/switch_rules
 TARGET		:=	greeny
 APP_TITLE	:=	Greeny
 APP_AUTHOR	:=	Jhondy
-APP_VERSION	:=	0.1.5
+APP_VERSION	:=	0.1.6
 BUILD		:=	build
 SOURCES		:=	source ../common
 DATA		:=	data

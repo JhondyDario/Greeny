@@ -1,0 +1,21 @@
+# Super Mario Bros. Wonder
+# Va en  sdmc:/config/greeny/games/010015100B514000.txt
+#
+# SIN EMPEZAR. Todavia no se han buscado las direcciones de memoria de este juego, asi que
+# solo trae un logro que no depende de ninguna: jugar un rato. Sin "version" ni "build" a
+# proposito: ese logro sirve con cualquier version del juego.
+#
+# Ideas para los logros de verdad (hay que encontrarlas con el buscador de valores):
+#   Semillas maravilla y monedas flor (0 a 999).
+
+game = Super Mario Bros. Wonder
+
+[primera_partida]
+name = Primera partida
+desc = Juega 2 minutos seguidos
+name.en = First session
+desc.en = Play for 2 minutes straight
+points = 5
+# main+0x4 nunca es cero en un juego: la condicion es "el juego esta abierto", durante 2 minutos
+hold = 120000
+when = main+0x4 u32 != 0

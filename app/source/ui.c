@@ -676,7 +676,7 @@ void ui_achievement(gfx_canvas *c, const ui_assets *a, const gr_model *m, int ga
     char buf[64];
     const int fy = y + 290;
     snprintf(buf, sizeof(buf), T("%u puntos", "%u points"), ac->points);
-    fact(c, a, tx, fy, UI_IMG_stat_puntos, T("Puntos", "Points"), buf, P->ink);
+    fact(c, a, tx, fy, UI_IMG_star, T("Puntos", "Points"), buf, P->ink);
     int tier = lg_ach_tier(ac);
     fact(c, a, tx + 300, fy, tier == LG_TIER_GOLD ? UI_IMG_medal_oro : tier == LG_TIER_SILVER ? UI_IMG_medal_plata : UI_IMG_medal_bronce,
          T("Dificultad", "Difficulty"), tier_name(ac), P->ink);
@@ -1483,7 +1483,11 @@ void ui_profile_screen(gfx_canvas *c, const ui_assets *a, const ui_profile *p) {
     gfx_round_rect(c, lx + 40, ly + 406, lw - 80, 18, 9, P->gray_lt);
     if (into > 0) gfx_round_rect(c, lx + 40, ly + 406, 18 + (lw - 98) * into / span, 18, 9, C_GREEN);
     snprintf(buf, sizeof(buf), T("%d / %d pts para el nivel %d", "%d / %d pts to level %d"), into, span, level + 1);
-    text_center(c, cx, ly + 432, 18, P->gray, buf, lw - 40);
+    {
+        int tw = gfx_text_width(18, buf), sx = cx - (tw + 30) / 2;
+        img_fit(c, a, UI_IMG_star, sx, ly + 431, 24);
+        gfx_text(c, sx + 30, ly + 432, 18, P->gray, buf);
+    }
 
     /* numeros */
     const int rx = lx + lw + 30, tw = 240, gap = 20;
@@ -1496,7 +1500,7 @@ void ui_profile_screen(gfx_canvas *c, const ui_assets *a, const ui_profile *p) {
     else { snprintf(v[4], 16, "–"); snprintf(v[5], 16, "–"); }
     const char *labels[6] = { T("Mis juegos", "My games"), T("Logros", "Achievements"), T("Platinados", "Platinum"),
                               T("Puntos", "Points"), T("Seguidores", "Followers"), T("Siguiendo", "Following") };
-    static const int icons[6] = { UI_IMG_stat_juegos, UI_IMG_stat_logros, UI_IMG_stat_completados, UI_IMG_stat_puntos,
+    static const int icons[6] = { UI_IMG_stat_juegos, UI_IMG_stat_logros, UI_IMG_stat_completados, UI_IMG_star,
                                   UI_IMG_stat_seguidores, UI_IMG_stat_siguiendo };
     for (int i = 0; i < 6; i++) stat_tile(c, a, rx + (i % 3) * (tw + gap), ly + (i / 3) * 124, tw, icons[i], v[i], labels[i]);
     if (!p->linked)

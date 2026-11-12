@@ -43,6 +43,8 @@ Todo sale de `assets/` con `python3 scripts/assets.py`.
 | Fotos de perfil (36) | `assets/avatars/` | Perfil; se elige una, no se suben fotos propias |
 | Flecha, palancas de encendido y apagado | `assets/icons/` | Logro al detalle, Opciones |
 | Logos con el nombre | `assets/logo-greeny*.png` | Acerca de, portada de la web |
+| Estrella de puntos | `assets/icons/estrella.png` | Perfil y logro al detalle (app) |
+| Medalla de donador | `assets/badges/donador.png` | Perfil (web) |
 
 ### Medallas del perfil
 

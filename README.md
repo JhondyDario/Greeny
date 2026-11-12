@@ -150,6 +150,8 @@ make -C test
 | Buscador de valores (encuentra direcciones y cadenas de punteros para crear logros) | Probado en PC con memoria simulada; falta probarlo en consola |
 | Ranking (global, por país, amigos; por puntos o por juego) y país en el perfil, en la app y en la web | Revisado en PC y en navegador; falta probarlo en consola y contra el servidor real |
 | App: filtro rápido de logros (X), sonidos de la app configurables | Revisado en PC; falta probarlo en consola |
+| Web en español e inglés; página Contribuir (donar y postularse al equipo); medalla de donador | Probado en navegador con servidor simulado |
+| Catálogo: 8 juegos más en "sin empezar", con un logro de 2 minutos de juego (`supabase/juegos_iniciales.sql`) | SQL probado en Postgres |
 | Menú dentro del juego (overlay de Tesla), nombres de juegos desde una base pública | Pendiente |
 | Iconos por logro, música y animaciones en la app | Pendiente ([docs/RECURSOS.md](docs/RECURSOS.md)) |
 

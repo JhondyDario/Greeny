@@ -92,6 +92,7 @@ app_images = [  # (nombre, archivo en assets/, ancho, alto, espejo)
     ("stat_seguidores", "stats/seguidores.png", 56, 56, False), ("stat_siguiendo", "stats/siguiendo.png", 56, 56, False),
     ("st_sin_empezar", "estado/sin_empezar.png", 40, 40, False), ("st_prueba", "estado/prueba.png", 40, 40, False),
     ("st_jugable", "estado/jugable.png", 40, 40, False), ("st_perfecto", "estado/perfecto.png", 40, 40, False),
+    ("star", "icons/estrella.png", 56, 56, False),  # puntos: perfil y logro al detalle
     ("arrow_r", "icons/flecha.png", 72, 72, False), ("arrow_l", "icons/flecha.png", 72, 72, True),
     ("toggle_on", "icons/toggle_on.png", 92, 44, False), ("toggle_off", "icons/toggle_off.png", 92, 44, False),
     ("logo", "logo-greeny-detalles.png", 300, 152, False),
@@ -131,7 +132,7 @@ def web_copy(file, out, w, h):
     os.makedirs(os.path.dirname(os.path.join(web, out)), exist_ok=True)
     fit(im.crop(im.getbbox()), w, h).save(os.path.join(web, out), optimize=True)
 
-for b in BADGES + ["bloqueada"]:
+for b in BADGES + ["bloqueada", "donador"]:  # "donador" solo se ve en la web por ahora
     web_copy("badges/%s.png" % b, "badges/%s.png" % b, 128, 128)
 for a in AVATARS:
     web_copy("avatars/%s.png" % a, "avatars/%s.png" % a, 192, 192)
