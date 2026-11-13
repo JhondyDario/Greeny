@@ -869,7 +869,6 @@ static ui_song g_songs[] = {
     { "cold_in_summer", "Cold in summer", 1112, false },
     { "beyond_the_end", "Beyond the end", 1295, false },
     { "excited_for_the_last_time", "Excited for the last time", 1244, false },
-    { "new_generation", "New generation", 1245, false },
 };
 #define NSONGS ((int)(sizeof(g_songs) / sizeof(g_songs[0])))
 

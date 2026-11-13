@@ -732,3 +732,4 @@ form.stack.review-form { max-width: none; width: 100%; box-sizing: border-box; }
 }
 .profile-head .avatar.big { width: 120px; height: 120px; font-size: 3rem; }
 @media (max-width: 1080px) { .profile-head .avatar.big { width: 104px; height: 104px; } }
+.bell img { width: 24px; height: 24px; display: block; }

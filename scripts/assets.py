@@ -109,7 +109,7 @@ app_images = [  # (nombre, archivo en assets/, ancho, alto, espejo)
 ] + [("flag_" + code.lower(), "flags/" + code.lower() + ".png", 40, 40, False) for code, _, _ in PAISES
 ] + [("pill_" + c, "etiquetas/" + c + ".png", 240, 42, False) for c in ("verde", "amarilla", "gris", "roja")
 ] + [("opt_" + o, "opciones/" + o + ".png", 48, 48, False) for o in OPCIONES
-] + [("heart_lleno", "corazon/lleno.png", 48, 48, False), ("heart_vacio", "corazon/vacio.png", 48, 48, False)]
+] + [("bell", "icons/campana.png", 44, 44, False), ("heart_lleno", "corazon/lleno.png", 48, 48, False), ("heart_vacio", "corazon/vacio.png", 48, 48, False)]
 
 for old in os.listdir(os.path.join(ROOT, "app", "data")):
     if old.startswith("img_"):
@@ -165,6 +165,7 @@ web_copy("relleno_logro.png", "ach_fill.png", 128, 128)
 web_copy("trofeo.png", "trophy.png", 96, 96)
 web_copy("icons/estrella.png", "estrella.png", 40, 40)
 web_copy("corazon/lleno.png", "corazon_lleno.png", 48, 48)
+web_copy("icons/campana.png", "campana.png", 48, 48)
 web_copy("corazon/vacio.png", "corazon_vacio.png", 48, 48)
 web_copy("logo-greeny-detalles.png", "logo.png", 600, 304)
 web_copy("logo-greeny.png", "logo_simple.png", 360, 164)

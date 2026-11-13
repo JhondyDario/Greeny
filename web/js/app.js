@@ -275,7 +275,6 @@
   }
 
   // ---------- avisos (notificaciones) ----------
-  const BELL = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22Zm7-6V11a7 7 0 0 0-5.5-6.84V3.5a1.5 1.5 0 0 0-3 0v.66A7 7 0 0 0 5 11v5l-1.7 1.7A1 1 0 0 0 4 19.4h16a1 1 0 0 0 .7-1.7Z"/></svg>';
   const PENCIL = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17.3V21h3.7L17.8 9.9l-3.7-3.7L3 17.3Zm17.7-10.1a1 1 0 0 0 0-1.4l-2.5-2.5a1 1 0 0 0-1.4 0l-1.9 1.9 3.7 3.7 2.1-1.7Z"/></svg>';
   const HEART = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.8 4.5c2.1 0 3.6 1.2 5.2 3 1.6-1.8 3.1-3 5.2-3 3.8 0 5.9 3.9 4.4 7.3C19.5 16.4 12 21 12 21Z"/></svg>';
   let notifs = { unread: 0, items: [] };
@@ -284,7 +283,8 @@
 
   function bellLink() {
     const label = uiLang() === "en" ? "Notifications" : "Avisos";
-    const a = h("a", { href: "#/avisos", class: "bell", "data-nav": "avisos", "data-label": label, "aria-label": label + (notifs.unread ? " (" + notifs.unread + ")" : "") }, svgEl(BELL));
+    const a = h("a", { href: "#/avisos", class: "bell", "data-nav": "avisos", "data-label": label, "aria-label": label + (notifs.unread ? " (" + notifs.unread + ")" : "") },
+      h("img", { src: "img/campana.png", alt: "", width: 24, height: 24 }));
     if (notifs.unread) a.append(h("span", { class: "bell-count" }, notifs.unread > 99 ? "99+" : String(notifs.unread)));
     return a;
   }

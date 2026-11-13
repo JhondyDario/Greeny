@@ -275,11 +275,13 @@ void ui_set_unread(int n) { g_unread = n; }
 /* Campana dibujada a mano, con el globito rojo de avisos sin leer. */
 static void bell(gfx_canvas *c, int cx, int cy, int unread) {
     gfx_circle_alpha(c, cx, cy, 24, C_WHITE, 40);
+    if (g_a && img_fit(c, g_a, UI_IMG_bell, cx - 17, cy - 17, 34)) goto count; /* la campana dibujada (assets/icons/campana.png) */
     gfx_circle(c, cx, cy - 6, 9, C_WHITE);                        /* cupula */
     gfx_round_rect(c, cx - 9, cy - 6, 18, 12, 2, C_WHITE);        /* cuerpo */
     gfx_round_rect(c, cx - 13, cy + 5, 26, 4, 2, C_WHITE);        /* borde */
     gfx_circle(c, cx, cy + 12, 3, C_WHITE);                       /* badajo */
     gfx_circle(c, cx, cy - 16, 2, C_WHITE);
+count:
     if (unread > 0) {
         char n[8];
         snprintf(n, sizeof(n), unread > 99 ? "99+" : "%d", unread);
