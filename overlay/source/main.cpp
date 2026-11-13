@@ -237,8 +237,10 @@ public:
 
 class GreenyOverlay : public tsl::Overlay {
 public:
-    void initServices() override { pminfoInitialize(); }
-    void exitServices() override { pminfoExit(); }
+    // libtesla no monta la SD por su cuenta (cambia el arranque de libnx): sin esto,
+    // fopen("sdmc:/...") falla y parece que el juego no tiene logros.
+    void initServices() override { pminfoInitialize(); fsdevMountSdmc(); }
+    void exitServices() override { fsdevUnmountAll(); pminfoExit(); }
     void onShow() override { g_refresh = true; }
     std::unique_ptr<tsl::Gui> loadInitialGui() override {
         load();
