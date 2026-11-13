@@ -1351,6 +1351,7 @@ static bool pill_img(gfx_canvas *c, int id, int x, int y, int w) {
     return true;
 }
 
+static int g_row_h = 88;    /* alto de las filas de Opciones */
 static int g_opt_icon = -1; /* icono de la fila que se dibuja ahora (UI_IMG_opt_*), -1 = sin icono */
 
 /* valores especiales de option_row: dibujan la palanquita en vez de texto */
@@ -1358,13 +1359,14 @@ static const char k_on[] = "on", k_off[] = "off";
 
 static void option_row(gfx_canvas *c, int y, bool selected, const char *label, const char *help, const char *value,
                        gfx_color value_bg) {
-    const int x = MARGIN, w = CONTENT_W, h = 88;
+    const int x = MARGIN, w = CONTENT_W, h = g_row_h, ty = (h - 88) / 2; /* con seis filas van mas bajitas */
     card(c, x, y, w, h, selected);
     zone(x, y, w, h, UI_ZONE_ITEM, g_row_index);
     int lx = x + 28;
     if (g_opt_icon >= 0 && img_fit(c, g_a, g_opt_icon, x + 22, y + (h - 48) / 2, 48)) lx = x + 88;
-    gfx_text(c, lx, y + 12, 27, P->ink, label);
-    gfx_text_fit(c, lx, y + 51, 19, P->gray, help, w - (lx - x) - 28 - 300);
+    gfx_text(c, lx, y + 12 + ty / 2, 27, P->ink, label);
+    gfx_text_fit(c, lx, y + 51 + ty, 19, P->gray, help, w - (lx - x) - 28 - 300);
+    y += ty; /* lo de la derecha, centrado en el alto de la fila */
     if (value == k_on || value == k_off) { /* encendido o apagado: la palanquita */
         if (img(c, g_a, value == k_on ? UI_IMG_toggle_on : UI_IMG_toggle_off, x + w - 28 - 92, y + 22)) return;
         value = value == k_on ? T("Activado", "On") : T("Desactivado", "Off");
@@ -1466,7 +1468,8 @@ void ui_settings(gfx_canvas *c, const ui_assets *a, const gr_config *cfg, int ta
 
     int count = ui_tab_count(tab, acc->linked);
     for (int i = 0; i < count; i++) {
-        int y = count >= 5 ? 176 + i * 94 : 184 + i * 104; /* con cinco filas van mas juntas */
+        g_row_h = count >= 6 ? 74 : 88;
+        int y = count >= 6 ? 172 + i * 80 : count >= 5 ? 176 + i * 94 : 184 + i * 104; /* con cinco o seis filas van mas juntas */
         bool sel = i == row;
         g_row_index = i;
         g_opt_icon = opt_icon(ui_tab_option(tab, i, acc->linked), i);

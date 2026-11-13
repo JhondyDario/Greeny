@@ -2,8 +2,32 @@
 #pragma once
 #include <stdbool.h>
 
-/* ACCEPT = boton A; ACCEPT_ALT = otras acciones (recargar, cambiar vista, pestañas); OPEN = entrar a otra pantalla */
-typedef enum { SFX_NAV, SFX_ACCEPT, SFX_ACCEPT_ALT, SFX_OPEN, SFX_BACK, SFX_COUNT } sfx_id;
+/* Mismo orden que APP_SFX en scripts/assets.py (assets/sounds/<nombre>.wav). */
+typedef enum {
+    SFX_NAV,        /* moverse por las listas */
+    SFX_ACCEPT,     /* A sobre un elemento */
+    SFX_OPTION,     /* cambiar una opcion de las que se eligen */
+    SFX_TOGGLE,     /* encender o apagar un interruptor */
+    SFX_XY,         /* acciones con X o Y */
+    SFX_LR,         /* L o R: pestañas y atajos */
+    SFX_DETAIL,     /* abrir un logro o pasar al siguiente con las flechas */
+    SFX_OPEN1,      /* abrir una pantalla */
+    SFX_OPEN2,      /* abrir una pantalla grande que casi nunca se abre (acerca de, diagnostico, actualizar) */
+    SFX_OPEN3,      /* abrir un panel pequeño (fotos, frases, paises) */
+    SFX_BACK1,      /* volver */
+    SFX_BACK2,      /* volver al inicio */
+    SFX_ERROR,      /* algo salio mal */
+    SFX_READ,       /* marcar avisos como leidos */
+    SFX_NOTICE,     /* llego un aviso nuevo */
+    SFX_SOCIAL,     /* me gusta, seguir a alguien */
+    SFX_MENU,       /* abrir el perfil, el ranking o el buscador */
+    SFX_SUCCESS,    /* algo salio bien (mensaje de "listo") */
+    SFX_COUNT
+} sfx_id;
+/* nombres de antes */
+#define SFX_ACCEPT_ALT SFX_XY
+#define SFX_OPEN SFX_OPEN2
+#define SFX_BACK SFX_BACK1
 
 bool sfx_init(void);
 void sfx_play(sfx_id id);

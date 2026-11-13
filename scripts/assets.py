@@ -224,13 +224,21 @@ def write_pcm(x, path):
 
 SND = os.path.join(ROOT, "assets", "sounds")
 os.makedirs(os.path.join(ROOT, "sd", "config", "greeny", "sounds"), exist_ok=True)
-jobs = [("cargado", "sd/config/greeny/sounds/cargado.pcm", 32000), ("logro", "sd/config/greeny/sounds/logro.pcm", 32000),
-        ("navegar", "app/data/sfx_navegar.bin", 48000), ("regresar", "app/data/sfx_regresar.bin", 48000),
-        ("aceptar_1", "app/data/sfx_aceptar_1.bin", 48000), ("aceptar_2", "app/data/sfx_aceptar_2.bin", 48000),
-        ("abrir_menu", "app/data/sfx_abrir_menu.bin", 48000)]
+# los del sysmodule (al abrir un juego y al desbloquear) y los de la app, en el orden de sfx_id (app/source/sfx.h)
+APP_SFX = ["navegar", "aceptar", "opcion", "interruptor", "boton_xy", "boton_lr", "detalle_logro", "abrir_1", "abrir_2", "abrir_3",
+           "atras_1", "atras_2", "error", "marcar_leido", "aviso_nuevo", "social", "extra_menus", "extra"]
+for old in os.listdir(os.path.join(ROOT, "app", "data")):
+    if old.startswith("sfx_"):
+        os.remove(os.path.join(ROOT, "app", "data", old))
+jobs = [("cargado", "sd/config/greeny/sounds/cargado.pcm", 32000), ("logro", "sd/config/greeny/sounds/logro.pcm", 32000)] + \
+       [(n, "app/data/sfx_%s.bin" % n, 48000) for n in APP_SFX]
 for name, out, rate in jobs:
     x, src_rate = load_mono(os.path.join(SND, name + ".wav"))
     n = write_pcm(resample(x, src_rate, rate), os.path.join(ROOT, out))
-    print("%-9s -> %-26s %5.2f s  %4d KB" % (name, out, n / rate, n * 2 // 1024))
+    print("%-13s -> %-34s %5.2f s  %4d KB" % (name, out, n / rate, n * 2 // 1024))
+with open(os.path.join(ROOT, "app", "source", "sfx_list.h"), "w") as f:
+    f.write("/* Generado por scripts/assets.py. No editar a mano.\n * SFX(nombre): sonidos de la app, en el orden de sfx_id. */\n")
+    for n in APP_SFX:
+        f.write("SFX(%s)\n" % n)
 
 print("recursos generados")

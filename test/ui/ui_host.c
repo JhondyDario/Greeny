@@ -244,14 +244,15 @@ int main(int argc, char **argv) {
         ui_home(&c, &bare, &empty, &cfg, 0, 0);
         save(&c, out, "home_empty", sfx);
         {
-            static const ui_song songs[4] = { { "rest_garden", "Rest garden", 1171, true }, { "cold_in_summer", "Cold in summer", 1112, true },
-                                              { "beyond_the_end", "Beyond the end", 1295, false }, { "excited_for_the_last_time", "Excited for the last time", 1244, false } };
+            static const ui_song songs[5] = { { "rest_garden", "Rest garden", 1171, true }, { "cold_in_summer", "Cold in summer", 1112, true },
+                                              { "beyond_the_end", "Beyond the end", 1295, false }, { "excited_for_the_last_time", "Excited for the last time", 1244, false },
+                                              { "new_generation", "New generation", 1245, false } };
             gr_config mc;
             gr_config_defaults(&mc);
             mc.music = true;
             snprintf(mc.music_track, sizeof(mc.music_track), "rest_garden");
             static const ui_account none = { .linked = false, .username = "", .caption = "", .sync_es = "", .sync_en = "" };
-            ui_set_music(songs, 4, 4);
+            ui_set_music(songs, 5, 4);
             ui_settings(&c, &a, &mc, UI_TAB_MUSIC, 2, true, dark, &none);
             save(&c, out, "musica", sfx);
             ui_set_music(NULL, 0, -1);

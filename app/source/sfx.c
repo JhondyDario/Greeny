@@ -5,11 +5,9 @@
 #include <string.h>
 #include <switch.h>
 
-#include "sfx_abrir_menu_bin.h"
-#include "sfx_aceptar_1_bin.h"
-#include "sfx_aceptar_2_bin.h"
-#include "sfx_navegar_bin.h"
-#include "sfx_regresar_bin.h"
+#define SFX(n) extern const u8 sfx_##n##_bin[]; extern const u32 sfx_##n##_bin_size;
+#include "sfx_list.h"
+#undef SFX
 
 #define STB_VORBIS_HEADER_ONLY
 #include "third_party/stb_vorbis.c"
@@ -46,9 +44,16 @@ static AudioDriverWaveBuf g_music_wave[MUSIC_BUFS];
 
 bool sfx_init(void) {
     /* mismo orden que sfx_id */
-    const u8 *src[SFX_COUNT] = { sfx_navegar_bin, sfx_aceptar_1_bin, sfx_aceptar_2_bin, sfx_abrir_menu_bin, sfx_regresar_bin };
-    size_t size[SFX_COUNT] = { sfx_navegar_bin_size, sfx_aceptar_1_bin_size, sfx_aceptar_2_bin_size, sfx_abrir_menu_bin_size,
-                               sfx_regresar_bin_size };
+#define SFX(n) sfx_##n##_bin,
+    const u8 *src[SFX_COUNT] = {
+#include "sfx_list.h"
+    };
+#undef SFX
+#define SFX(n) sfx_##n##_bin_size,
+    size_t size[SFX_COUNT] = {
+#include "sfx_list.h"
+    };
+#undef SFX
     size_t offset[SFX_COUNT], total = 0;
     for (int i = 0; i < SFX_COUNT; i++) {
         size[i] &= ~(size_t)1;

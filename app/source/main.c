@@ -306,6 +306,10 @@ static bool install_file(const char *path, const void *data, size_t size) {
     return rename(tmp, path) == 0;
 }
 
+/* Sonido que pidio una accion concreta en esta vuelta del bucle (-1 = el que toque por la pantalla). */
+static int g_sfx_next = -1;
+static void sfx_next(sfx_id id) { g_sfx_next = id; }
+
 /* ---------- overlay de Tesla (opcional) ---------- */
 static void show_message(bool ok, const char *title, const char *line1, const char *line2);
 static bool g_overlay_msg; /* overlay_toggle dejo un mensaje para mostrar */
@@ -476,6 +480,7 @@ static bool icons_collect(const char *open_tid) {
 
 static void show_message(bool ok, const char *title, const char *line1, const char *line2) {
     g_msg_ok = ok;
+    sfx_next(ok ? SFX_SUCCESS : SFX_ERROR);
     snprintf(g_msg_title, sizeof(g_msg_title), "%s", title);
     snprintf(g_msg_line1, sizeof(g_msg_line1), "%s", line1 ? line1 : "");
     snprintf(g_msg_line2, sizeof(g_msg_line2), "%s", line2 ? line2 : "");
@@ -645,6 +650,7 @@ static bool sync_collect(void) {
         gr_account_save(&g_account, ACCOUNT_PATH);
     }
     if (g_sync_notifs_ok) {
+        if (g_sync_unread > g_unread) sfx_play(SFX_NOTICE); /* llego algo nuevo */
         memcpy(g_notifs, g_sync_notifs, sizeof(g_notifs));
         g_nnotif = g_sync_nnotif;
         g_unread = g_sync_unread;
@@ -863,6 +869,7 @@ static ui_song g_songs[] = {
     { "cold_in_summer", "Cold in summer", 1112, false },
     { "beyond_the_end", "Beyond the end", 1295, false },
     { "excited_for_the_last_time", "Excited for the last time", 1244, false },
+    { "new_generation", "New generation", 1245, false },
 };
 #define NSONGS ((int)(sizeof(g_songs) / sizeof(g_songs[0])))
 
@@ -1275,6 +1282,7 @@ int main(int argc, char *argv[]) {
 
         bool moved = false, accepted = false, accepted_alt = false, opened = false, opened_rare = false, back = false;
         bool quiet = false; /* la accion ya suena sola (elegir una cancion): sin el sonido del boton encima */
+        const screen_t screen_before = screen;
 
         /* ZL o ZR abren los avisos desde cualquier pantalla; B vuelve a donde estabas */
         if ((down & (HidNpadButton_ZL | HidNpadButton_ZR)) && screen != SCREEN_NOTIF && screen != SCREEN_INTRO && screen != SCREEN_MSG && !g_dl_live) {
@@ -1333,6 +1341,7 @@ int main(int argc, char *argv[]) {
             if (ncursor < ntop) ntop = ncursor;
             if (ncursor >= ntop + UI_NOTIF_ROWS) ntop = ncursor - UI_NOTIF_ROWS + 1;
             if ((down & HidNpadButton_X) && notif_state == 1 && g_unread > 0) {
+                sfx_next(SFX_READ);
                 if (gr_notifications_read(net_http, &g_account, -1) == GR_NET_OK) {
                     for (int i = 0; i < g_nnotif; i++) g_notifs[i].read = true;
                     g_unread = 0;
@@ -1342,6 +1351,7 @@ int main(int argc, char *argv[]) {
             }
             if ((down & HidNpadButton_A) && notif_state == 1 && g_nnotif > 0) {
                 gr_notif *v = &g_notifs[ncursor];
+                if (!v->read) sfx_next(SFX_READ);
                 if (!v->read && gr_notifications_read(net_http, &g_account, v->id) == GR_NET_OK) {
                     v->read = true;
                     if (g_unread > 0) g_unread--;
@@ -1487,7 +1497,7 @@ int main(int argc, char *argv[]) {
                 gr_review *v = &g_reviews[vcursor];
                 char err[160] = "";
                 gr_net_result r = net_online() ? gr_review_like(net_http, &g_account, v->id, !v->liked, err, sizeof(err)) : GR_NET_OFFLINE;
-                if (r == GR_NET_OK) { v->liked = !v->liked; v->likes += v->liked ? 1 : -1; }
+                if (r == GR_NET_OK) { v->liked = !v->liked; v->likes += v->liked ? 1 : -1; if (v->liked) sfx_next(SFX_SOCIAL); }
                 else {
                     show_message(false, "No se pudo", r == GR_NET_OFFLINE ? "No hay conexión a internet." : err, NULL);
                     g_msg_return = SCREEN_REVIEWS;
@@ -1579,7 +1589,7 @@ int main(int argc, char *argv[]) {
             if (n == 0) screen = SCREEN_DETAIL;
             if (down & (HidNpadButton_R | HidNpadButton_AnyRight)) step = 1;
             if (down & (HidNpadButton_L | HidNpadButton_AnyLeft)) step = -1;
-            if (step && dcursor + step >= 0 && dcursor + step < n) { dcursor += step; moved = true; }
+            if (step && dcursor + step >= 0 && dcursor + step < n) { dcursor += step; moved = true; sfx_next(SFX_DETAIL); }
             if (down & HidNpadButton_B) {
                 follow(dcursor, &dtop, ui_detail_layout(&g_config));
                 screen = SCREEN_DETAIL;
@@ -1593,6 +1603,7 @@ int main(int argc, char *argv[]) {
                 stab = (stab + ((down & HidNpadButton_R) ? 1 : UI_TABS - 1)) % UI_TABS;
                 srow = 0;
                 accepted_alt = true;
+                sfx_next(SFX_LR);
             }
             if (srow >= ui_tab_count(stab, linked)) srow = 0;
             moved = move_cursor(&srow, ui_tab_count(stab, linked), 1, nav);
@@ -1763,6 +1774,11 @@ int main(int argc, char *argv[]) {
                 }
                 if (opt < UI_OPT_DIAG) {
                     accepted = true;
+                    if (g_sfx_next < 0) {
+                        bool is_toggle = opt == UI_OPT_ANIM || opt == UI_OPT_APPSOUND || opt == UI_OPT_INGAME || opt == UI_OPT_SOUND ||
+                                         opt == UI_OPT_POPUP || opt == UI_OPT_STARTPOP || opt == UI_OPT_OVERLAY || opt == UI_OPT_MUSIC;
+                        if (opt != UI_OPT_SONG) sfx_next(is_toggle ? SFX_TOGGLE : SFX_OPTION);
+                    }
                     save_config();
                     if (lang_changed) { refresh_greeting(); lang_changed = false; } /* la frase del perfil cambia de idioma */
                     top = 0; /* la vista pudo cambiar de forma */
@@ -1899,7 +1915,7 @@ int main(int argc, char *argv[]) {
                 char err[160] = "", line[96];
                 gr_net_result r = net_online() ? gr_follow_user(net_http, &g_account, g_rank_view.username, err, sizeof(err)) : GR_NET_OFFLINE;
                 snprintf(line, sizeof(line), "Ahora sigues a @%s.", g_rank_view.username);
-                if (r == GR_NET_OK) { show_message(true, "¡Listo!", line, NULL); sync_start(); }
+                if (r == GR_NET_OK) { show_message(true, "¡Listo!", line, NULL); sync_start(); sfx_next(SFX_SOCIAL); }
                 else show_message(false, "No se pudo seguir", r == GR_NET_OFFLINE ? "No hay conexión a internet." : err, NULL);
                 g_msg_return = g_user_return ? g_user_return : SCREEN_RANKING;
                 g_user_return = 0;
@@ -1972,12 +1988,21 @@ int main(int argc, char *argv[]) {
             if ((down & HidNpadButton_B) && intro_page > 0) { intro_page--; back = true; }
         }
 
+        /* que suena: lo que pidio la accion; si no, segun a que pantalla se fue */
+        bool went = screen != screen_before;
         if (quiet) { /* nada: ya suena la musica */ }
-        else if (back) sfx_play(SFX_BACK);
-        else if (opened_rare) sfx_play(SFX_OPEN); /* solo para pantallas que casi nunca se abren */
-        else if (accepted || opened) sfx_play(SFX_ACCEPT);
-        else if (accepted_alt) sfx_play(SFX_ACCEPT_ALT);
+        else if (g_sfx_next >= 0) sfx_play((sfx_id)g_sfx_next);
+        else if (back) sfx_play(screen == SCREEN_HOME ? SFX_BACK2 : SFX_BACK1);
+        else if (went && (screen == SCREEN_PROFILE || screen == SCREEN_RANKING || screen == SCREEN_BROWSE)) sfx_play(SFX_MENU);
+        else if (went && (screen == SCREEN_AVATARS || screen == SCREEN_CAPTION || screen == SCREEN_COUNTRY || screen == SCREEN_BADGES)) sfx_play(SFX_OPEN3);
+        else if (went && screen == SCREEN_ACH) sfx_play(SFX_DETAIL);
+        else if (opened_rare || (went && (screen == SCREEN_ABOUT || screen == SCREEN_DIAG || screen == SCREEN_UPDATE || screen == SCREEN_SEARCH)))
+            sfx_play(SFX_OPEN2);
+        else if (went || opened) sfx_play(SFX_OPEN1);
+        else if (accepted) sfx_play(SFX_ACCEPT);
+        else if (accepted_alt) sfx_play((down & (HidNpadButton_L | HidNpadButton_R)) ? SFX_LR : SFX_XY);
         else if (moved) sfx_play(SFX_NAV);
+        g_sfx_next = -1;
         if (moved || accepted || accepted_alt || opened || opened_rare || back) dirty = true;
         if (sync_collect()) dirty = true;
         if (icons_collect(screen == SCREEN_DETAIL || screen == SCREEN_ACH ? g_model.games[cursor].tid : NULL)) {
