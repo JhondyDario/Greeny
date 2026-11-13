@@ -749,3 +749,14 @@ form.stack.review-form { max-width: none; width: 100%; box-sizing: border-box; }
   padding: 18px 16px; border-radius: 16px; background: rgba(247, 201, 30, .07); border: 1px solid rgba(247, 201, 30, .28); }
 .donor-note img { width: 84px; height: 84px; filter: drop-shadow(0 6px 14px rgba(0, 0, 0, .35)); }
 .donor-title { display: block; font-size: 1.05rem; color: #ffe169; }
+
+/* celular: todo el menu alineado a la derecha */
+@media (max-width: 1080px) {
+  .top .nav > a, .top .nav > button, .top .nav #nav-user > a:not(.cta), .top .nav .lang-menu summary, .top .nav .user-menu summary {
+    justify-content: flex-end; text-align: right; }
+  .top .nav .lang-menu summary .caret, .top .nav .user-menu summary .caret { margin-left: 0; margin-right: auto; order: -1; }
+  .top .nav .bell { justify-content: flex-end; flex-direction: row; }
+  .top .nav .bell img { order: 1; }
+  .top .nav .bell::after { order: 2; }
+  .top .nav .bell .bell-count { order: 3; margin: 0 0 0 2px; }
+}
