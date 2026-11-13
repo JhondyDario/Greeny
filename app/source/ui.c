@@ -454,12 +454,18 @@ static void text_2lines(gfx_canvas *c, int x, int y, int size, gfx_color col, co
     gfx_text_fit(c, x, y + line_h, size, col, rest, max_w);
 }
 
+/* Barra de desplazamiento a la derecha: dice que tanto hay y por donde vas. Solo sale si no cabe todo. */
 static void scrollbar(gfx_canvas *c, int y, int h, int top, int visible, int total) {
-    if (total <= visible) return;
+    if (total <= visible || h <= 0) return;
+    if (top < 0) top = 0;
+    if (top > total - visible) top = total - visible;
     int bar_h = h * visible / total;
+    if (bar_h < 36) bar_h = 36;
     int bar_y = y + (h - bar_h) * top / (total - visible);
-    gfx_round_rect(c, UI_W - 26, y, 8, h, 4, P->gray_lt);
-    gfx_round_rect(c, UI_W - 26, bar_y, 8, bar_h, 4, C_GREEN);
+    const int x = UI_W - 27, w = 10;
+    gfx_glass(c, x, y, w, h, 5, P->gray_lt, P->gray_lt, 150, 150);              /* el riel */
+    gfx_glass(c, x, bar_y, w, bar_h, 5, GFX_RGB(0x6E, 0xDB, 0x6A), C_GREEN, 255, 255); /* lo que se ve */
+    gfx_glass(c, x + 2, bar_y + 3, 2, bar_h - 6, 1, C_WHITE, C_WHITE, 90, 30);    /* brillo */
 }
 
 static void cover_or_placeholder(gfx_canvas *c, int x, int y, int size, const uint8_t *cover, const char *name) {
@@ -525,7 +531,7 @@ static void home_grid(gfx_canvas *c, const ui_assets *a, const gr_model *m, int 
         zone(x, y, w, h, UI_ZONE_ITEM, i);
         int cx = x + w / 2;
         cover_or_placeholder(c, cx - UI_COVER_BIG / 2, y + 12, UI_COVER_BIG, a->covers_big[i], g->name);
-        if (!g->broken && g->total > 0 && g->unlocked == g->total) img_fit(c, a, UI_IMG_trophy, cx - UI_COVER_BIG / 2 - 14, y + 2, 60);
+        if (!g->broken && g->total > 0 && g->unlocked == g->total) img_fit(c, a, UI_IMG_trophy, cx + UI_COVER_BIG / 2 - 46, y + 2, 60);
         text_center(c, cx, y + 168, 20, P->ink, g->name, w - 20);
 
         char buf[64];
@@ -535,7 +541,8 @@ static void home_grid(gfx_canvas *c, const ui_assets *a, const gr_model *m, int 
         }
         if (g->version[0]) {
             snprintf(buf, sizeof(buf), "v%s", g->version);
-            pill(c, cx + UI_COVER_BIG / 2 - 6, y + 12 + UI_COVER_BIG - 34, C_ON_YELLOW, C_WHITE, buf);
+            int pw = gfx_text_width(17, buf) + 26;   /* abajo a la izquierda de la portada */
+            pill(c, cx - UI_COVER_BIG / 2 + 6 + pw, y + 12 + UI_COVER_BIG - 34, C_ON_YELLOW, C_WHITE, buf);
         }
         progress(c, x + 20, y + 200, w - 40, g->unlocked, g->total);
         snprintf(buf, sizeof(buf), "%d pts  ·  %d%%", g->points_got, g->total > 0 ? g->unlocked * 100 / g->total : 0);
@@ -960,6 +967,7 @@ void ui_browse(gfx_canvas *c, const ui_assets *a, const gr_cat_game *games, cons
             if (have[shown[i]]) pill(c, x + w - 22, y + h / 2 - 14, C_GREEN, C_WHITE, T("EN TU CONSOLA", "ON YOUR CONSOLE"));
         }
 
+        scrollbar(c, 116, UI_BROWSE_ROWS * (h + 10) - 10, top, UI_BROWSE_ROWS, nshown);
         /* el abecedario, a la derecha: resalta la letra por la que va la lista y apaga las que no tienen juegos */
         bool used[26] = { false };
         for (int i = 0; i < nshown; i++) {
@@ -1022,11 +1030,25 @@ void ui_browse_game(gfx_canvas *c, const ui_assets *a, const gr_cat_game *game, 
 
 void ui_splash(gfx_canvas *c, const ui_assets *a, const char *name, bool first, int t) {
     begin(c);
-    /* el logo entra desde un poco mas abajo y el texto aparece despues */
-    int rise = t < 250 ? (250 - t) * 40 / 250 : 0;
-    const int lw = 760, lx = (UI_W - lw) / 2, ly = 150 + rise;
-    if (!img(c, a, UI_IMG_splash_logo, lx, ly)) img(c, a, UI_IMG_logo, (UI_W - 300) / 2, 200);
-    if (t > 300) {
+    /* el logo sale de la nada en el centro: crece con un rebote suave (como un pop) y se queda quieto */
+    const int lw = 760, lh = 254, cxl = UI_W / 2, cyl = 150 + lh / 2;
+    float k = t >= 160 ? 1.0f : t / 160.0f;                          /* 0..1 en ~0,8 s */
+    float p = k - 1.0f, scale = 1.0f + 2.1f * p * p * p + 1.1f * p * p; /* sube a 1 pasandose un poquito (rebote leve) */
+    if (scale < 0.05f) scale = 0.05f;
+    if (a && a->img[UI_IMG_splash_logo]) {
+        if (scale > 0.995f && scale < 1.005f) img(c, a, UI_IMG_splash_logo, cxl - lw / 2, cyl - lh / 2);
+        else {
+            static uint8_t pop[820 * 280 * 4];
+            int dw = (int)(lw * scale), dh = (int)(lh * scale);
+            if (dw > 820) dw = 820;
+            if (dh > 280) dh = 280;
+            if (dw > 4 && dh > 2) {
+                gfx_scale_rgba(a->img[UI_IMG_splash_logo], lw, lh, pop, dw, dh);
+                gfx_image(c, cxl - dw / 2, cyl - dh / 2, pop, dw, dh);
+            }
+        }
+    } else img(c, a, UI_IMG_logo, (UI_W - 300) / 2, 200);
+    if (t > 175) { /* la frase, cuando el logo ya se asento */
         char line[160];
         if (first) snprintf(line, sizeof(line), "%s", T("El primer sistema de logros no oficial para la Switch", "The first unofficial achievement system for the Switch"));
         else if (name && name[0]) snprintf(line, sizeof(line), T("¡Bienvenido de vuelta, %s!", "Welcome back, %s!"), name);
@@ -1178,7 +1200,7 @@ void ui_notifs(gfx_canvas *c, const ui_assets *a, const gr_notif *n, int count, 
             snprintf(date, sizeof(date), "%.2s/%.2s/%.4s", T(v->date + 8, v->date + 5), T(v->date + 5, v->date + 8), v->date);
             gfx_text(c, x + 102, y + 39, 17, P->gray, date);
         }
-        if (count > top + UI_NOTIF_ROWS) text_center(c, UI_W / 2, 640, 16, P->gray, "▼", 40);
+        scrollbar(c, 112, UI_NOTIF_ROWS * 76 - 8, top, UI_NOTIF_ROWS, count);
     }
 
     footer_bar(c);
@@ -1284,7 +1306,7 @@ void ui_reviews(gfx_canvas *c, const ui_assets *a, const char *game, const gr_re
                 heart(c, lx + 30, ly + 24, 20, v->liked ? C_WHITE : P->gray);
             gfx_text(c, lx + 52, ly + 9, 24, v->liked ? C_WHITE : P->ink, likes);
         }
-        if (n > top + UI_REVIEW_ROWS) text_center(c, UI_W / 2, 632, 18, P->gray, "▼", 40);
+        scrollbar(c, 116, UI_REVIEW_ROWS * 172 - 12, top, UI_REVIEW_ROWS, n);
     }
 
     footer_bar(c);
@@ -1562,8 +1584,7 @@ void ui_settings(gfx_canvas *c, const ui_assets *a, const gr_config *cfg, int ta
     int first = row >= vis ? row - vis + 1 : 0;
     if (first > count - vis) first = count > vis ? count - vis : 0;
     g_row_h = 86;
-    if (first > 0) text_center(c, UI_W / 2, 163, 13, P->gray, "▲", 40);
-    if (first + vis < count) text_center(c, UI_W / 2, 646, 13, P->gray, "▼", 40);
+    scrollbar(c, 170, vis * step - 12, first, vis, count);
     for (int i = first; i < count && i < first + vis; i++) {
         int y = 170 + (i - first) * step;
         bool sel = i == row;
@@ -2355,8 +2376,7 @@ void ui_ranking(gfx_canvas *c, const ui_assets *a, const gr_rank_row *rows, int 
     } else {
         bool in_top = false;
         int first = cursor >= UI_RANK_ROWS ? cursor - UI_RANK_ROWS + 1 : 0;
-        if (first > 0) text_center(c, UI_W / 2, 100, 13, P->gray, "▲", 40);
-        if (first + UI_RANK_ROWS < n) text_center(c, UI_W / 2, 646, 13, P->gray, "▼", 40);
+        scrollbar(c, 114, UI_RANK_ROWS * 60 - 12, first, UI_RANK_ROWS, n);
         for (int i = 0; i < n; i++) {
             bool mine = me->position > 0 && !strcmp(rows[i].username, me->username);
             in_top = in_top || mine;
@@ -2445,8 +2465,7 @@ void ui_badges(gfx_canvas *c, const ui_assets *a, const ui_profile *p, int top) 
     int order[32], no = badge_order(&p->stats, order);
     if (top > no - UI_BADGE_ROWS) top = no > UI_BADGE_ROWS ? no - UI_BADGE_ROWS : 0;
     if (top < 0) top = 0;
-    if (top > 0) text_center(c, UI_W / 2, 104, 13, P->gray, "▲", 40);
-    if (top + UI_BADGE_ROWS < no) text_center(c, UI_W / 2, 646, 13, P->gray, "▼", 40);
+    scrollbar(c, 112, UI_BADGE_ROWS * 66 - 10, top, UI_BADGE_ROWS, no);
     for (int i = top; i < no && i < top + UI_BADGE_ROWS; i++) {
         const gr_badge *b = &gr_badges[order[i]];
         int y = 118 + (i - top) * 66, value = gr_badge_value(b, &p->stats);

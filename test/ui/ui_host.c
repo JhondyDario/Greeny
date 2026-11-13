@@ -313,6 +313,10 @@ int main(int argc, char **argv) {
             save(&c, out, "actualizar_bajando", sfx);
             ui_splash(&c, &a, "Jhondy", false, 800);
             save(&c, out, "splash", sfx);
+            ui_splash(&c, &a, "Jhondy", false, 30);
+            save(&c, out, "splash_pop1", sfx);
+            ui_splash(&c, &a, "Jhondy", false, 70);
+            save(&c, out, "splash_pop2", sfx);
             ui_splash(&c, &a, "", true, 800);
             save(&c, out, "splash_primera", sfx);
             ui_ranking(&c, &a, rows, 3, &yo, 14, "Mi país", "My country", "Super Mario 3D World", 0, 1);
