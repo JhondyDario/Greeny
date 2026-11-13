@@ -275,6 +275,7 @@
 
   // ---------- avisos (notificaciones) ----------
   const BELL = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22Zm7-6V11a7 7 0 0 0-5.5-6.84V3.5a1.5 1.5 0 0 0-3 0v.66A7 7 0 0 0 5 11v5l-1.7 1.7A1 1 0 0 0 4 19.4h16a1 1 0 0 0 .7-1.7Z"/></svg>';
+  const PENCIL = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17.3V21h3.7L17.8 9.9l-3.7-3.7L3 17.3Zm17.7-10.1a1 1 0 0 0 0-1.4l-2.5-2.5a1 1 0 0 0-1.4 0l-1.9 1.9 3.7 3.7 2.1-1.7Z"/></svg>';
   const HEART = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.8 4.5c2.1 0 3.6 1.2 5.2 3 1.6-1.8 3.1-3 5.2-3 3.8 0 5.9 3.9 4.4 7.3C19.5 16.4 12 21 12 21Z"/></svg>';
   let notifs = { unread: 0, items: [] };
   let notifTimer = null;
@@ -714,14 +715,21 @@
     }
 
     return [
-      h("section", { class: "card row profile-head" }, avatar(profile, "big"),
-        h("div", { class: "grow" },
-          h("h1", { style: "margin-bottom:2px" }, shownName(profile), " ", flag(profile.country, 36)),
+      h("section", { class: "card profile-head" },
+        // en tu propio perfil, la foto lleva a cambiarla
+        isMe ? h("a", { class: "avatar-edit", href: "#/cuenta", title: "Cambiar foto de perfil", "aria-label": "Cambiar foto de perfil", onclick: () => {
+            try { sessionStorage.setItem("greeny-ajustes-tab", "perfil"); sessionStorage.setItem("greeny-ir-a-foto", "1"); } catch (e) { /* da igual */ }
+          } }, avatar(profile, "big"), h("span", { class: "avatar-edit-badge", "aria-hidden": "true" }, svgEl(PENCIL)))
+          : avatar(profile, "big"),
+        h("div", { class: "profile-main" },
+          h("h1", {}, shownName(profile), " ", flag(profile.country, 36)),
           h("div", { class: "muted" }, "@" + profile.username, profile.discord_username ? " · Discord: " + profile.discord_username : ""),
-          profile.caption ? h("p", { style: "margin:8px 0 0;font-size:1.1rem" }, "“" + profile.caption + "”") : null,
-          profile.friend_code ? h("div", { class: "small", style: "margin-top:8px" }, "Código de amigo: ", h("code", {}, profile.friend_code), " ", copyButton(profile.friend_code)) : null,
-          h("div", { class: "muted small", style: "margin-top:6px" }, "En Greeny desde " + fmtDate(profile.created_at))),
-        isMe ? h("a", { class: "btn alt", href: "#/cuenta" }, "Editar") : followBtn),
+          profile.caption ? h("p", { class: "profile-caption" }, "“" + profile.caption + "”") : null),
+        h("div", { class: "profile-side" },
+          profile.friend_code ? h("div", { class: "side-row" }, h("span", { class: "side-label" }, "Código de amigo"),
+            h("span", { class: "side-value" }, h("code", {}, profile.friend_code), copyButton(profile.friend_code))) : null,
+          h("div", { class: "side-row" }, h("span", { class: "side-label" }, "En Greeny desde"), h("span", { class: "side-value" }, fmtDate(profile.created_at))),
+          isMe ? h("a", { class: "btn alt side-btn", href: "#/cuenta" }, "Editar perfil") : followBtn)),
       h("section", { class: "card level", style: "margin-top:14px" },
         h("div", { class: "row" },
           h("div", { class: "lvl-tags" },
@@ -955,6 +963,10 @@
     const photoRow = h("div", { class: "stack", style: "margin-bottom:18px" },
       h("div", {}, h("strong", {}, "Foto de perfil"), h("div", { class: "muted small" }, "Elige una. Es la misma en la app y en la web.")),
       picker);
+    // venimos de tocar la foto en el perfil: llevar la vista a las fotos y resaltarlas un momento
+    let goPhoto = false;
+    try { goPhoto = sessionStorage.getItem("greeny-ir-a-foto") === "1"; sessionStorage.removeItem("greeny-ir-a-foto"); } catch (e) { /* da igual */ }
+    if (goPhoto) setTimeout(() => { photoRow.scrollIntoView({ behavior: "smooth", block: "center" }); photoRow.classList.add("flash"); }, 150);
     const discordName = discord && discord.identity_data &&
       (discord.identity_data.full_name || discord.identity_data.name || (discord.identity_data.custom_claims || {}).global_name);
     const presets = (presetRes.data || []).map((p) => p.text_es);

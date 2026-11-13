@@ -703,3 +703,32 @@ form.stack.review-form { max-width: none; width: 100%; box-sizing: border-box; }
 .pw .peek:focus-visible { outline: 2px solid var(--green); outline-offset: 1px; }
 .pw .peek[aria-pressed="true"] { color: #8ff09c; }
 .pw .peek svg { width: 22px; height: 22px; fill: currentColor; }
+
+/* cabecera del perfil: foto | nombre y frase | datos y boton */
+.profile-head { display: grid; grid-template-columns: auto minmax(0, 1fr) minmax(220px, 300px); gap: 22px; align-items: center; }
+.profile-main h1 { margin: 0 0 4px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.profile-caption { margin: 10px 0 0; font-size: 1.1rem; }
+.profile-side { display: grid; gap: 10px; padding: 14px 16px; border-radius: 16px; background: rgba(255, 255, 255, .04); border: 1px solid var(--line); }
+.side-row { display: grid; gap: 2px; }
+.side-label { color: var(--muted); font-size: .78rem; text-transform: uppercase; letter-spacing: .05em; }
+.side-value { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-weight: 600; }
+.side-btn, .profile-side > .btn { width: 100%; box-sizing: border-box; justify-content: center; text-align: center; margin-top: 4px; }
+/* tocar tu foto = cambiarla */
+.avatar-edit { position: relative; display: block; border-radius: 50%; line-height: 0; }
+.avatar-edit .avatar { transition: filter .15s ease; }
+.avatar-edit:hover .avatar { filter: brightness(.75); }
+.avatar-edit-badge { position: absolute; right: 0; bottom: 0; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center;
+  background: linear-gradient(180deg, #43d058, #27a23a); border: 3px solid #13241a; color: #fff; }
+.avatar-edit-badge svg { width: 16px; height: 16px; fill: currentColor; }
+.flash { animation: flash 1.6s ease-out 1; border-radius: 16px; }
+@keyframes flash { 0% { box-shadow: 0 0 0 0 rgba(67, 208, 88, .0); } 20% { box-shadow: 0 0 0 6px rgba(67, 208, 88, .45); } 100% { box-shadow: 0 0 0 0 rgba(67, 208, 88, 0); } }
+/* corazones: el mismo tamaño que la etiqueta de nivel */
+.pill.hearts { font-size: 1rem; padding: 5px 14px; gap: 7px; }
+.pill.hearts img { width: 20px; height: 20px; }
+@media (max-width: 1080px) {
+  .profile-head { grid-template-columns: 1fr; justify-items: center; text-align: center; gap: 14px; }
+  .profile-main h1 { justify-content: center; }
+  .profile-side { width: 100%; box-sizing: border-box; text-align: left; }
+}
+.profile-head .avatar.big { width: 120px; height: 120px; font-size: 3rem; }
+@media (max-width: 1080px) { .profile-head .avatar.big { width: 104px; height: 104px; } }
