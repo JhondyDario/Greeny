@@ -19,6 +19,7 @@ typedef struct {
     bool dark;   /* tarjeta oscura */
     const char *title, *name, *desc; /* UTF-8 */
     const unsigned char *badge;      /* dibujo RGBA de TOAST_BADGE de lado, o NULL: se pinta el circulo sencillo */
+    bool mirror;                     /* aviso a la izquierda de la pantalla: el dibujo va a la derecha */
 } toast_view;
 
 /* Recibe cada pixel una o mas veces; el ultimo valor es el bueno. Componentes de 0 a 255. */

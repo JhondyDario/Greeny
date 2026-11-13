@@ -9,6 +9,10 @@ static const char *k_view[GR_VIEW_COUNT] = { "list", "grid" };
 static const char *k_scope[GR_SCOPE_COUNT] = { "active", "played" };
 static const char *k_show[GR_SHOW_COUNT] = { "all", "pending", "done" };
 static const char *k_start[GR_START_COUNT] = { "trophies", "profile" };
+static const char *k_tpos[GR_TOAST_POS_COUNT] = { "right", "left", "center" };
+static const char *k_ttime[GR_TOAST_TIME_COUNT] = { "short", "medium", "long" };
+
+int gr_toast_ms(int t) { return t == GR_TOAST_SHORT ? 3000 : t == GR_TOAST_LONG ? 8000 : 5000; }
 
 void gr_config_defaults(gr_config *c) {
     c->lang = GR_LANG_AUTO;
@@ -19,6 +23,8 @@ void gr_config_defaults(gr_config *c) {
     c->popup = true;
     c->start_popup = true;
     c->overlay = false;
+    c->toast_pos = GR_TOAST_RIGHT;
+    c->toast_time = GR_TOAST_MEDIUM;
     c->animated_bg = true;
     c->intro_done = false;
     c->start_page = GR_START_TROPHIES;
@@ -63,6 +69,8 @@ void gr_config_load(gr_config *c, const char *path) {
         else if (!strcmp(key, "app_sound")) pick_bool(val, &c->app_sound);
         else if (!strcmp(key, "start_popup")) pick_bool(val, &c->start_popup);
         else if (!strcmp(key, "overlay")) pick_bool(val, &c->overlay);
+        else if (!strcmp(key, "toast_pos")) pick(val, k_tpos, GR_TOAST_POS_COUNT, &c->toast_pos);
+        else if (!strcmp(key, "toast_time")) pick(val, k_ttime, GR_TOAST_TIME_COUNT, &c->toast_time);
         else if (!strcmp(key, "music_track")) {
             /* solo letras, numeros y _: es parte del nombre de un archivo */
             bool ok = true;
@@ -87,7 +95,8 @@ int gr_config_save(const gr_config *c, const char *path) {
                      name_of(k_view, GR_VIEW_COUNT, c->games_view), name_of(k_view, GR_VIEW_COUNT, c->ach_view),
                      c->sound ? 1 : 0, c->popup ? 1 : 0, c->animated_bg ? 1 : 0, c->intro_done ? 1 : 0, name_of(k_start, GR_START_COUNT, c->start_page),
                      name_of(k_scope, GR_SCOPE_COUNT, c->games_scope), name_of(k_show, GR_SHOW_COUNT, c->games_show), c->music ? 1 : 0, c->app_sound ? 1 : 0) > 0;
-    if (ok) ok = fprintf(f, "start_popup = %d\noverlay = %d\n", c->start_popup ? 1 : 0, c->overlay ? 1 : 0) > 0;
+    if (ok) ok = fprintf(f, "start_popup = %d\noverlay = %d\ntoast_pos = %s\ntoast_time = %s\n", c->start_popup ? 1 : 0, c->overlay ? 1 : 0,
+                         name_of(k_tpos, GR_TOAST_POS_COUNT, c->toast_pos), name_of(k_ttime, GR_TOAST_TIME_COUNT, c->toast_time)) > 0;
     if (ok && c->music_track[0]) ok = fprintf(f, "music_track = %s\n", c->music_track) > 0;
     if (fclose(f) != 0) ok = 0;
     return ok ? 0 : -1;

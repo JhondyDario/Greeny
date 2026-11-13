@@ -9,6 +9,9 @@
 /* tier (1 bronce, 2 plata, 3 oro) y points solo cuentan en TOAST_UNLOCK; points < 0 no se muestra. */
 void toast_push(toast_kind kind, int tier, int points, bool dark, const char *title, const char *name, const char *desc);
 
+/* Donde sale (0 derecha, 1 izquierda, 2 centro; siempre arriba) y cuanto dura. Se aplica al siguiente aviso. */
+void toast_configure(int pos, int show_ms);
+
 /* Llamar en cada vuelta del loop principal. */
 void toast_update(uint64_t now_ms);
 

@@ -156,7 +156,8 @@ void toast_draw(const toast_view *v, toast_put_fn put) {
         default: accent = RGB(0x2FA63B); head = v->dark ? RGB(0x7FE08A) : RGB(0x1E8A2E); break;
     }
 
-    const float bcx = 50, bcy = BAR_H / 2.0f, br = 28;
+    /* dibujo pegado al borde de la pantalla... o al otro lado si el aviso esta a la izquierda */
+    const float bcx = v->mirror ? TOAST_W - 50 : 50, bcy = BAR_H / 2.0f, br = 28;
     for (int y = 0; y < TOAST_H; y++) {
         for (int x = 0; x < TOAST_W; x++) {
             if (y >= BAR_H) { put(x, y, 0, 0, 0, 0); continue; }
@@ -192,7 +193,7 @@ void toast_draw(const toast_view *v, toast_put_fn put) {
     }
 
     /* puntos, arriba a la derecha, como texto */
-    const int tx = 96, right = TOAST_W - 18;
+    const int tx = v->mirror ? 18 : 96, right = v->mirror ? TOAST_W - 96 : TOAST_W - 18;
     int pts_w = 0;
     if (v->points >= 0) {
         uint8_t pts[12];

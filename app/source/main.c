@@ -1706,6 +1706,8 @@ int main(int argc, char *argv[]) {
                     case UI_OPT_SOUND:      g_config.sound = !g_config.sound; break;
                     case UI_OPT_POPUP:      g_config.popup = !g_config.popup; break;
                     case UI_OPT_STARTPOP:   g_config.start_popup = !g_config.start_popup; break;
+                    case UI_OPT_TOAST_POS:  g_config.toast_pos = (g_config.toast_pos + 1) % GR_TOAST_POS_COUNT; break;
+                    case UI_OPT_TOAST_TIME: g_config.toast_time = (g_config.toast_time + 1) % GR_TOAST_TIME_COUNT; break;
                     case UI_OPT_NOTIFY_LIKE: case UI_OPT_NOTIFY_FOLLOW: case UI_OPT_NOTIFY_ACH: case UI_OPT_NOTIFY_BADGE:
                     case UI_OPT_NOTIFY_FRIEND: case UI_OPT_NOTIFY_RANKING: case UI_OPT_NOTIFY_ALMOST: {
                         int k = opt - UI_OPT_NOTIFY_LIKE;

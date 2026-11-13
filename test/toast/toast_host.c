@@ -34,6 +34,7 @@ int main(int argc, char **argv) {
         { TOAST_WARN, 0, -1, false, "LOGROS DESACTIVADOS", "Super Mario 3D World", "Tu juego es otra versión. Hace falta la 1.1.0." },
         { TOAST_WARN, 0, -1, true, "ACHIEVEMENTS OFF", "Pokémon Añil ¿Ñandú?", "The achievement file has an error." },
     };
+    v[3].mirror = true; /* como sale si el aviso va arriba a la izquierda */
     /* con los dibujos de la SD, igual que en la consola (generados por scripts/assets.py) */
     static unsigned char badge[N][TOAST_BADGE * TOAST_BADGE * 4];
     for (int i = 0; i < N; i++) {

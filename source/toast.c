@@ -16,10 +16,15 @@
 /* vi trabaja en coordenadas de 1920x1080; 1.5x igual que Tesla */
 #define LAYER_W 672
 #define LAYER_H 192
-#define LAYER_X (1920 - LAYER_W) /* pegado a la esquina de arriba a la derecha, como los avisos de la consola */
 #define LAYER_Y 0
+/* donde y cuanto: lo elige el usuario en la app (Opciones -> En el juego) */
+static int g_layer_x = 1920 - LAYER_W; /* arriba a la derecha, como los avisos de la consola */
+static int g_show_ms = 5000;
 
-#define SHOW_MS 5000
+void toast_configure(int pos, int show_ms) {
+    g_layer_x = pos == 1 ? 0 : pos == 2 ? (1920 - LAYER_W) / 2 : 1920 - LAYER_W;
+    g_show_ms = show_ms >= 1000 && show_ms <= 20000 ? show_ms : 5000;
+}
 #define QUEUE_LEN 4
 
 extern u64 __nx_vi_layer_id;
@@ -95,7 +100,7 @@ static Result gfx_init(void) {
     }
     rc = viSetLayerSize(&g_layer, LAYER_W, LAYER_H);
     if (R_FAILED(rc)) goto fail;
-    rc = viSetLayerPosition(&g_layer, LAYER_X, LAYER_Y);
+    rc = viSetLayerPosition(&g_layer, g_layer_x, LAYER_Y);
     if (R_FAILED(rc)) goto fail;
     rc = nwindowCreateFromLayer(&g_win, &g_layer);
     if (R_FAILED(rc)) goto fail;
@@ -175,7 +180,7 @@ static void present(const toast_msg *m) {
             have = fread(badge, 1, sizeof(badge), f) == sizeof(badge);
             fclose(f);
         }
-        toast_view v = { m->kind, m->tier, m->points, m->dark, m->title, m->name, m->desc, have ? badge : NULL };
+        toast_view v = { m->kind, m->tier, m->points, m->dark, m->title, m->name, m->desc, have ? badge : NULL, g_layer_x == 0 };
         toast_draw(&v, put_rgba8);
     } else {
         fill(0, 0, FB_W, FB_H, 0); /* transparente */
@@ -239,5 +244,5 @@ void toast_update(uint64_t now_ms) {
     g_head = (g_head + 1) % QUEUE_LEN;
     g_count--;
     g_showing = true;
-    g_until = now_ms + SHOW_MS;
+    g_until = now_ms + (uint64_t)g_show_ms;
 }

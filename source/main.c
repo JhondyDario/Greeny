@@ -427,6 +427,7 @@ int main(int argc, char *argv[]) {
                 defs_result d = load_defs(cur_tid);
                 if (d != DEFS_NONE) {
                     gr_config_load(&g_config, CONFIG_PATH); /* la app pudo cambiarla */
+                    toast_configure(g_config.toast_pos, gr_toast_ms(g_config.toast_time));
                     pending = d == DEFS_OK;
                     bad_defs = d == DEFS_BAD;
                     retries = 0;

@@ -1322,7 +1322,7 @@ void ui_search(gfx_canvas *c, const ui_assets *a, unsigned value, int type_bits,
 static const struct { const char *es, *en; int n; int opt[8]; } k_tabs[UI_TABS] = {
     { "General",     "General",  5, { UI_OPT_ANIM, UI_OPT_APPSOUND, UI_OPT_LANG, UI_OPT_THEME, UI_OPT_START } }, /* los de encender/apagar arriba, como en Música */
     { "Vista",       "View",     4, { UI_OPT_SCOPE, UI_OPT_SHOW, UI_OPT_GAMES_VIEW, UI_OPT_ACH_VIEW } },
-    { "En el juego", "In-game",  5, { UI_OPT_INGAME, UI_OPT_SOUND, UI_OPT_POPUP, UI_OPT_STARTPOP, UI_OPT_OVERLAY } },
+    { "En el juego", "In-game",  7, { UI_OPT_INGAME, UI_OPT_SOUND, UI_OPT_POPUP, UI_OPT_STARTPOP, UI_OPT_OVERLAY, UI_OPT_TOAST_POS, UI_OPT_TOAST_TIME } },
     { "Música",      "Music",    0, { 0 } },  /* una fila para encender y una por cancion */
     { "Cuenta",      "Account",  0, { 0 } },  /* sus filas dependen de si la consola esta vinculada */
     { "Avisos",      "Alerts",   7, { UI_OPT_NOTIFY_LIKE, UI_OPT_NOTIFY_FOLLOW, UI_OPT_NOTIFY_ACH, UI_OPT_NOTIFY_BADGE,
@@ -1428,6 +1428,8 @@ static int opt_icon(int opt, int row) {
         case UI_OPT_SOUND: return UI_IMG_opt_sonido_juego;
         case UI_OPT_POPUP: return UI_IMG_opt_avisos;
         case UI_OPT_STARTPOP: return UI_IMG_opt_aviso_inicio;
+        case UI_OPT_TOAST_POS: return UI_IMG_opt_fondo_animado;  /* provisional: falta su icono */
+        case UI_OPT_TOAST_TIME: return UI_IMG_opt_sincronizar;   /* provisional: falta su icono */
         case UI_OPT_OVERLAY: return UI_IMG_opt_ver_logros_juego;
         case UI_OPT_MUSIC: return UI_IMG_opt_musica;
         case UI_OPT_SONG: return -1;
@@ -1579,7 +1581,7 @@ void ui_settings(gfx_canvas *c, const ui_assets *a, const gr_config *cfg, int ta
                 break;
             case UI_OPT_INGAME:
                 option_row(c, y, sel, T("Logros en los juegos", "Achievements in games"),
-                           T("Greeny vigila el juego y desbloquea logros. Al cambiarlo hay que reiniciar la consola.",
+                           T("Greeny vigila el juego y desbloquea logros. Al cambiarlo, reinicia la consola.",
                              "Greeny watches the game and unlocks achievements. Restart the console after changing it."),
                            g_ingame ? on : off, C_GREEN);
                 break;
@@ -1595,9 +1597,23 @@ void ui_settings(gfx_canvas *c, const ui_assets *a, const gr_config *cfg, int ta
                              "On-screen messages while you play. Applies when a game starts."),
                            cfg->popup ? on : off, cfg->popup ? C_GREEN : C_NEUTRAL);
                 break;
+            case UI_OPT_TOAST_POS:
+                option_row(c, y, sel, T("Dónde sale el aviso", "Where the pop-up shows"),
+                           T("Siempre arriba: derecha, izquierda o centro. Al abrir un juego.",
+                             "Always at the top: right, left or center. When a game starts."),
+                           cfg->toast_pos == GR_TOAST_LEFT ? T("Arriba a la izquierda", "Top left")
+                           : cfg->toast_pos == GR_TOAST_CENTER ? T("Arriba al centro", "Top center") : T("Arriba a la derecha", "Top right"), C_GREEN);
+                break;
+            case UI_OPT_TOAST_TIME:
+                option_row(c, y, sel, T("Cuánto dura el aviso", "How long the pop-up stays"),
+                           T("Breve: 3 segundos. Media: 5. Larga: 8. Se aplica al abrir un juego.",
+                             "Short: 3 seconds. Medium: 5. Long: 8. Applies when a game starts."),
+                           cfg->toast_time == GR_TOAST_SHORT ? T("Breve", "Short")
+                           : cfg->toast_time == GR_TOAST_LONG ? T("Larga", "Long") : T("Media", "Medium"), C_GREEN);
+                break;
             case UI_OPT_STARTPOP:
                 option_row(c, y, sel, T("Aviso al abrir un juego", "Pop-up when a game starts"),
-                           T("El de \"Logros activos\" arriba a la derecha. Los de logros desbloqueados siguen saliendo.",
+                           T("El de \"Logros activos\". Los de logros desbloqueados siguen saliendo.",
                              "The \"Achievements on\" one at the top right. Unlock pop-ups still show."),
                            cfg->start_popup ? on : off, C_GREEN);
                 break;
