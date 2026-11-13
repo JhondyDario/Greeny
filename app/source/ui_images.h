@@ -166,7 +166,7 @@ UI_IMG(opt_desvincular, 48, 48)
 UI_IMG(opt_diagnostico, 48, 48)
 UI_IMG(opt_acerca, 48, 48)
 UI_IMG(opt_ver_logros_juego, 48, 48)
-UI_IMG(bell, 44, 44)
+UI_IMG(bell, 48, 48)
 UI_IMG(heart_lleno, 48, 48)
 UI_IMG(heart_vacio, 48, 48)
 #define UI_AVATAR_COUNT 36

@@ -274,8 +274,8 @@ void ui_set_unread(int n) { g_unread = n; }
 
 /* Campana dibujada a mano, con el globito rojo de avisos sin leer. */
 static void bell(gfx_canvas *c, int cx, int cy, int unread) {
-    gfx_circle_alpha(c, cx, cy, 24, C_WHITE, 40);
-    if (g_a && img_fit(c, g_a, UI_IMG_bell, cx - 17, cy - 17, 34)) goto count; /* la campana dibujada (assets/icons/campana.png) */
+    gfx_circle_alpha(c, cx, cy, 29, C_WHITE, 40);
+    if (g_a && img_fit(c, g_a, UI_IMG_bell, cx - 21, cy - 21, 42)) goto count; /* la campana dibujada (assets/icons/campana.png) */
     gfx_circle(c, cx, cy - 6, 9, C_WHITE);                        /* cupula */
     gfx_round_rect(c, cx - 9, cy - 6, 18, 12, 2, C_WHITE);        /* cuerpo */
     gfx_round_rect(c, cx - 13, cy + 5, 26, 4, 2, C_WHITE);        /* borde */
@@ -287,9 +287,9 @@ count:
         snprintf(n, sizeof(n), unread > 99 ? "99+" : "%d", unread);
         int w = gfx_text_width(15, n) + 12;
         if (w < 22) w = 22;
-        gfx_round_rect(c, cx + 6, cy - 24, w, 22, 11, GFX_RGB(0xEF, 0x44, 0x44));
-        gfx_ring(c, cx + 6, cy - 24, w, 22, 11, 2, C_WHITE, 200);
-        gfx_text(c, cx + 6 + (w - gfx_text_width(15, n)) / 2, cy - 22, 15, C_WHITE, n);
+        gfx_round_rect(c, cx + 8, cy - 29, w, 24, 12, GFX_RGB(0xEF, 0x44, 0x44));
+        gfx_ring(c, cx + 8, cy - 29, w, 24, 12, 2, C_WHITE, 200);
+        gfx_text(c, cx + 8 + (w - gfx_text_width(16, n)) / 2, cy - 27, 16, C_WHITE, n);
     }
 }
 
@@ -308,7 +308,7 @@ static void user_chip(gfx_canvas *c) {
     if (g_unread >= 0) { /* la campana, a la izquierda del nombre: ZL o ZR abren los avisos */
         int nw = gfx_text_width(25, g_profile->name);
         if (nw < w) nw = w;
-        bell(c, right - nw - 40, 48, g_unread);
+        bell(c, right - nw - 46, 48, g_unread);
     }
 }
 

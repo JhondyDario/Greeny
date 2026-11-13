@@ -733,3 +733,19 @@ form.stack.review-form { max-width: none; width: 100%; box-sizing: border-box; }
 .profile-head .avatar.big { width: 120px; height: 120px; font-size: 3rem; }
 @media (max-width: 1080px) { .profile-head .avatar.big { width: 104px; height: 104px; } }
 .bell img { width: 24px; height: 24px; display: block; }
+
+/* celular: el logo con la mascota al lado, en vez de logo y mascota por separado */
+.hero-logo-mobile { display: none; }
+@media (max-width: 1080px) {
+  .hero .hero-logo { display: none; }
+  .hero .hero-logo-mobile { display: block; width: min(380px, 92vw); height: auto; margin: 4px auto 10px; }
+}
+/* la foto del menu de arriba, mas grande */
+.user-menu .avatar.tiny { width: 36px; height: 36px; }
+.user-menu summary { padding: 4px 12px 4px 4px; }
+
+/* medalla de donador: medalla, titulo y texto centrados, en su propio recuadro */
+.donor-note { display: flex !important; flex-direction: column; align-items: center; text-align: center; gap: 8px; margin-top: 18px;
+  padding: 18px 16px; border-radius: 16px; background: rgba(247, 201, 30, .07); border: 1px solid rgba(247, 201, 30, .28); }
+.donor-note img { width: 84px; height: 84px; filter: drop-shadow(0 6px 14px rgba(0, 0, 0, .35)); }
+.donor-title { display: block; font-size: 1.05rem; color: #ffe169; }
