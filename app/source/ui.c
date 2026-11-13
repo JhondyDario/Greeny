@@ -985,6 +985,28 @@ void ui_browse_game(gfx_canvas *c, const ui_assets *a, const gr_cat_game *game, 
     hint(c, hx, "+", T("Salir", "Exit"));
 }
 
+/* ---------- presentacion al abrir ---------- */
+
+void ui_splash(gfx_canvas *c, const ui_assets *a, const char *name, bool first, int t) {
+    begin(c);
+    /* el logo entra desde un poco mas abajo y el texto aparece despues */
+    int rise = t < 250 ? (250 - t) * 40 / 250 : 0;
+    const int lw = 760, lh = 254, lx = (UI_W - lw) / 2, ly = 150 + rise;
+    if (!img(c, a, UI_IMG_splash_logo, lx, ly)) img(c, a, UI_IMG_logo, (UI_W - 300) / 2, 200);
+    if (t > 300) {
+        char line[160];
+        if (first) snprintf(line, sizeof(line), "%s", T("El primer sistema de logros no oficial para la Switch", "The first unofficial achievement system for the Switch"));
+        else if (name && name[0]) snprintf(line, sizeof(line), T("¡Bienvenido de vuelta, %s!", "Welcome back, %s!"), name);
+        else snprintf(line, sizeof(line), "%s", T("¡Bienvenido de vuelta!", "Welcome back!"));
+        text_center(c, UI_W / 2, 450, 34, P->ink, line, UI_W - 2 * MARGIN);
+    }
+    /* barrita de avance y como saltarla */
+    const int bw = 360, bx = (UI_W - bw) / 2;
+    gfx_round_rect(c, bx, 560, bw, 8, 4, P->gray_lt);
+    gfx_round_rect(c, bx, 560, 8 + (bw - 8) * (t > 1000 ? 1000 : t) / 1000, 8, 4, C_GREEN);
+    text_center(c, UI_W / 2, 586, 18, P->gray, T("Pulsa A para empezar", "Press A to start"), 400);
+}
+
 /* ---------- actualizar la app ---------- */
 
 static int g_upd_state;
@@ -1320,7 +1342,7 @@ void ui_search(gfx_canvas *c, const ui_assets *a, unsigned value, int type_bits,
 /* ---------- opciones ---------- */
 
 static const struct { const char *es, *en; int n; int opt[8]; } k_tabs[UI_TABS] = {
-    { "General",     "General",  5, { UI_OPT_ANIM, UI_OPT_APPSOUND, UI_OPT_LANG, UI_OPT_THEME, UI_OPT_START } }, /* los de encender/apagar arriba, como en Música */
+    { "General",     "General",  6, { UI_OPT_ANIM, UI_OPT_APPSOUND, UI_OPT_SPLASH, UI_OPT_LANG, UI_OPT_THEME, UI_OPT_START } }, /* los de encender/apagar arriba, como en Música */
     { "Vista",       "View",     4, { UI_OPT_SCOPE, UI_OPT_SHOW, UI_OPT_GAMES_VIEW, UI_OPT_ACH_VIEW } },
     { "En el juego", "In-game",  7, { UI_OPT_INGAME, UI_OPT_SOUND, UI_OPT_POPUP, UI_OPT_STARTPOP, UI_OPT_OVERLAY, UI_OPT_TOAST_POS, UI_OPT_TOAST_TIME } },
     { "Música",      "Music",    0, { 0 } },  /* una fila para encender y una por cancion */
@@ -1366,7 +1388,8 @@ static bool pill_img(gfx_canvas *c, int id, int x, int y, int w) {
 }
 
 static int g_row_h = 88;    /* alto de las filas de Opciones */
-static int g_opt_icon = -1; /* icono de la fila que se dibuja ahora (UI_IMG_opt_*), -1 = sin icono */
+static int g_opt_icon = -1;
+static bool g_row_restart; /* la fila que se dibuja ahora necesita reiniciar la consola para aplicarse */ /* icono de la fila que se dibuja ahora (UI_IMG_opt_*), -1 = sin icono */
 
 /* valores especiales de option_row: dibujan la palanquita en vez de texto */
 static const char k_on[] = "on", k_off[] = "off";
@@ -1379,6 +1402,12 @@ static void option_row(gfx_canvas *c, int y, bool selected, const char *label, c
     int lx = x + 28;
     if (g_opt_icon >= 0 && img_fit(c, g_a, g_opt_icon, x + 22, y + (h - 48) / 2, 48)) lx = x + 88;
     gfx_text(c, lx, y + 12 + ty / 2, 27, P->ink, label);
+    if (g_row_restart) { /* este cambio no se ve hasta reiniciar la consola: se dice antes de tocarlo */
+        const char *r = T("Requiere reiniciar la consola", "Needs a console restart");
+        int rx = lx + gfx_text_width(27, label) + 14, rw = gfx_text_width(15, r) + 20;
+        gfx_round_rect(c, rx, y + 15 + ty / 2, rw, 24, 12, GFX_RGB(0x5A, 0x48, 0x08));
+        gfx_text(c, rx + 10, y + 18 + ty / 2, 15, C_YELLOW, r);
+    }
     gfx_text_fit(c, lx, y + 51 + ty, 19, P->gray, help, w - (lx - x) - 28 - 300);
     y += ty; /* lo de la derecha, centrado en el alto de la fila */
     if (value == k_on || value == k_off) { /* encendido o apagado: la palanquita */
@@ -1428,8 +1457,9 @@ static int opt_icon(int opt, int row) {
         case UI_OPT_SOUND: return UI_IMG_opt_sonido_juego;
         case UI_OPT_POPUP: return UI_IMG_opt_avisos;
         case UI_OPT_STARTPOP: return UI_IMG_opt_aviso_inicio;
-        case UI_OPT_TOAST_POS: return UI_IMG_opt_fondo_animado;  /* provisional: falta su icono */
-        case UI_OPT_TOAST_TIME: return UI_IMG_opt_sincronizar;   /* provisional: falta su icono */
+        case UI_OPT_TOAST_POS: return UI_IMG_opt_toast_pos;
+        case UI_OPT_TOAST_TIME: return UI_IMG_opt_toast_time;
+        case UI_OPT_SPLASH: return UI_IMG_opt_inicio;
         case UI_OPT_OVERLAY: return UI_IMG_opt_ver_logros_juego;
         case UI_OPT_MUSIC: return UI_IMG_opt_musica;
         case UI_OPT_SONG: return -1;
@@ -1490,12 +1520,19 @@ void ui_settings(gfx_canvas *c, const ui_assets *a, const gr_config *cfg, int ta
     snprintf(who, sizeof(who), "@%s", acc->username[0] ? acc->username : "?");
 
     int count = ui_tab_count(tab, acc->linked);
-    for (int i = 0; i < count; i++) {
-        g_row_h = count >= 7 ? 64 : count >= 6 ? 74 : 88;
-        int y = count >= 7 ? 170 + i * 69 : count >= 6 ? 172 + i * 80 : count >= 5 ? 176 + i * 94 : 184 + i * 104; /* con mas filas van mas juntas */
+    /* filas siempre del mismo alto y bien separadas; si no caben, la lista baja con el cursor */
+    const int vis = UI_SETTINGS_ROWS, step = 98;
+    int first = row >= vis ? row - vis + 1 : 0;
+    if (first > count - vis) first = count > vis ? count - vis : 0;
+    g_row_h = 86;
+    if (first > 0) text_center(c, UI_W / 2, 163, 13, P->gray, "▲", 40);
+    if (first + vis < count) text_center(c, UI_W / 2, 646, 13, P->gray, "▼", 40);
+    for (int i = first; i < count && i < first + vis; i++) {
+        int y = 170 + (i - first) * step;
         bool sel = i == row;
         g_row_index = i;
         g_opt_icon = opt_icon(ui_tab_option(tab, i, acc->linked), i);
+        g_row_restart = ui_tab_option(tab, i, acc->linked) == UI_OPT_INGAME;
         switch (ui_tab_option(tab, i, acc->linked)) {
             case UI_OPT_MUSIC:
                 option_row(c, y, sel, T("Música de fondo", "Background music"),
@@ -1581,7 +1618,7 @@ void ui_settings(gfx_canvas *c, const ui_assets *a, const gr_config *cfg, int ta
                 break;
             case UI_OPT_INGAME:
                 option_row(c, y, sel, T("Logros en los juegos", "Achievements in games"),
-                           T("Greeny vigila el juego y desbloquea logros. Al cambiarlo, reinicia la consola.",
+                           T("Greeny vigila el juego y desbloquea logros.",
                              "Greeny watches the game and unlocks achievements. Restart the console after changing it."),
                            g_ingame ? on : off, C_GREEN);
                 break;
@@ -1596,6 +1633,12 @@ void ui_settings(gfx_canvas *c, const ui_assets *a, const gr_config *cfg, int ta
                            T("Mensajes en pantalla mientras juegas. Se aplica al abrir un juego.",
                              "On-screen messages while you play. Applies when a game starts."),
                            cfg->popup ? on : off, cfg->popup ? C_GREEN : C_NEUTRAL);
+                break;
+            case UI_OPT_SPLASH:
+                option_row(c, y, sel, T("Presentación al abrir", "Intro when opening"),
+                           T("El logo de Greeny y el sonido de bienvenida, unos 5 segundos. A la salta.",
+                             "Greeny's logo and the welcome sound, about 5 seconds. A skips it."),
+                           cfg->splash ? on : off, C_GREEN);
                 break;
             case UI_OPT_TOAST_POS:
                 option_row(c, y, sel, T("Dónde sale el aviso", "Where the pop-up shows"),
@@ -1685,13 +1728,13 @@ void ui_settings(gfx_canvas *c, const ui_assets *a, const gr_config *cfg, int ta
     }
 
     if (tab == UI_TAB_NOTIFY && !acc->linked)
-        gfx_text_fit(c, MARGIN + 4, (acc->linked ? 184 + 4 * 104 : 184 + 104) + 4, 19, P->gray,
+        gfx_text_fit(c, MARGIN + 4, 170 + count * 98 + 6, 19, P->gray,
                      acc->linked ? T("Salen en la campana de arriba y se abren con ZL o ZR. También se eligen en la web, en Ajustes.",
                                      "They show in the bell at the top and open with ZL or ZR. You can also choose them on the web, in Settings.")
                                  : T("Los avisos llegan a tu cuenta: vincula esta consola para elegirlos.", "Notifications go to your account: link this console to choose them."),
                      CONTENT_W - 8);
     if (tab == UI_TAB_ACCOUNT && count < 5)
-        gfx_text(c, MARGIN + 4, 184 + count * 104 + 6, 19, P->gray,
+        gfx_text(c, MARGIN + 4, 170 + count * 98 + 6, 19, P->gray,
                  acc->linked ? T("La cuenta es opcional: sin internet la app y los logros funcionan igual.",
                                  "The account is optional: without internet the app and achievements work the same.")
                              : T("Opcional. Crea tu cuenta en " GR_WEB_URL " y vincula esta consola para ver tu progreso en la web.",
@@ -2198,6 +2241,7 @@ void ui_countries(gfx_canvas *c, const ui_assets *a, int cursor, const char *cur
 
 static void rank_line(gfx_canvas *c, const ui_assets *a, int y, const gr_rank_row *r, bool sel, bool me) {
     const int x = MARGIN, w = CONTENT_W, h = 44;
+    y += 4; /* dentro de una fila de 52 */
     if (sel) gfx_round_rect(c, x - 4, y - 4, w + 8, h + 8, 14, C_YELLOW);
     glass(c, x, y, w, h, 10, me);
     char buf[64];
@@ -2240,14 +2284,19 @@ void ui_ranking(gfx_canvas *c, const ui_assets *a, const gr_rank_row *rows, int 
         gfx_text_fit(c, MARGIN + 320, 350, 23, P->gray, t2, CONTENT_W - 360);
     } else {
         bool in_top = false;
+        int first = cursor >= UI_RANK_ROWS ? cursor - UI_RANK_ROWS + 1 : 0;
+        if (first > 0) text_center(c, UI_W / 2, 100, 13, P->gray, "▲", 40);
+        if (first + UI_RANK_ROWS < n) text_center(c, UI_W / 2, 646, 13, P->gray, "▼", 40);
         for (int i = 0; i < n; i++) {
             bool mine = me->position > 0 && !strcmp(rows[i].username, me->username);
             in_top = in_top || mine;
-            rank_line(c, a, 112 + i * 49, &rows[i], i == cursor, mine);
-            zone(MARGIN, 112 + i * 49, CONTENT_W, 44, UI_ZONE_ITEM, i);
+            if (i < first || i >= first + UI_RANK_ROWS) continue;
+            int y = 110 + (i - first) * 60;
+            rank_line(c, a, y, &rows[i], i == cursor, mine);
+            zone(MARGIN, y, CONTENT_W, 52, UI_ZONE_ITEM, i);
         }
         /* si no saliste entre los diez y queda sitio, tu fila va debajo; si no, tu posicion ya esta en la cabecera */
-        if (me->position > 0 && !in_top && n < 10) rank_line(c, a, 112 + n * 49 + 6, me, false, true);
+        if (me->position > 0 && !in_top && n < UI_RANK_ROWS) rank_line(c, a, 110 + n * 60 + 6, me, false, true);
     }
 
     footer_bar(c);
@@ -2316,20 +2365,25 @@ static int badge_order(const gr_stats *st, int *out) {
     return n;
 }
 
-void ui_badges(gfx_canvas *c, const ui_assets *a, const ui_profile *p) {
+void ui_badges(gfx_canvas *c, const ui_assets *a, const ui_profile *p, int top) {
     begin(c);
     char sub[96];
     snprintf(sub, sizeof(sub), T("%d de %d conseguidas", "%d of %d earned"), gr_badges_earned(&p->stats), gr_badge_count);
     header(c, a, NULL, T("Medallas", "Badges"), sub);
 
-    const int x = MARGIN, w = CONTENT_W, h = 44;
+    const int x = MARGIN, w = CONTENT_W, h = 56;
     int order[32], no = badge_order(&p->stats, order);
-    for (int i = 0; i < no; i++) {
+    if (top > no - UI_BADGE_ROWS) top = no > UI_BADGE_ROWS ? no - UI_BADGE_ROWS : 0;
+    if (top < 0) top = 0;
+    if (top > 0) text_center(c, UI_W / 2, 104, 13, P->gray, "▲", 40);
+    if (top + UI_BADGE_ROWS < no) text_center(c, UI_W / 2, 646, 13, P->gray, "▼", 40);
+    for (int i = top; i < no && i < top + UI_BADGE_ROWS; i++) {
         const gr_badge *b = &gr_badges[order[i]];
-        int y = 112 + i * 49, value = gr_badge_value(b, &p->stats);
+        int y = 118 + (i - top) * 66, value = gr_badge_value(b, &p->stats);
+        y += 6; /* el contenido de antes estaba pensado para 44 de alto: se centra en 56 */
         bool earned = value >= b->goal;
-        glass(c, x, y, w, h, 12, false);
-        medal(c, x + 28, y + h / 2, 17, b, earned);
+        glass(c, x, y - 6, w, h, 12, false);
+        medal(c, x + 30, y + 22, 20, b, earned);
         gfx_text_fit(c, x + 58, y + 9, 21, earned ? P->ink : P->gray, T(b->name_es, b->name_en), 250);
         gfx_text_fit(c, x + 320, y + 11, 18, P->gray, T(b->how_es, b->how_en), w - 320 - 250);
         if (earned) {
@@ -2345,6 +2399,8 @@ void ui_badges(gfx_canvas *c, const ui_assets *a, const ui_profile *p) {
     }
 
     footer_bar(c);
-    int hx = hint(c, MARGIN, "B", T("Volver al perfil", "Back to profile"));
+    int hx = MARGIN;
+    if (no > UI_BADGE_ROWS) hx = hint(c, hx, "↕", T("Bajar y subir", "Scroll"));
+    hx = hint(c, hx, "B", T("Volver al perfil", "Back to profile"));
     hint(c, hx, "+", T("Salir", "Exit"));
 }

@@ -202,7 +202,7 @@ int main(int argc, char **argv) {
         ui_profile_screen(&c, &a, &anon);
         save(&c, out, "perfil_sin_cuenta", sfx);
         ui_set_profile(&prof);
-        ui_badges(&c, &a, &prof);
+        ui_badges(&c, &a, &prof, 0);
         save(&c, out, "medallas", sfx);
         ui_link(&c, &a, "JSH6PN", 547);
         save(&c, out, "link", sfx);
@@ -302,6 +302,10 @@ int main(int argc, char **argv) {
             save(&c, out, "actualizar", sfx);
             ui_update(&c, &a, UI_UPD_DOWNLOADING, "1.0.0", "- Avisos dentro de la app (ZL o ZR)", 3 << 20, 7 << 20);
             save(&c, out, "actualizar_bajando", sfx);
+            ui_splash(&c, &a, "Jhondy", false, 800);
+            save(&c, out, "splash", sfx);
+            ui_splash(&c, &a, "", true, 800);
+            save(&c, out, "splash_primera", sfx);
             ui_ranking(&c, &a, rows, 3, &yo, 14, "Mi país", "My country", "Super Mario 3D World", 0, 1);
             save(&c, out, "ranking_pais", sfx);
             ui_ranking(&c, &a, rows, 0, &yo, 0, "Mi país", "My country", "Puntos totales", 0, 3);

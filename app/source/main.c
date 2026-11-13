@@ -59,7 +59,7 @@
 
 typedef enum {
     SCREEN_HOME, SCREEN_DETAIL, SCREEN_SETTINGS, SCREEN_DIAG, SCREEN_ABOUT, SCREEN_INTRO, SCREEN_LINK, SCREEN_MSG,
-    SCREEN_PROFILE, SCREEN_BADGES, SCREEN_ACH, SCREEN_AVATARS, SCREEN_BROWSE, SCREEN_BROWSE_GAME, SCREEN_SEARCH, SCREEN_RANKING, SCREEN_USER, SCREEN_COUNTRY, SCREEN_CAPTION, SCREEN_REVIEWS, SCREEN_NOTIF, SCREEN_UPDATE
+    SCREEN_PROFILE, SCREEN_BADGES, SCREEN_ACH, SCREEN_AVATARS, SCREEN_BROWSE, SCREEN_BROWSE_GAME, SCREEN_SEARCH, SCREEN_RANKING, SCREEN_USER, SCREEN_COUNTRY, SCREEN_CAPTION, SCREEN_REVIEWS, SCREEN_NOTIF, SCREEN_UPDATE, SCREEN_SPLASH
 } screen_t;
 
 static gr_model g_model;
@@ -1177,7 +1177,7 @@ int main(int argc, char *argv[]) {
     apply_config();
     music_refresh();
     ui_set_music(g_songs, NSONGS, -1);
-    music_apply();
+    if (!g_config.splash) music_apply(); /* con presentacion, la musica empieza al terminarla */
     rescan();
     /* capa donde se dibuja la pantalla; el fondo se pinta aparte en cada cuadro */
     static u32 layer_px[UI_W * UI_H];
@@ -1190,6 +1190,7 @@ int main(int argc, char *argv[]) {
     int cursor = 0, top = 0, dcursor = 0, dtop = 0, stab = 0, srow = 0, intro_page = 0, acursor = 0, bcursor = 0, btop = 0, browse_pending = 0, song_pending = 0, song_wait = 0, vcursor = 0, vtop = 0, ncursor = 0, ntop = 0, notif_state = 0;
     screen_t notif_return = SCREEN_HOME, upd_return = SCREEN_HOME;
     bool song_all = false;
+    int badge_top = 0;
     int ccursor = 0, rcursor = 0, rank_scope = 0, rank_mode = 0, rank_state = 0, kcursor = 0, ktop = 0;
     bool lang_changed = false;
     int ach_filter = UI_ACH_ALL;
@@ -1216,6 +1217,17 @@ int main(int argc, char *argv[]) {
         screen = SCREEN_PROFILE;
     }
     refresh_greeting();
+    /* presentacion: el logo y el sonido de bienvenida; despues va la pantalla que tocaba */
+    screen_t splash_next = screen;
+    u64 splash_start = 0;
+    char splash_name[48] = "";
+    if (g_config.splash) {
+        snprintf(splash_name, sizeof(splash_name), "%s", g_account.linked && g_account.display[0] ? g_account.display
+                                                         : g_account.linked && g_account.username[0] ? g_account.username : g_nick);
+        splash_start = armGetSystemTick();
+        screen = SCREEN_SPLASH;
+        sfx_play(SFX_WELCOME);
+    }
     ui_set_unread(g_account.token[0] && g_account.linked ? 0 : -1); /* la campana sale si hay cuenta */
     sync_start(); /* en segundo plano y solo si hay cuenta e internet; la app no espera por esto */
 
@@ -1285,7 +1297,7 @@ int main(int argc, char *argv[]) {
         const screen_t screen_before = screen;
 
         /* ZL o ZR abren los avisos desde cualquier pantalla; B vuelve a donde estabas */
-        if ((down & (HidNpadButton_ZL | HidNpadButton_ZR)) && screen != SCREEN_NOTIF && screen != SCREEN_INTRO && screen != SCREEN_MSG && !g_dl_live) {
+        if ((down & (HidNpadButton_ZL | HidNpadButton_ZR)) && screen != SCREEN_NOTIF && screen != SCREEN_INTRO && screen != SCREEN_MSG && screen != SCREEN_SPLASH && !g_dl_live) {
             notif_return = screen;
             notif_state = notifs_load();
             ncursor = ntop = 0;
@@ -1296,6 +1308,16 @@ int main(int argc, char *argv[]) {
         /* cada 5 minutos, sincronizar otra vez (sube logros nuevos y trae avisos) */
         if (!g_sync_thread_live && g_account.linked && armTicksToNs(armGetSystemTick() - g_last_sync_tick) > 300000000000ULL) sync_start();
 
+        if (screen == SCREEN_SPLASH) {
+            int ms = (int)(armTicksToNs(armGetSystemTick() - splash_start) / 1000000ULL);
+            dirty = true;
+            if (ms >= 5200 || (down & (HidNpadButton_A | HidNpadButton_B))) {
+                screen = splash_next;
+                music_apply();
+                quiet = true;
+                down = 0;
+            }
+        }
         /* hay version nueva: se ofrece una vez, al estar en el inicio */
         if (g_upd_prompt && screen == SCREEN_HOME && !g_sync_thread_live) {
             g_upd_prompt = false;
@@ -1707,6 +1729,7 @@ int main(int argc, char *argv[]) {
                     case UI_OPT_POPUP:      g_config.popup = !g_config.popup; break;
                     case UI_OPT_STARTPOP:   g_config.start_popup = !g_config.start_popup; break;
                     case UI_OPT_TOAST_POS:  g_config.toast_pos = (g_config.toast_pos + 1) % GR_TOAST_POS_COUNT; break;
+                    case UI_OPT_SPLASH:     g_config.splash = !g_config.splash; break;
                     case UI_OPT_TOAST_TIME: g_config.toast_time = (g_config.toast_time + 1) % GR_TOAST_TIME_COUNT; break;
                     case UI_OPT_NOTIFY_LIKE: case UI_OPT_NOTIFY_FOLLOW: case UI_OPT_NOTIFY_ACH: case UI_OPT_NOTIFY_BADGE:
                     case UI_OPT_NOTIFY_FRIEND: case UI_OPT_NOTIFY_RANKING: case UI_OPT_NOTIFY_ALMOST: {
@@ -1796,7 +1819,7 @@ int main(int argc, char *argv[]) {
                     accepted = true;
                     if (g_sfx_next < 0) {
                         bool is_toggle = opt == UI_OPT_ANIM || opt == UI_OPT_APPSOUND || opt == UI_OPT_INGAME || opt == UI_OPT_SOUND ||
-                                         opt == UI_OPT_POPUP || opt == UI_OPT_STARTPOP || opt == UI_OPT_OVERLAY || opt == UI_OPT_MUSIC;
+                                         opt == UI_OPT_POPUP || opt == UI_OPT_STARTPOP || opt == UI_OPT_OVERLAY || opt == UI_OPT_MUSIC || opt == UI_OPT_SPLASH;
                         if (opt != UI_OPT_SONG) sfx_next(is_toggle ? SFX_TOGGLE : SFX_OPTION);
                     }
                     save_config();
@@ -1839,7 +1862,7 @@ int main(int argc, char *argv[]) {
             }
         } else if (screen == SCREEN_PROFILE) {
             if (down & (HidNpadButton_L | HidNpadButton_B)) { screen = SCREEN_HOME; back = true; }
-            if (down & HidNpadButton_X) { screen = SCREEN_BADGES; opened = true; }
+            if (down & HidNpadButton_X) { screen = SCREEN_BADGES; badge_top = 0; opened = true; }
             if ((down & HidNpadButton_A) && g_account.linked) {
                 rank_state = rank_load(rank_scope, rank_mode); /* antes de cambiar de pantalla, para que no parpadee */
                 screen = SCREEN_RANKING;
@@ -1944,6 +1967,8 @@ int main(int argc, char *argv[]) {
             }
             if (down & HidNpadButton_B) { screen = g_user_return ? g_user_return : SCREEN_RANKING; g_user_return = 0; back = true; }
         } else if (screen == SCREEN_BADGES) {
+            if ((nav & HidNpadButton_AnyDown) && badge_top + UI_BADGE_ROWS < gr_badge_count) { badge_top++; moved = true; }
+            if ((nav & HidNpadButton_AnyUp) && badge_top > 0) { badge_top--; moved = true; }
             if (down & HidNpadButton_B) { screen = g_badges_return; g_badges_return = SCREEN_PROFILE; back = true; }
         } else if (screen == SCREEN_MSG) {
             if (down & (HidNpadButton_A | HidNpadButton_B)) {
@@ -2054,7 +2079,7 @@ int main(int argc, char *argv[]) {
                 ui_settings(&layer, &g_assets, &g_config, stab, srow, g_system_spanish, g_system_dark, &acc);
             }
             else if (screen == SCREEN_PROFILE) ui_profile_screen(&layer, &g_assets, &g_profile);
-            else if (screen == SCREEN_BADGES) ui_badges(&layer, &g_assets, &g_profile);
+            else if (screen == SCREEN_BADGES) ui_badges(&layer, &g_assets, &g_profile, badge_top);
             else if (screen == SCREEN_CAPTION) ui_captions(&layer, &g_assets, g_captions, g_ncaptions, kcursor, ktop, g_account.caption);
             else if (screen == SCREEN_COUNTRY) ui_countries(&layer, &g_assets, ccursor, g_account.country);
             else if (screen == SCREEN_RANKING) {
@@ -2065,6 +2090,9 @@ int main(int argc, char *argv[]) {
                 const char *mode = rank_mode > 0 && rank_mode <= ngames ? g_model.games[gidx[rank_mode - 1]].name : (g_ui_en ? "Total points" : "Puntos totales");
                 ui_ranking(&layer, &g_assets, g_rank, g_nrank, &g_rank_me, g_rank_total, sc_es[rank_scope], sc_en[rank_scope], mode, rcursor, rank_state);
             }
+            else if (screen == SCREEN_SPLASH)
+                ui_splash(&layer, &g_assets, splash_name, !g_config.intro_done,
+                          (int)(armTicksToNs(armGetSystemTick() - splash_start) / 5000000ULL));
             else if (screen == SCREEN_UPDATE) ui_update(&layer, &g_assets, g_dl_live ? UI_UPD_DOWNLOADING : g_upd, g_rel.version, g_rel.notes, g_dl_done, g_dl_total);
             else if (screen == SCREEN_NOTIF) ui_notifs(&layer, &g_assets, g_notifs, g_nnotif, g_unread, ncursor, ntop, notif_state);
             else if (screen == SCREEN_REVIEWS) ui_reviews(&layer, &g_assets, g_rev_name, g_reviews, g_nrev, vcursor, vtop, g_rev_state, g_account.linked, g_rev_closed);

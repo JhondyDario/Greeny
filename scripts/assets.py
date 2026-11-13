@@ -85,7 +85,7 @@ from paises import PAISES  # los paises que se pueden elegir, con su bandera en 
 # iconos de las filas de Opciones (assets/opciones/), en el orden que usa ui.c
 OPCIONES = ["idioma", "tema", "inicio", "fondo_animado", "sonido_app", "vista_juegos", "vista_logros", "juegos_inicio", "mostrar",
             "logros_juego", "sonido_juego", "avisos", "aviso_inicio", "musica", "foto", "pais", "sincronizar", "desvincular",
-            "diagnostico", "acerca", "ver_logros_juego"]
+            "diagnostico", "acerca", "ver_logros_juego", "toast_pos", "toast_time"]
 AVATARS = sorted(f[:-4] for f in os.listdir(os.path.join(A, "avatars")) if f.endswith(".png"))
 app_images = [  # (nombre, archivo en assets/, ancho, alto, espejo)
     ("medal_bronce", "medals/bronce.png", 64, 64, False), ("medal_plata", "medals/plata.png", 64, 64, False),
@@ -109,7 +109,8 @@ app_images = [  # (nombre, archivo en assets/, ancho, alto, espejo)
 ] + [("flag_" + code.lower(), "flags/" + code.lower() + ".png", 40, 40, False) for code, _, _ in PAISES
 ] + [("pill_" + c, "etiquetas/" + c + ".png", 240, 42, False) for c in ("verde", "amarilla", "gris", "roja")
 ] + [("opt_" + o, "opciones/" + o + ".png", 48, 48, False) for o in OPCIONES
-] + [("bell", "icons/campana.png", 48, 48, False), ("heart_lleno", "corazon/lleno.png", 48, 48, False), ("heart_vacio", "corazon/vacio.png", 48, 48, False)]
+] + [("splash_logo", "logo-greeny-mascota-grande.png", 760, 254, False),
+     ("bell", "icons/campana.png", 48, 48, False), ("heart_lleno", "corazon/lleno.png", 48, 48, False), ("heart_vacio", "corazon/vacio.png", 48, 48, False)]
 
 for old in os.listdir(os.path.join(ROOT, "app", "data")):
     if old.startswith("img_"):
@@ -227,7 +228,7 @@ SND = os.path.join(ROOT, "assets", "sounds")
 os.makedirs(os.path.join(ROOT, "sd", "config", "greeny", "sounds"), exist_ok=True)
 # los del sysmodule (al abrir un juego y al desbloquear) y los de la app, en el orden de sfx_id (app/source/sfx.h)
 APP_SFX = ["navegar", "aceptar", "opcion", "interruptor", "boton_xy", "boton_lr", "detalle_logro", "abrir_1", "abrir_2", "abrir_3",
-           "atras_1", "atras_2", "error", "marcar_leido", "aviso_nuevo", "social", "extra_menus", "extra"]
+           "atras_1", "atras_2", "error", "marcar_leido", "aviso_nuevo", "social", "extra_menus", "extra", "bienvenida"]
 for old in os.listdir(os.path.join(ROOT, "app", "data")):
     if old.startswith("sfx_"):
         os.remove(os.path.join(ROOT, "app", "data", old))

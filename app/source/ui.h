@@ -17,7 +17,7 @@
 
 /* opciones, agrupadas en pestañas que se cambian con L y R */
 enum {
-    UI_OPT_LANG, UI_OPT_THEME, UI_OPT_ANIM, UI_OPT_GAMES_VIEW, UI_OPT_ACH_VIEW, UI_OPT_SOUND, UI_OPT_POPUP, UI_OPT_START, UI_OPT_SCOPE, UI_OPT_SHOW, UI_OPT_INGAME, UI_OPT_MUSIC, UI_OPT_SONG, UI_OPT_APPSOUND, UI_OPT_STARTPOP, UI_OPT_OVERLAY, UI_OPT_TOAST_POS, UI_OPT_TOAST_TIME,
+    UI_OPT_LANG, UI_OPT_THEME, UI_OPT_ANIM, UI_OPT_GAMES_VIEW, UI_OPT_ACH_VIEW, UI_OPT_SOUND, UI_OPT_POPUP, UI_OPT_START, UI_OPT_SCOPE, UI_OPT_SHOW, UI_OPT_INGAME, UI_OPT_MUSIC, UI_OPT_SONG, UI_OPT_APPSOUND, UI_OPT_STARTPOP, UI_OPT_OVERLAY, UI_OPT_TOAST_POS, UI_OPT_TOAST_TIME, UI_OPT_SPLASH,
     UI_OPT_DIAG, UI_OPT_ABOUT, UI_OPT_SEARCH, UI_OPT_UPDATE,
     /* pestaña Cuenta: unas u otras segun si la consola esta vinculada */
     UI_OPT_ACC_LINK, UI_OPT_ACC_LOGIN, UI_OPT_ACC_INFO, UI_OPT_ACC_SYNC, UI_OPT_ACC_UNLINK, UI_OPT_ACC_PHOTO, UI_OPT_ACC_COUNTRY,
@@ -25,6 +25,8 @@ enum {
     UI_OPT_COUNT
 };
 #define UI_TABS 7
+#define UI_SETTINGS_ROWS 5 /* filas de Opciones que caben a la vez */
+#define UI_RANK_ROWS 9     /* filas del ranking que caben a la vez */
 #define UI_TAB_MUSIC 3
 #define UI_TAB_ACCOUNT 4
 #define UI_TAB_INGAME 2
@@ -182,6 +184,8 @@ void ui_user(gfx_canvas *c, const ui_assets *a, const gr_rank_row *who, bool can
 /* Actualizar la app. state: UI_UPD_* ; done/total en bytes mientras se descarga. */
 enum { UI_UPD_UNKNOWN, UI_UPD_CHECKING, UI_UPD_CURRENT, UI_UPD_AVAILABLE, UI_UPD_DOWNLOADING, UI_UPD_NONE, UI_UPD_OFFLINE };
 void ui_set_update(int state, const char *version);  /* para el valor de la opcion en Ayuda */
+/* Presentacion al abrir: el logo, y "bienvenido de vuelta" o la frase de Greeny. t = 0..1000 (avance). */
+void ui_splash(gfx_canvas *c, const ui_assets *a, const char *name, bool first, int t);
 void ui_update(gfx_canvas *c, const ui_assets *a, int state, const char *version, const char *notes, long done, long total);
 
 /* Avisos. state: 1 listo, 2 sin conexion, 3 sin cuenta vinculada. */
@@ -211,7 +215,8 @@ void ui_profile_screen(gfx_canvas *c, const ui_assets *a, const ui_profile *p);
 /* Elegir foto de perfil: cuadricula con todas; `cursor` es la que esta marcada (0..UI_AVATAR_COUNT-1). */
 #define UI_AVATAR_COLS 9
 void ui_avatars(gfx_canvas *c, const ui_assets *a, const ui_profile *p, int cursor);
-void ui_badges(gfx_canvas *c, const ui_assets *a, const ui_profile *p);
+#define UI_BADGE_ROWS 8 /* medallas que caben a la vez; el resto con arriba y abajo */
+void ui_badges(gfx_canvas *c, const ui_assets *a, const ui_profile *p, int top);
 
 /* Introduccion de la primera vez: bienvenida, revision de la instalacion y que hacer despues. */
 #define UI_INTRO_PAGES 4

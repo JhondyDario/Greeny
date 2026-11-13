@@ -22,6 +22,7 @@ typedef enum {
     SFX_SOCIAL,     /* me gusta, seguir a alguien */
     SFX_MENU,       /* abrir el perfil, el ranking o el buscador */
     SFX_SUCCESS,    /* algo salio bien (mensaje de "listo") */
+    SFX_WELCOME,    /* la presentacion al abrir la app */
     SFX_COUNT
 } sfx_id;
 /* nombres de antes */
