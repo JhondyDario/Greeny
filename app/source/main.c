@@ -1274,6 +1274,7 @@ int main(int argc, char *argv[]) {
         if ((down & HidNpadButton_Plus) && !g_dl_live) { plus_pressed = true; break; } /* no salir a mitad de una actualizacion */
 
         bool moved = false, accepted = false, accepted_alt = false, opened = false, opened_rare = false, back = false;
+        bool quiet = false; /* la accion ya suena sola (elegir una cancion): sin el sonido del boton encima */
 
         /* ZL o ZR abren los avisos desde cualquier pantalla; B vuelve a donde estabas */
         if ((down & (HidNpadButton_ZL | HidNpadButton_ZR)) && screen != SCREEN_NOTIF && screen != SCREEN_INTRO && screen != SCREEN_MSG && !g_dl_live) {
@@ -1668,6 +1669,7 @@ int main(int argc, char *argv[]) {
                         screen = SCREEN_MSG;
                         break;
                     case UI_OPT_MUSIC:
+                        quiet = g_config.music == false; /* al encenderla, lo que se oye es la musica */
                         g_config.music = !g_config.music;
                         if (g_config.music && !g_config.music_track[0]) /* aun no hay cancion elegida: la primera que este descargada */
                             for (int i = 0; i < NSONGS && !g_config.music_track[0]; i++)
@@ -1675,6 +1677,7 @@ int main(int argc, char *argv[]) {
                         music_apply();
                         break;
                     case UI_OPT_SONG:
+                        quiet = true;
                         if (g_songs[srow - 1].have) {
                             snprintf(g_config.music_track, sizeof(g_config.music_track), "%s", g_songs[srow - 1].id);
                             g_config.music = true;
@@ -1969,7 +1972,8 @@ int main(int argc, char *argv[]) {
             if ((down & HidNpadButton_B) && intro_page > 0) { intro_page--; back = true; }
         }
 
-        if (back) sfx_play(SFX_BACK);
+        if (quiet) { /* nada: ya suena la musica */ }
+        else if (back) sfx_play(SFX_BACK);
         else if (opened_rare) sfx_play(SFX_OPEN); /* solo para pantallas que casi nunca se abren */
         else if (accepted || opened) sfx_play(SFX_ACCEPT);
         else if (accepted_alt) sfx_play(SFX_ACCEPT_ALT);
