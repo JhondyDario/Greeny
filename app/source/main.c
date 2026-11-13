@@ -1365,7 +1365,11 @@ int main(int argc, char *argv[]) {
                     g_rev_return = SCREEN_NOTIF;
                     vcursor = vtop = 0;
                     screen = SCREEN_REVIEWS;
-                } else if (v->kind == GR_NOTIF_FOLLOW && v->actor[0]) {
+                } else if (v->kind == GR_NOTIF_RANKING) {
+                    rank_state = rank_load(rank_scope, rank_mode);
+                    rcursor = 0;
+                    screen = SCREEN_RANKING;
+                } else if ((v->kind == GR_NOTIF_FOLLOW || v->kind == GR_NOTIF_FRIEND) && v->actor[0]) {
                     memset(&g_rank_view, 0, sizeof(g_rank_view));
                     snprintf(g_rank_view.username, sizeof(g_rank_view.username), "%s", v->actor);
                     snprintf(g_rank_view.display, sizeof(g_rank_view.display), "%s", v->actor_name);
@@ -1376,7 +1380,7 @@ int main(int argc, char *argv[]) {
                 } else if (v->kind == GR_NOTIF_BADGE) {
                     screen = SCREEN_BADGES;
                     g_badges_return = SCREEN_NOTIF;
-                } else if (v->kind == GR_NOTIF_ACH && v->title_id[0]) {
+                } else if ((v->kind == GR_NOTIF_ACH || v->kind == GR_NOTIF_ALMOST) && v->title_id[0]) {
                     for (int i = 0; i < g_model.ngames; i++)
                         if (!strcmp(g_model.games[i].tid, v->title_id)) {
                             cursor = i;
@@ -1702,7 +1706,8 @@ int main(int argc, char *argv[]) {
                     case UI_OPT_SOUND:      g_config.sound = !g_config.sound; break;
                     case UI_OPT_POPUP:      g_config.popup = !g_config.popup; break;
                     case UI_OPT_STARTPOP:   g_config.start_popup = !g_config.start_popup; break;
-                    case UI_OPT_NOTIFY_LIKE: case UI_OPT_NOTIFY_FOLLOW: case UI_OPT_NOTIFY_ACH: case UI_OPT_NOTIFY_BADGE: {
+                    case UI_OPT_NOTIFY_LIKE: case UI_OPT_NOTIFY_FOLLOW: case UI_OPT_NOTIFY_ACH: case UI_OPT_NOTIFY_BADGE:
+                    case UI_OPT_NOTIFY_FRIEND: case UI_OPT_NOTIFY_RANKING: case UI_OPT_NOTIFY_ALMOST: {
                         int k = opt - UI_OPT_NOTIFY_LIKE;
                         char err[160] = "";
                         gr_net_result r = net_online() ? gr_set_notify(net_http, &g_account, k, g_account.notify_off[k], err, sizeof(err)) : GR_NET_OFFLINE;
@@ -2041,7 +2046,8 @@ int main(int argc, char *argv[]) {
             }
             else if (screen == SCREEN_SETTINGS) {
                 ui_account acc = { .linked = g_account.linked, .username = g_account.username, .caption = (g_ui_en && g_account.caption_en[0]) ? g_account.caption_en : g_account.caption,
-                                   .notify = { !g_account.notify_off[0], !g_account.notify_off[1], !g_account.notify_off[2], !g_account.notify_off[3] } };
+                                   .notify = { !g_account.notify_off[0], !g_account.notify_off[1], !g_account.notify_off[2], !g_account.notify_off[3],
+                                               !g_account.notify_off[4], !g_account.notify_off[5], !g_account.notify_off[6] } };
                 sync_text(&acc.sync_es, &acc.sync_en);
                 ui_settings(&layer, &g_assets, &g_config, stab, srow, g_system_spanish, g_system_dark, &acc);
             }

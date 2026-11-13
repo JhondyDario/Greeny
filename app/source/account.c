@@ -157,7 +157,7 @@ void gr_account_load(gr_account *a, const char *path) {
         else if (!strcmp(line, "friend_code")) snprintf(a->friend_code, sizeof(a->friend_code), "%s", v);
         else if (!strcmp(line, "joined")) snprintf(a->joined, sizeof(a->joined), "%.10s", v);
         else if (!strcmp(line, "likes")) a->likes = atoi(v);
-        else if (!strcmp(line, "notify_off") && strlen(v) == 4) for (int k = 0; k < 4; k++) a->notify_off[k] = v[k] == '1';
+        else if (!strcmp(line, "notify_off")) for (int k = 0; k < GR_NOTIFY_KINDS && v[k]; k++) a->notify_off[k] = v[k] == '1';
         else if (!strcmp(line, "avatar")) a->avatar = atoi(v);
         else if (!strcmp(line, "admin")) a->admin = v[0] == '1';
         else if (!strcmp(line, "donor")) a->donor = v[0] == '1';
@@ -178,7 +178,12 @@ int gr_account_save(const gr_account *a, const char *path) {
     if (ok && a->friend_code[0]) ok = fprintf(f, "friend_code=%s\n", a->friend_code) > 0;
     if (ok && a->joined[0]) ok = fprintf(f, "joined=%s\n", a->joined) > 0;
     if (ok && a->likes > 0) ok = fprintf(f, "likes=%d\n", a->likes) > 0;
-    if (ok) ok = fprintf(f, "notify_off=%d%d%d%d\n", a->notify_off[0], a->notify_off[1], a->notify_off[2], a->notify_off[3]) > 0;
+    if (ok) {
+        char bits[GR_NOTIFY_KINDS + 1];
+        for (int k = 0; k < GR_NOTIFY_KINDS; k++) bits[k] = a->notify_off[k] ? '1' : '0';
+        bits[GR_NOTIFY_KINDS] = 0;
+        ok = fprintf(f, "notify_off=%s\n", bits) > 0;
+    }
     if (ok && a->avatar > 0) ok = fprintf(f, "avatar=%d\n", a->avatar) > 0;
     if (ok && a->admin) ok = fprintf(f, "admin=1\n") > 0;
     if (ok && a->donor) ok = fprintf(f, "donor=1\n") > 0;
@@ -461,7 +466,9 @@ int gr_parse_notifs(char *json, gr_notif *out, int max, int *unread) {
         char kind[16] = "";
         gr_json_string(p, "kind", kind, sizeof(kind));
         r->kind = !strcmp(kind, "like") ? GR_NOTIF_LIKE : !strcmp(kind, "follow") ? GR_NOTIF_FOLLOW
-                : !strcmp(kind, "achievement") ? GR_NOTIF_ACH : !strcmp(kind, "badge") ? GR_NOTIF_BADGE : GR_NOTIF_OTHER;
+                : !strcmp(kind, "achievement") ? GR_NOTIF_ACH : !strcmp(kind, "badge") ? GR_NOTIF_BADGE
+                : !strcmp(kind, "friend") ? GR_NOTIF_FRIEND : !strcmp(kind, "ranking") ? GR_NOTIF_RANKING : !strcmp(kind, "almost") ? GR_NOTIF_ALMOST : GR_NOTIF_OTHER;
+        gr_json_int(p, "amount", &r->amount);
         gr_json_bool(p, "read", &r->read);
         gr_json_string(p, "actor", r->actor, sizeof(r->actor));
         gr_json_string(p, "actor_name", r->actor_name, sizeof(r->actor_name));
@@ -503,7 +510,7 @@ gr_net_result gr_notifications_read(gr_http_fn http, const gr_account *a, long l
     return call(http, "/rest/v1/rpc/device_notifications_read", NULL, body, resp, sizeof(resp), NULL, 0);
 }
 
-static const char *const k_notify_kinds[4] = { "like", "follow", "achievement", "badge" };
+static const char *const k_notify_kinds[GR_NOTIFY_KINDS] = { "like", "follow", "achievement", "badge", "friend", "ranking", "almost" };
 
 gr_net_result gr_notify_prefs(gr_http_fn http, gr_account *a) {
     char body[160], resp[RESP_MAX];
@@ -511,7 +518,7 @@ gr_net_result gr_notify_prefs(gr_http_fn http, gr_account *a) {
     snprintf(body, sizeof(body), "{\"device_token\":\"%s\"}", a->token);
     gr_net_result r = call(http, "/rest/v1/rpc/device_notify_prefs", NULL, body, resp, sizeof(resp), NULL, 0);
     if (r != GR_NET_OK) return r;
-    for (int k = 0; k < 4; k++) {
+    for (int k = 0; k < GR_NOTIFY_KINDS; k++) {
         bool on;
         if (gr_json_bool(resp, k_notify_kinds[k], &on)) a->notify_off[k] = !on;
     }
@@ -520,7 +527,7 @@ gr_net_result gr_notify_prefs(gr_http_fn http, gr_account *a) {
 
 gr_net_result gr_set_notify(gr_http_fn http, gr_account *a, int kind, bool on, char *err, size_t errlen) {
     char body[200], resp[RESP_MAX];
-    if (kind < 0 || kind > 3) return GR_NET_BAD;
+    if (kind < 0 || kind >= GR_NOTIFY_KINDS) return GR_NET_BAD;
     if (!a->token[0] || !a->linked) { snprintf(err, errlen, "Esta consola no está vinculada."); return GR_NET_REJECTED; }
     snprintf(body, sizeof(body), "{\"device_token\":\"%s\",\"kind\":\"%s\",\"enabled\":%s}", a->token, k_notify_kinds[kind], on ? "true" : "false");
     gr_net_result r = call(http, "/rest/v1/rpc/device_set_notify", NULL, body, resp, sizeof(resp), err, errlen);

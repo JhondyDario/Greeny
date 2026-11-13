@@ -25,6 +25,7 @@ typedef enum {
     GR_NET_BAD,       /* respuesta que no se entiende */
 } gr_net_result;
 
+#define GR_NOTIFY_KINDS 7
 typedef struct {
     char token[80];      /* llave de esta consola; "" = nunca se vinculo */
     bool linked;         /* la ultima vez que se pregunto, estaba vinculada a un usuario */
@@ -36,7 +37,7 @@ typedef struct {
     char friend_code[24];  /* GR-123456; "" si aun no se sabe */
     char joined[11];       /* AAAA-MM-DD en que se creo la cuenta; "" si aun no se sabe */
     int  likes;            /* me gusta recibidos en sus comentarios */
-    bool notify_off[4];    /* avisos apagados: me gusta, seguidores, logros, medallas (en cero = todos encendidos) */
+    bool notify_off[GR_NOTIFY_KINDS]; /* avisos apagados (en cero = todos encendidos), en el orden de gr_notify_kind */
     int  avatar;           /* foto de perfil elegida (1..); 0 = aun no se sabe */
     char country[4];       /* pais elegido, dos letras ("DO"); "" = sin indicar */
     char caption_en[64];   /* la frase en ingles, si es una de las de la lista */
@@ -123,7 +124,7 @@ gr_net_result gr_review_like(gr_http_fn http, const gr_account *a, long long id,
 
 /* ---- avisos (notificaciones) ---- */
 #define GR_NOTIFS_MAX 50
-typedef enum { GR_NOTIF_LIKE, GR_NOTIF_FOLLOW, GR_NOTIF_ACH, GR_NOTIF_BADGE, GR_NOTIF_OTHER } gr_notif_kind;
+typedef enum { GR_NOTIF_LIKE, GR_NOTIF_FOLLOW, GR_NOTIF_ACH, GR_NOTIF_BADGE, GR_NOTIF_FRIEND, GR_NOTIF_RANKING, GR_NOTIF_ALMOST, GR_NOTIF_OTHER } gr_notif_kind;
 typedef struct {
     long long id;
     int  kind;            /* gr_notif_kind */
@@ -135,6 +136,7 @@ typedef struct {
     char game[64];
     char ach_name[48], ach_name_en[48];
     char badge[24];
+    int  amount;          /* resumenes: logros del amigo, puesto en el ranking o logros que faltan */
     char date[11];        /* AAAA-MM-DD */
 } gr_notif;
 int gr_parse_notifs(char *json, gr_notif *out, int max, int *unread);
@@ -142,7 +144,7 @@ gr_net_result gr_notifications(gr_http_fn http, const gr_account *a, gr_notif *o
 /* id < 0 = todas */
 gr_net_result gr_notifications_read(gr_http_fn http, const gr_account *a, long long id);
 
-/* Que avisos recibir: 0 me gusta, 1 seguidores, 2 logros, 3 medallas. */
+/* Que avisos recibir: 0 me gusta, 1 seguidores, 2 logros, 3 medallas, 4 amigos, 5 puesto de la semana, 6 casi platino. */
 gr_net_result gr_notify_prefs(gr_http_fn http, gr_account *a);
 gr_net_result gr_set_notify(gr_http_fn http, gr_account *a, int kind, bool on, char *err, size_t errlen);
 

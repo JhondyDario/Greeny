@@ -656,4 +656,35 @@ begin
     reset role;
 end $$;
 
+-- avisos de resumen: amigo, ranking de la semana y casi platino, sin repetirse
+do $$
+declare yo uuid := '00000000-0000-0000-0000-0000000000d1'; amigo uuid := '00000000-0000-0000-0000-0000000000d2'; j jsonb; n int;
+begin
+    insert into auth.users (id, email, raw_user_meta_data) values (yo, 'd1@g.test', '{"username":"resumen_yo"}'), (amigo, 'd2@g.test', '{"username":"resumen_amigo"}');
+    insert into public.follows (follower_id, followed_id) values (yo, amigo);
+    -- el amigo y yo subimos logros de Mario esta semana; a mi me falta uno solo
+    insert into public.unlocks (user_id, title_id, ach_id, unlocked_at)
+        select amigo, title_id, ach_id, now() - interval '10 days' from public.achievements where title_id = '010028600EBDA000';
+    insert into public.unlocks (user_id, title_id, ach_id, unlocked_at)
+        select yo, title_id, ach_id, now() - interval '10 days' from public.achievements where title_id = '010028600EBDA000' order by ach_id offset 1;
+    delete from public.notifications where user_id = yo;
+    perform public.make_digests(yo);
+    assert exists (select 1 from public.notifications where user_id = yo and kind = 'friend' and actor_id = amigo and amount >= 1), 'aviso del amigo';
+    assert exists (select 1 from public.notifications where user_id = yo and kind = 'ranking' and amount >= 2), 'puesto de la semana: detras del amigo';
+    assert exists (select 1 from public.notifications where user_id = yo and kind = 'almost' and amount = 1), 'te falta un logro';
+    n := (select count(*) from public.notifications where user_id = yo);
+    perform public.make_digests(yo);
+    assert (select count(*) from public.notifications where user_id = yo) = n, 'no se repiten enseguida';
+    -- apagado = no llega
+    delete from public.notifications where user_id = yo and kind = 'friend';
+    insert into public.notify_prefs (user_id, friends_on) values (yo, false);
+    perform public.make_digests(yo);
+    assert not exists (select 1 from public.notifications where user_id = yo and kind = 'friend'), 'con amigos apagado no llega';
+    perform set_config('request.jwt.claim.sub', yo::text, true);
+    set local role authenticated;
+    j := public.my_notifications();
+    reset role;
+    assert jsonb_array_length(j -> 'items') >= 2 and (j -> 'items' -> 0) ? 'amount', 'la lista trae el numero';
+end $$;
+
 select 'TODAS LAS PRUEBAS PASARON' as resultado;

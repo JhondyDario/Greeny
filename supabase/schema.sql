@@ -1162,6 +1162,11 @@ create table if not exists public.notifications (
     read_at    timestamptz
 );
 create index if not exists notifications_user_idx on public.notifications (user_id, created_at desc);
+-- avisos de resumen (amigos, ranking de la semana, casi platino): llevan un numero
+alter table public.notifications add column if not exists amount int;
+alter table public.notifications drop constraint if exists notifications_kind_check;
+alter table public.notifications add constraint notifications_kind_check
+    check (kind in ('like', 'follow', 'achievement', 'badge', 'friend', 'ranking', 'almost'));
 alter table public.notifications enable row level security;
 drop policy if exists notifications_own on public.notifications;
 create policy notifications_own on public.notifications for select using ((select auth.uid()) = user_id);
@@ -1182,6 +1187,9 @@ create table if not exists public.notify_prefs (
     unlock_on   boolean not null default true,  -- desbloqueaste un logro jugando
     badge_on    boolean not null default true   -- conseguiste una medalla
 );
+alter table public.notify_prefs add column if not exists friends_on boolean not null default true; -- como van tus amigos
+alter table public.notify_prefs add column if not exists ranking_on boolean not null default true; -- tu puesto de la semana
+alter table public.notify_prefs add column if not exists almost_on  boolean not null default true; -- te falta poco para platinar
 alter table public.notify_prefs enable row level security;
 drop policy if exists notify_prefs_own on public.notify_prefs;
 create policy notify_prefs_own on public.notify_prefs for all
@@ -1193,7 +1201,8 @@ create or replace function public.wants_notify(uid uuid, kind text)
 returns boolean language sql stable security definer set search_path = ''
 as $$
     select coalesce((select case kind when 'like' then p.like_on when 'follow' then p.follow_on
-                                      when 'achievement' then p.unlock_on when 'badge' then p.badge_on else true end
+                                      when 'achievement' then p.unlock_on when 'badge' then p.badge_on
+                                      when 'friend' then p.friends_on when 'ranking' then p.ranking_on when 'almost' then p.almost_on else true end
                        from public.notify_prefs p where p.user_id = uid), true);
 $$;
 revoke all on function public.wants_notify(uuid, text) from public, anon, authenticated;
@@ -1304,7 +1313,7 @@ as $$
     select jsonb_build_object(
         'unread', (select count(*) from public.notifications n where n.user_id = uid and n.read_at is null),
         'items', coalesce((select jsonb_agg(x order by x.created_at desc) from (
-            select n.id, n.kind, n.title_id, n.ach_id, n.badge, n.created_at, n.read_at is not null as read,
+            select n.id, n.kind, n.title_id, n.ach_id, n.badge, n.amount, n.created_at, n.read_at is not null as read,
                    a.username as actor, coalesce(a.display_name, a.username) as actor_name, a.avatar as actor_avatar,
                    g.name as game, coalesce(ac.name_es, n.ach_id) as ach_name, coalesce(ac.name_en, ac.name_es, n.ach_id) as ach_name_en
               from public.notifications n
@@ -1390,7 +1399,9 @@ create or replace function public.device_notify_prefs(device_token text)
 returns jsonb language sql stable security definer set search_path = ''
 as $$
     select jsonb_build_object('like', public.wants_notify(d.user_id, 'like'), 'follow', public.wants_notify(d.user_id, 'follow'),
-                              'achievement', public.wants_notify(d.user_id, 'achievement'), 'badge', public.wants_notify(d.user_id, 'badge'))
+                              'achievement', public.wants_notify(d.user_id, 'achievement'), 'badge', public.wants_notify(d.user_id, 'badge'),
+                              'friend', public.wants_notify(d.user_id, 'friend'), 'ranking', public.wants_notify(d.user_id, 'ranking'),
+                              'almost', public.wants_notify(d.user_id, 'almost'))
       from public.devices d where d.token_hash = public.hash_token(device_token) and d.user_id is not null;
 $$;
 grant execute on function public.device_notify_prefs(text) to anon, authenticated;
@@ -1407,9 +1418,103 @@ begin
         like_on   = case when kind = 'like' then enabled else p.like_on end,
         follow_on = case when kind = 'follow' then enabled else p.follow_on end,
         unlock_on = case when kind = 'achievement' then enabled else p.unlock_on end,
-        badge_on  = case when kind = 'badge' then enabled else p.badge_on end
+        badge_on  = case when kind = 'badge' then enabled else p.badge_on end,
+        friends_on = case when kind = 'friend' then enabled else p.friends_on end,
+        ranking_on = case when kind = 'ranking' then enabled else p.ranking_on end,
+        almost_on  = case when kind = 'almost' then enabled else p.almost_on end
      where p.user_id = v_uid;
     return enabled;
 end;
 $$;
 grant execute on function public.device_set_notify(text, text, boolean) to anon, authenticated;
+
+
+-- -----------------------------------------------------------------------------
+-- 16. AVISOS DE RESUMEN: se crean solos de vez en cuando, al mirar los avisos
+-- -----------------------------------------------------------------------------
+-- No hace falta un reloj en el servidor: cuando alguien abre sus avisos (web o consola)
+-- se mira si toca uno nuevo. Cada tipo tiene su espera, asi no se repiten.
+--   friend:  a quien sigues que mas logros subio esta semana, y cuantos lleva en ese juego (cada 3 dias)
+--   ranking: tu puesto esta semana en el juego que mas jugaste (cada 7 dias)
+--   almost:  el juego en el que te faltan menos logros para el platino (cada 5 dias)
+create or replace function public.make_digests(uid uuid)
+returns void
+language plpgsql security definer set search_path = ''
+as $$
+declare
+    r record;
+    v_pos int;
+begin
+    if uid is null then return; end if;
+
+    if public.wants_notify(uid, 'friend')
+       and not exists (select 1 from public.notifications n where n.user_id = uid and n.kind = 'friend' and n.created_at > now() - interval '3 days') then
+        select f.followed_id as who, u.title_id, count(*) as recent
+          into r
+          from public.follows f
+          join public.unlocks u on u.user_id = f.followed_id and u.synced_at > now() - interval '7 days'
+         where f.follower_id = uid
+         group by f.followed_id, u.title_id
+         order by count(*) desc
+         limit 1;
+        if found then
+            insert into public.notifications (user_id, kind, actor_id, title_id, amount)
+            values (uid, 'friend', r.who, r.title_id,
+                    (select count(*) from public.unlocks x where x.user_id = r.who and x.title_id = r.title_id));
+        end if;
+    end if;
+
+    if public.wants_notify(uid, 'ranking')
+       and not exists (select 1 from public.notifications n where n.user_id = uid and n.kind = 'ranking' and n.created_at > now() - interval '7 days') then
+        select u.title_id into r
+          from public.unlocks u
+         where u.user_id = uid and u.synced_at > now() - interval '7 days'
+         group by u.title_id
+         order by count(*) desc
+         limit 1;
+        if found then
+            select 1 + count(*) into v_pos
+              from public.game_points g
+             where g.title_id = r.title_id
+               and g.points > coalesce((select m.points from public.game_points m where m.user_id = uid and m.title_id = r.title_id), 0);
+            insert into public.notifications (user_id, kind, title_id, amount) values (uid, 'ranking', r.title_id, v_pos);
+        end if;
+    end if;
+
+    if public.wants_notify(uid, 'almost')
+       and not exists (select 1 from public.notifications n where n.user_id = uid and n.kind = 'almost' and n.created_at > now() - interval '5 days') then
+        select g.title_id, t.total - g.achievements as missing
+          into r
+          from public.game_points g
+          join (select a.title_id, count(*) as total from public.achievements a group by a.title_id) t on t.title_id = g.title_id
+         where g.user_id = uid and g.achievements < t.total and g.achievements * 2 >= t.total -- ya lleva la mitad o mas
+         order by t.total - g.achievements, g.achievements desc
+         limit 1;
+        if found then
+            insert into public.notifications (user_id, kind, title_id, amount) values (uid, 'almost', r.title_id, r.missing);
+        end if;
+    end if;
+end;
+$$;
+revoke all on function public.make_digests(uuid) from public, anon, authenticated;
+
+create or replace function public.my_notifications()
+returns jsonb language plpgsql volatile security definer set search_path = ''
+as $$
+begin
+    perform public.make_digests((select auth.uid()));
+    return public.notifications_for((select auth.uid()));
+end;
+$$;
+grant execute on function public.my_notifications() to authenticated;
+
+create or replace function public.device_notifications(device_token text)
+returns jsonb language plpgsql volatile security definer set search_path = ''
+as $$
+declare v_uid uuid := (select d.user_id from public.devices d where d.token_hash = public.hash_token(device_token));
+begin
+    perform public.make_digests(v_uid);
+    return public.notifications_for(v_uid);
+end;
+$$;
+grant execute on function public.device_notifications(text) to anon, authenticated;

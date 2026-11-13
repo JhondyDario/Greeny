@@ -189,7 +189,7 @@ int main(int argc, char **argv) {
                               .sync_en = "Up to date: 7 achievements sent, 2 new on your account." };
         ui_settings(&c, &a, &cfg, UI_TAB_ACCOUNT, 1, true, dark, &linked);
         save(&c, out, "settings_cuenta", sfx);
-        linked.notify[0] = true; linked.notify[1] = false; linked.notify[2] = true; linked.notify[3] = true;
+        linked.notify[0] = true; linked.notify[1] = false; linked.notify[2] = true; linked.notify[3] = true; linked.notify[4] = true; linked.notify[5] = false; linked.notify[6] = true;
         ui_settings(&c, &a, &cfg, UI_TAB_NOTIFY, 1, true, dark, &linked);
         save(&c, out, "settings_avisos", sfx);
         ui_profile prof = { .name = "Jhondy", .username = "megaJHONDY", .caption = "Coleccionista de logros", .friend_code = "GR-4821-0937-5516", .joined = "2025-04-11", .likes = 14, .country = "DO", .linked = true,
@@ -285,14 +285,16 @@ int main(int argc, char **argv) {
             gr_rank_row from_rev = { 0, "Ana_99", "Ana", 9, "MX", 3, 310, 9 };
             ui_user(&c, &a, &from_rev, true);
             save(&c, out, "usuario_comentario", sfx);
-            static gr_notif nt[4] = {
-                { 1, GR_NOTIF_LIKE, false, "Ana_99", "Ana", 9, "010028600EBDA000", "Super Mario 3D World", "", "", "", "2026-11-12" },
-                { 2, GR_NOTIF_FOLLOW, false, "luis", "Luis", 15, "", "", "", "", "", "2026-11-12" },
-                { 3, GR_NOTIF_BADGE, true, "", "", 0, "", "", "", "", "logros_10", "2026-11-11" },
-                { 4, GR_NOTIF_ACH, true, "", "", 0, "010028600EBDA000", "Super Mario 3D World", "Medio camino", "Halfway", "", "2026-11-11" },
+            static gr_notif nt[6] = {
+                { 1, GR_NOTIF_LIKE, false, "Ana_99", "Ana", 9, "010028600EBDA000", "Super Mario 3D World", "", "", "", 0, "2026-11-12" },
+                { 5, GR_NOTIF_FRIEND, false, "luis", "Luis", 15, "010028600EBDA000", "Super Mario 3D World", "", "", "", 14, "2026-11-12" },
+                { 6, GR_NOTIF_RANKING, false, "", "", 0, "010028600EBDA000", "Super Mario 3D World", "", "", "", 3, "2026-11-12" },
+                { 7, GR_NOTIF_ALMOST, true, "", "", 0, "010028600EBDA000", "Super Mario 3D World", "", "", "", 2, "2026-11-11" },
+                { 3, GR_NOTIF_BADGE, true, "", "", 0, "", "", "", "", "logros_10", 0, "2026-11-11" },
+                { 4, GR_NOTIF_ACH, true, "", "", 0, "010028600EBDA000", "Super Mario 3D World", "Medio camino", "Halfway", "", 0, "2026-11-11" },
             };
             ui_set_unread(2);
-            ui_notifs(&c, &a, nt, 4, 2, 0, 0, 1);
+            ui_notifs(&c, &a, nt, 6, 3, 0, 0, 1);
             save(&c, out, "avisos", sfx);
             ui_notifs(&c, &a, nt, 0, 0, 0, 0, 3);
             save(&c, out, "avisos_sin_cuenta", sfx);

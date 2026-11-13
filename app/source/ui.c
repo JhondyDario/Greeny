@@ -1066,6 +1066,12 @@ void ui_notif_text(const gr_notif *n, char *out, size_t cap) {
             snprintf(out, cap, T("Nueva medalla: %s", "New badge: %s"), name);
             break;
         }
+        case GR_NOTIF_FRIEND:  snprintf(out, cap, T("%s lleva %d logros en %s", "%s has %d achievements in %s"), who, n->amount, n->game[0] ? n->game : n->title_id); break;
+        case GR_NOTIF_RANKING: snprintf(out, cap, T("Esta semana vas #%d en el ranking de %s", "This week you're #%d in the %s ranking"), n->amount, n->game[0] ? n->game : n->title_id); break;
+        case GR_NOTIF_ALMOST:
+            if (n->amount == 1) snprintf(out, cap, T("Te falta 1 logro para platinar %s", "Just 1 achievement left to platinum %s"), n->game[0] ? n->game : n->title_id);
+            else snprintf(out, cap, T("Te faltan %d logros para platinar %s", "%d achievements left to platinum %s"), n->amount, n->game[0] ? n->game : n->title_id);
+            break;
         default: out[0] = 0;
     }
 }
@@ -1095,7 +1101,9 @@ void ui_notifs(gfx_canvas *c, const ui_assets *a, const gr_notif *n, int count, 
             if (!v->read) gfx_circle(c, x + 18, y + h / 2, 6, C_GREEN);
             int ix = x + 34, iy = y + 8;
             bool drawn = false;
-            if (v->kind == GR_NOTIF_FOLLOW && v->actor_avatar >= 1 && v->actor_avatar <= UI_AVATAR_COUNT)
+            if (v->kind == GR_NOTIF_RANKING) drawn = img_fit(c, a, UI_IMG_medal_oro, ix, iy, 52);
+            else if (v->kind == GR_NOTIF_ALMOST) drawn = img_fit(c, a, UI_IMG_badge_primer_platino, ix, iy, 52);
+            else if ((v->kind == GR_NOTIF_FOLLOW || v->kind == GR_NOTIF_FRIEND) && v->actor_avatar >= 1 && v->actor_avatar <= UI_AVATAR_COUNT)
                 drawn = img_fit(c, a, UI_IMG_avatar_01 + v->actor_avatar - 1, ix, iy, 52);
             else if (v->kind == GR_NOTIF_BADGE)
                 for (int k = 0; k < gr_badge_count && !drawn; k++)
@@ -1311,13 +1319,14 @@ void ui_search(gfx_canvas *c, const ui_assets *a, unsigned value, int type_bits,
 
 /* ---------- opciones ---------- */
 
-static const struct { const char *es, *en; int n; int opt[5]; } k_tabs[UI_TABS] = {
+static const struct { const char *es, *en; int n; int opt[8]; } k_tabs[UI_TABS] = {
     { "General",     "General",  5, { UI_OPT_ANIM, UI_OPT_APPSOUND, UI_OPT_LANG, UI_OPT_THEME, UI_OPT_START } }, /* los de encender/apagar arriba, como en Música */
     { "Vista",       "View",     4, { UI_OPT_SCOPE, UI_OPT_SHOW, UI_OPT_GAMES_VIEW, UI_OPT_ACH_VIEW } },
     { "En el juego", "In-game",  5, { UI_OPT_INGAME, UI_OPT_SOUND, UI_OPT_POPUP, UI_OPT_STARTPOP, UI_OPT_OVERLAY } },
     { "Música",      "Music",    0, { 0 } },  /* una fila para encender y una por cancion */
     { "Cuenta",      "Account",  0, { 0 } },  /* sus filas dependen de si la consola esta vinculada */
-    { "Avisos",      "Alerts",   4, { UI_OPT_NOTIFY_LIKE, UI_OPT_NOTIFY_FOLLOW, UI_OPT_NOTIFY_ACH, UI_OPT_NOTIFY_BADGE } },
+    { "Avisos",      "Alerts",   7, { UI_OPT_NOTIFY_LIKE, UI_OPT_NOTIFY_FOLLOW, UI_OPT_NOTIFY_ACH, UI_OPT_NOTIFY_BADGE,
+                                     UI_OPT_NOTIFY_FRIEND, UI_OPT_NOTIFY_RANKING, UI_OPT_NOTIFY_ALMOST } },
     { "Ayuda",       "Help",     4, { UI_OPT_DIAG, UI_OPT_UPDATE, UI_OPT_ABOUT, UI_OPT_SEARCH } }, /* la ultima solo la ve un administrador */
 };
 
@@ -1325,7 +1334,7 @@ int ui_tab_count(int tab, bool linked) {
     if (tab == UI_TAB_MUSIC) return 1 + g_nsongs;
     if (tab == UI_TABS - 1) return g_admin ? 4 : 3;
     if (tab == UI_TAB_ACCOUNT) return linked ? 5 : 2;
-    if (tab == UI_TAB_NOTIFY) return linked ? 4 : 1; /* sin cuenta: solo la fila para vincular */
+    if (tab == UI_TAB_NOTIFY) return linked ? 7 : 1; /* sin cuenta: solo la fila para vincular */
     return k_tabs[tab].n;
 }
 
@@ -1435,6 +1444,9 @@ static int opt_icon(int opt, int row) {
         case UI_OPT_NOTIFY_FOLLOW: return UI_IMG_stat_seguidores;
         case UI_OPT_NOTIFY_ACH: return UI_IMG_opt_logros_juego;
         case UI_OPT_NOTIFY_BADGE: return UI_IMG_opt_vista_logros;
+        case UI_OPT_NOTIFY_FRIEND: return UI_IMG_stat_siguiendo;
+        case UI_OPT_NOTIFY_RANKING: return UI_IMG_medal_oro;
+        case UI_OPT_NOTIFY_ALMOST: return UI_IMG_badge_primer_platino;
         default: (void)row; return -1;
     }
 }
@@ -1477,8 +1489,8 @@ void ui_settings(gfx_canvas *c, const ui_assets *a, const gr_config *cfg, int ta
 
     int count = ui_tab_count(tab, acc->linked);
     for (int i = 0; i < count; i++) {
-        g_row_h = count >= 6 ? 74 : 88;
-        int y = count >= 6 ? 172 + i * 80 : count >= 5 ? 176 + i * 94 : 184 + i * 104; /* con cinco o seis filas van mas juntas */
+        g_row_h = count >= 7 ? 64 : count >= 6 ? 74 : 88;
+        int y = count >= 7 ? 170 + i * 69 : count >= 6 ? 172 + i * 80 : count >= 5 ? 176 + i * 94 : 184 + i * 104; /* con mas filas van mas juntas */
         bool sel = i == row;
         g_row_index = i;
         g_opt_icon = opt_icon(ui_tab_option(tab, i, acc->linked), i);
@@ -1627,13 +1639,20 @@ void ui_settings(gfx_canvas *c, const ui_assets *a, const gr_config *cfg, int ta
             case UI_OPT_NOTIFY_LIKE:
             case UI_OPT_NOTIFY_FOLLOW:
             case UI_OPT_NOTIFY_ACH:
-            case UI_OPT_NOTIFY_BADGE: {
-                static const char *const t[4][2] = { { "Me gusta", "Likes" }, { "Seguidores", "Followers" }, { "Logros", "Achievements" }, { "Medallas", "Badges" } };
-                static const char *const d[4][2] = {
+            case UI_OPT_NOTIFY_BADGE:
+            case UI_OPT_NOTIFY_FRIEND:
+            case UI_OPT_NOTIFY_RANKING:
+            case UI_OPT_NOTIFY_ALMOST: {
+                static const char *const t[7][2] = { { "Me gusta", "Likes" }, { "Seguidores", "Followers" }, { "Logros", "Achievements" }, { "Medallas", "Badges" },
+                                                     { "Tus amigos", "Your friends" }, { "Tu puesto de la semana", "Your weekly position" }, { "Casi platino", "Almost platinum" } };
+                static const char *const d[7][2] = {
                     { "Cuando alguien le da me gusta a tu comentario.", "When someone likes your comment." },
                     { "Cuando alguien empieza a seguirte.", "When someone starts following you." },
                     { "Cuando desbloqueas un logro jugando y se sube a tu cuenta.", "When you unlock an achievement and it reaches your account." },
-                    { "Cuando consigues una medalla nueva.", "When you earn a new badge." } };
+                    { "Cuando consigues una medalla nueva.", "When you earn a new badge." },
+                    { "Cada pocos días: quién de los que sigues está subiendo más logros.", "Every few days: who you follow is unlocking the most." },
+                    { "Cada semana: tu lugar en el ranking del juego que más jugaste.", "Every week: your place in the ranking of your most played game." },
+                    { "Cuando te faltan pocos logros para completar un juego.", "When you're a few achievements away from completing a game." } };
                 int k = ui_tab_option(tab, i, acc->linked) - UI_OPT_NOTIFY_LIKE;
                 option_row(c, y, sel, T(t[k][0], t[k][1]), T(d[k][0], d[k][1]), acc->notify[k] ? on : off, C_GREEN);
                 break;
@@ -1649,7 +1668,7 @@ void ui_settings(gfx_canvas *c, const ui_assets *a, const gr_config *cfg, int ta
         }
     }
 
-    if (tab == UI_TAB_NOTIFY)
+    if (tab == UI_TAB_NOTIFY && !acc->linked)
         gfx_text_fit(c, MARGIN + 4, (acc->linked ? 184 + 4 * 104 : 184 + 104) + 4, 19, P->gray,
                      acc->linked ? T("Salen en la campana de arriba y se abren con ZL o ZR. También se eligen en la web, en Ajustes.",
                                      "They show in the bell at the top and open with ZL or ZR. You can also choose them on the web, in Settings.")
@@ -1664,7 +1683,7 @@ void ui_settings(gfx_canvas *c, const ui_assets *a, const gr_config *cfg, int ta
 
     footer_bar(c);
     int cur = ui_tab_option(tab, row, acc->linked);
-    bool is_switch = cur < UI_OPT_DIAG || (cur >= UI_OPT_NOTIFY_LIKE && cur <= UI_OPT_NOTIFY_BADGE);
+    bool is_switch = cur < UI_OPT_DIAG || (cur >= UI_OPT_NOTIFY_LIKE && cur <= UI_OPT_NOTIFY_ALMOST);
     int hx = hint(c, MARGIN, "A", is_switch ? T("Cambiar", "Change") : T("Abrir", "Open"));
     hx = hint(c, hx, "B", T("Volver", "Back"));
     hint(c, hx, "+", T("Salir", "Exit"));

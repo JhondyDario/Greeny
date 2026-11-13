@@ -311,19 +311,27 @@
       case "follow": return en ? who + " started following you" : who + " empezó a seguirte";
       case "achievement": return en ? "You unlocked \u201c" + (n.ach_name_en || n.ach_name) + "\u201d in " + game : "Desbloqueaste \u201c" + n.ach_name + "\u201d en " + game;
       case "badge": return en ? "New badge: " + badgeName(n.badge) : "Nueva medalla: " + badgeName(n.badge);
+      case "friend": return en ? who + " has " + n.amount + " achievements in " + game : who + " lleva " + n.amount + " logros en " + game;
+      case "ranking": return en ? "This week you're #" + n.amount + " in the " + game + " ranking" : "Esta semana vas #" + n.amount + " en el ranking de " + game;
+      case "almost": return n.amount === 1 ? (en ? "Just 1 achievement left to platinum " + game : "Te falta 1 logro para platinar " + game)
+                                          : (en ? n.amount + " achievements left to platinum " + game : "Te faltan " + n.amount + " logros para platinar " + game);
       default: return "";
     }
   }
   function notifIcon(n) {
     const box = h("span", { class: "notif-icon", "aria-hidden": "true" });
     if (n.kind === "like") box.append(h("img", { src: "img/corazon_lleno.png", alt: "" }));
+    else if (n.kind === "friend" && n.actor_avatar) box.append(h("img", { src: avatarSrc(n.actor_avatar), alt: "" }));
+    else if (n.kind === "ranking") box.append(h("img", { src: "img/medal_oro.png", alt: "" }));
+    else if (n.kind === "almost") box.append(h("img", { src: "img/badges/primer_platino.png", alt: "" }));
     else if (n.kind === "follow") box.append(n.actor_avatar ? h("img", { src: avatarSrc(n.actor_avatar), alt: "" }) : h("img", { src: "img/stat_seguidores.png", alt: "" }));
     else if (n.kind === "badge") box.append(h("img", { src: "img/badges/" + n.badge + ".png", alt: "" }));
     else box.append(h("img", { src: "img/trophy.png", alt: "" }));
     return box;
   }
   function notifTarget(n) {
-    if (n.kind === "follow" && n.actor) return "#/u/" + encodeURIComponent(n.actor);
+    if ((n.kind === "follow" || n.kind === "friend") && n.actor) return "#/u/" + encodeURIComponent(n.actor);
+    if (n.kind === "ranking") return "#/ranking";
     if (n.kind === "badge" && me) return "#/u/" + encodeURIComponent(me.username);
     if (n.title_id) return "#/juego/" + n.title_id;
     return "#/avisos";
@@ -964,7 +972,7 @@
       sb.from("notify_prefs").select("*").eq("user_id", session.user.id).maybeSingle(),
     ]);
     // que avisos quiere recibir: sin fila = todos
-    const prefs = { like_on: true, follow_on: true, unlock_on: true, badge_on: true, ...((prefRes && prefRes.data) || {}) };
+    const prefs = { like_on: true, follow_on: true, unlock_on: true, badge_on: true, friends_on: true, ranking_on: true, almost_on: true, ...((prefRes && prefRes.data) || {}) };
     const prefMsg = h("div", { role: "status", "aria-live": "polite" });
     const prefRow = (key, title, help) => {
       const input = h("input", { type: "checkbox", class: "switch", checked: prefs[key] ? true : null, onchange: async () => {
@@ -985,6 +993,12 @@
         prefRow("follow_on", "Seguidores", "Cuando alguien empieza a seguirte."),
         prefRow("unlock_on", "Logros", "Cuando desbloqueas un logro jugando y se sube a tu cuenta."),
         prefRow("badge_on", "Medallas", "Cuando consigues una medalla nueva.")),
+      h("h3", { style: "margin:22px 0 4px" }, "De vez en cuando"),
+      h("p", { class: "muted small", style: "margin:0 0 10px" }, "Resúmenes que salen solos cada pocos días, si hay algo que contar."),
+      h("div", { class: "stack" },
+        prefRow("friends_on", "Tus amigos", "Cómo le va a la gente que sigues: quién está subiendo más logros esta semana."),
+        prefRow("ranking_on", "Tu puesto de la semana", "En qué lugar vas en el ranking del juego que más jugaste."),
+        prefRow("almost_on", "Casi platino", "Cuando te faltan pocos logros para completar un juego.")),
       prefMsg,
     ];
     const identities = (identRes.data && identRes.data.identities) || session.user.identities || [];
