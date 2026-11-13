@@ -679,3 +679,17 @@ a.card.notif { display: flex; }
 .tab-count { font-size: .75rem; opacity: .75; background: rgba(255, 255, 255, .12); border-radius: 999px; padding: 1px 7px; }
 .grid.games > [hidden] { display: none; }
 @media (max-width: 1080px) { .status-filter { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 8px; scrollbar-width: none; } .status-filter .tab { flex: none; } }
+
+/* filtro por estado: cada boton activo toma el color de su icono, como las etiquetas */
+.status-filter .tab.on { box-shadow: inset 0 0 0 1.5px currentColor; }
+.status-filter .tab[data-st=""].on { background: rgba(255, 255, 255, .16); color: #fff; box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, .55); }
+.status-filter .tab[data-st="sin_empezar"].on { background: rgba(255, 255, 255, .12); color: var(--ink); box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, .4); }
+.status-filter .tab[data-st="prueba"].on { background: rgba(247, 201, 30, .18); color: #ffe169; box-shadow: inset 0 0 0 1.5px rgba(247, 201, 30, .65); }
+.status-filter .tab[data-st="jugable"].on { background: rgba(59, 130, 246, .22); color: #a5cdff; box-shadow: inset 0 0 0 1.5px rgba(96, 165, 250, .7); }
+.status-filter .tab[data-st="perfecto"].on { background: rgba(67, 208, 88, .2); color: #8ff09c; box-shadow: inset 0 0 0 1.5px rgba(67, 208, 88, .7); }
+
+/* pagina de un juego: caratula del alto del titulo y su descripcion; comentario a lo ancho */
+.game-head { align-items: center; gap: 18px; }
+.game-head .cover.small { width: 128px; border-radius: 18px; }
+form.stack.review-form { max-width: none; width: 100%; box-sizing: border-box; }
+@media (max-width: 1080px) { .game-head .cover.small { width: 88px; border-radius: 14px; } .game-head { align-items: flex-start; } }
