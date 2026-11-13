@@ -1317,6 +1317,7 @@ static const struct { const char *es, *en; int n; int opt[5]; } k_tabs[UI_TABS] 
     { "En el juego", "In-game",  5, { UI_OPT_INGAME, UI_OPT_SOUND, UI_OPT_POPUP, UI_OPT_STARTPOP, UI_OPT_OVERLAY } },
     { "Música",      "Music",    0, { 0 } },  /* una fila para encender y una por cancion */
     { "Cuenta",      "Account",  0, { 0 } },  /* sus filas dependen de si la consola esta vinculada */
+    { "Avisos",      "Alerts",   4, { UI_OPT_NOTIFY_LIKE, UI_OPT_NOTIFY_FOLLOW, UI_OPT_NOTIFY_ACH, UI_OPT_NOTIFY_BADGE } },
     { "Ayuda",       "Help",     4, { UI_OPT_DIAG, UI_OPT_UPDATE, UI_OPT_ABOUT, UI_OPT_SEARCH } }, /* la ultima solo la ve un administrador */
 };
 
@@ -1324,6 +1325,7 @@ int ui_tab_count(int tab, bool linked) {
     if (tab == UI_TAB_MUSIC) return 1 + g_nsongs;
     if (tab == UI_TABS - 1) return g_admin ? 4 : 3;
     if (tab == UI_TAB_ACCOUNT) return linked ? 5 : 2;
+    if (tab == UI_TAB_NOTIFY) return linked ? 4 : 1; /* sin cuenta: solo la fila para vincular */
     return k_tabs[tab].n;
 }
 
@@ -1332,6 +1334,7 @@ int ui_tab_option(int tab, int row, bool linked) {
     static const int without[2] = { UI_OPT_ACC_LINK, UI_OPT_ACC_LOGIN };
     if (tab == UI_TAB_MUSIC) return row == 0 ? UI_OPT_MUSIC : UI_OPT_SONG;
     if (tab == UI_TAB_ACCOUNT) return linked ? with[row] : without[row];
+    if (tab == UI_TAB_NOTIFY && !linked) return UI_OPT_ACC_LINK;
     return k_tabs[tab].opt[row];
 }
 
@@ -1428,6 +1431,10 @@ static int opt_icon(int opt, int row) {
         case UI_OPT_ACC_UNLINK: return UI_IMG_opt_desvincular;
         case UI_OPT_DIAG: case UI_OPT_SEARCH: return UI_IMG_opt_diagnostico;
         case UI_OPT_ABOUT: return UI_IMG_opt_acerca;
+        case UI_OPT_NOTIFY_LIKE: return UI_IMG_heart_lleno;
+        case UI_OPT_NOTIFY_FOLLOW: return UI_IMG_stat_seguidores;
+        case UI_OPT_NOTIFY_ACH: return UI_IMG_opt_logros_juego;
+        case UI_OPT_NOTIFY_BADGE: return UI_IMG_opt_vista_logros;
         default: (void)row; return -1;
     }
 }
@@ -1617,6 +1624,20 @@ void ui_settings(gfx_canvas *c, const ui_assets *a, const gr_config *cfg, int ta
                            g_upd_state == UI_UPD_AVAILABLE ? g_upd_label : g_upd_state == UI_UPD_CURRENT ? T("Al día", "Up to date") : T("Buscar", "Check"),
                            g_upd_state == UI_UPD_AVAILABLE ? C_YELLOW : g_upd_state == UI_UPD_CURRENT ? C_GREEN : C_NEUTRAL);
                 break;
+            case UI_OPT_NOTIFY_LIKE:
+            case UI_OPT_NOTIFY_FOLLOW:
+            case UI_OPT_NOTIFY_ACH:
+            case UI_OPT_NOTIFY_BADGE: {
+                static const char *const t[4][2] = { { "Me gusta", "Likes" }, { "Seguidores", "Followers" }, { "Logros", "Achievements" }, { "Medallas", "Badges" } };
+                static const char *const d[4][2] = {
+                    { "Cuando alguien le da me gusta a tu comentario.", "When someone likes your comment." },
+                    { "Cuando alguien empieza a seguirte.", "When someone starts following you." },
+                    { "Cuando desbloqueas un logro jugando y se sube a tu cuenta.", "When you unlock an achievement and it reaches your account." },
+                    { "Cuando consigues una medalla nueva.", "When you earn a new badge." } };
+                int k = ui_tab_option(tab, i, acc->linked) - UI_OPT_NOTIFY_LIKE;
+                option_row(c, y, sel, T(t[k][0], t[k][1]), T(d[k][0], d[k][1]), acc->notify[k] ? on : off, C_GREEN);
+                break;
+            }
             case UI_OPT_DIAG:
                 option_row(c, y, sel, T("Diagnóstico", "Diagnostics"),
                            T("Revisa que Greeny esté bien instalado y funcionando.", "Checks that Greeny is installed and working."), open, C_NEUTRAL);
@@ -1628,6 +1649,12 @@ void ui_settings(gfx_canvas *c, const ui_assets *a, const gr_config *cfg, int ta
         }
     }
 
+    if (tab == UI_TAB_NOTIFY)
+        gfx_text_fit(c, MARGIN + 4, (acc->linked ? 184 + 4 * 104 : 184 + 104) + 4, 19, P->gray,
+                     acc->linked ? T("Salen en la campana de arriba y se abren con ZL o ZR. También se eligen en la web, en Ajustes.",
+                                     "They show in the bell at the top and open with ZL or ZR. You can also choose them on the web, in Settings.")
+                                 : T("Los avisos llegan a tu cuenta: vincula esta consola para elegirlos.", "Notifications go to your account: link this console to choose them."),
+                     CONTENT_W - 8);
     if (tab == UI_TAB_ACCOUNT && count < 5)
         gfx_text(c, MARGIN + 4, 184 + count * 104 + 6, 19, P->gray,
                  acc->linked ? T("La cuenta es opcional: sin internet la app y los logros funcionan igual.",
@@ -1637,7 +1664,8 @@ void ui_settings(gfx_canvas *c, const ui_assets *a, const gr_config *cfg, int ta
 
     footer_bar(c);
     int cur = ui_tab_option(tab, row, acc->linked);
-    int hx = hint(c, MARGIN, "A", cur >= UI_OPT_DIAG ? T("Abrir", "Open") : T("Cambiar", "Change"));
+    bool is_switch = cur < UI_OPT_DIAG || (cur >= UI_OPT_NOTIFY_LIKE && cur <= UI_OPT_NOTIFY_BADGE);
+    int hx = hint(c, MARGIN, "A", is_switch ? T("Cambiar", "Change") : T("Abrir", "Open"));
     hx = hint(c, hx, "B", T("Volver", "Back"));
     hint(c, hx, "+", T("Salir", "Exit"));
 }

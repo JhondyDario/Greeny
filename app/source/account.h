@@ -36,6 +36,7 @@ typedef struct {
     char friend_code[24];  /* GR-123456; "" si aun no se sabe */
     char joined[11];       /* AAAA-MM-DD en que se creo la cuenta; "" si aun no se sabe */
     int  likes;            /* me gusta recibidos en sus comentarios */
+    bool notify_off[4];    /* avisos apagados: me gusta, seguidores, logros, medallas (en cero = todos encendidos) */
     int  avatar;           /* foto de perfil elegida (1..); 0 = aun no se sabe */
     char country[4];       /* pais elegido, dos letras ("DO"); "" = sin indicar */
     char caption_en[64];   /* la frase en ingles, si es una de las de la lista */
@@ -140,6 +141,10 @@ int gr_parse_notifs(char *json, gr_notif *out, int max, int *unread);
 gr_net_result gr_notifications(gr_http_fn http, const gr_account *a, gr_notif *out, int max, int *count, int *unread);
 /* id < 0 = todas */
 gr_net_result gr_notifications_read(gr_http_fn http, const gr_account *a, long long id);
+
+/* Que avisos recibir: 0 me gusta, 1 seguidores, 2 logros, 3 medallas. */
+gr_net_result gr_notify_prefs(gr_http_fn http, gr_account *a);
+gr_net_result gr_set_notify(gr_http_fn http, gr_account *a, int kind, bool on, char *err, size_t errlen);
 
 /* Entra con correo y contraseña y registra la consola de una vez. */
 gr_net_result gr_login_password(gr_http_fn http, const char *email, const char *password, const char *device_name,

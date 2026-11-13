@@ -602,6 +602,7 @@ static void sync_thread(void *arg) {
         else if (!exists || !g_sync_account.linked) g_sync = SYNC_UNLINKED;
         else {
             gr_fetch_social(net_http, &g_sync_account); /* si falla, quedan los numeros de la ultima vez */
+            gr_notify_prefs(net_http, &g_sync_account);
             r = gr_push_unlocks(net_http, &g_sync_account, ROOT, &g_sync_sent, &g_sync_added, g_sync_err, sizeof(g_sync_err));
             g_sync = r == GR_NET_OK ? SYNC_OK : r == GR_NET_OFFLINE ? SYNC_OFFLINE : SYNC_FAILED;
             /* despues de subir, para que ya salgan los avisos de los logros recien subidos */
@@ -1701,6 +1702,19 @@ int main(int argc, char *argv[]) {
                     case UI_OPT_SOUND:      g_config.sound = !g_config.sound; break;
                     case UI_OPT_POPUP:      g_config.popup = !g_config.popup; break;
                     case UI_OPT_STARTPOP:   g_config.start_popup = !g_config.start_popup; break;
+                    case UI_OPT_NOTIFY_LIKE: case UI_OPT_NOTIFY_FOLLOW: case UI_OPT_NOTIFY_ACH: case UI_OPT_NOTIFY_BADGE: {
+                        int k = opt - UI_OPT_NOTIFY_LIKE;
+                        char err[160] = "";
+                        gr_net_result r = net_online() ? gr_set_notify(net_http, &g_account, k, g_account.notify_off[k], err, sizeof(err)) : GR_NET_OFFLINE;
+                        if (r == GR_NET_OK) { gr_account_save(&g_account, ACCOUNT_PATH); sfx_next(SFX_TOGGLE); }
+                        else {
+                            show_message(false, "No se pudo cambiar", r == GR_NET_OFFLINE ? "No hay conexión a internet." : err, "Los avisos se guardan en tu cuenta: hace falta internet.");
+                            g_msg_return = SCREEN_SETTINGS;
+                            g_msg_tab = UI_TAB_NOTIFY;
+                            screen = SCREEN_MSG;
+                        }
+                        break;
+                    }
                     case UI_OPT_OVERLAY:
                         overlay_toggle();
                         if (g_overlay_msg) { g_overlay_msg = false; g_msg_return = SCREEN_SETTINGS; screen = SCREEN_MSG; }
@@ -2026,7 +2040,8 @@ int main(int argc, char *argv[]) {
                 ui_achievement(&layer, &g_assets, &g_model, cursor, ach_map[dcursor < n ? dcursor : 0]);
             }
             else if (screen == SCREEN_SETTINGS) {
-                ui_account acc = { .linked = g_account.linked, .username = g_account.username, .caption = (g_ui_en && g_account.caption_en[0]) ? g_account.caption_en : g_account.caption };
+                ui_account acc = { .linked = g_account.linked, .username = g_account.username, .caption = (g_ui_en && g_account.caption_en[0]) ? g_account.caption_en : g_account.caption,
+                                   .notify = { !g_account.notify_off[0], !g_account.notify_off[1], !g_account.notify_off[2], !g_account.notify_off[3] } };
                 sync_text(&acc.sync_es, &acc.sync_en);
                 ui_settings(&layer, &g_assets, &g_config, stab, srow, g_system_spanish, g_system_dark, &acc);
             }

@@ -1174,6 +1174,30 @@ revoke all on public.notifications from anon;
 grant select, delete on public.notifications to authenticated;
 grant update (read_at) on public.notifications to authenticated;
 
+-- Que avisos quiere recibir cada uno. Sin fila = todos. Solo la ve y la cambia su dueño.
+create table if not exists public.notify_prefs (
+    user_id     uuid primary key references public.profiles (id) on delete cascade,
+    like_on     boolean not null default true,  -- le dieron me gusta a tu comentario
+    follow_on   boolean not null default true,  -- alguien empezo a seguirte
+    unlock_on   boolean not null default true,  -- desbloqueaste un logro jugando
+    badge_on    boolean not null default true   -- conseguiste una medalla
+);
+alter table public.notify_prefs enable row level security;
+drop policy if exists notify_prefs_own on public.notify_prefs;
+create policy notify_prefs_own on public.notify_prefs for all
+    using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
+revoke all on public.notify_prefs from anon;
+grant select, insert, update on public.notify_prefs to authenticated;
+
+create or replace function public.wants_notify(uid uuid, kind text)
+returns boolean language sql stable security definer set search_path = ''
+as $$
+    select coalesce((select case kind when 'like' then p.like_on when 'follow' then p.follow_on
+                                      when 'achievement' then p.unlock_on when 'badge' then p.badge_on else true end
+                       from public.notify_prefs p where p.user_id = uid), true);
+$$;
+revoke all on function public.wants_notify(uuid, text) from public, anon, authenticated;
+
 -- Medallas ya avisadas, para no repetir el aviso. Las mismas reglas que common/progress.c.
 create table if not exists public.badge_awards (
     user_id uuid not null references public.profiles (id) on delete cascade,
@@ -1201,7 +1225,7 @@ begin
     loop
         if b.earned then
             insert into public.badge_awards (user_id, badge) values (uid, b.badge) on conflict do nothing;
-            if found and notify then
+            if found and notify and public.wants_notify(uid, 'badge') then
                 insert into public.notifications (user_id, kind, badge) values (uid, 'badge', b.badge);
             end if;
         end if;
@@ -1229,7 +1253,7 @@ begin
     select user_id, title_id into v from public.reviews where id = new.review_id;
     if v.user_id is not null and v.user_id <> new.user_id then
         -- un solo aviso por persona y comentario, aunque quite y vuelva a dar me gusta
-        if not exists (select 1 from public.notifications n where n.user_id = v.user_id and n.kind = 'like'
+        if public.wants_notify(v.user_id, 'like') and not exists (select 1 from public.notifications n where n.user_id = v.user_id and n.kind = 'like'
                          and n.actor_id = new.user_id and n.title_id = v.title_id) then
             insert into public.notifications (user_id, kind, actor_id, title_id) values (v.user_id, 'like', new.user_id, v.title_id);
         end if;
@@ -1246,7 +1270,8 @@ returns trigger
 language plpgsql security definer set search_path = ''
 as $$
 begin
-    if not exists (select 1 from public.notifications n where n.user_id = new.followed_id and n.kind = 'follow' and n.actor_id = new.follower_id) then
+    if public.wants_notify(new.followed_id, 'follow')
+       and not exists (select 1 from public.notifications n where n.user_id = new.followed_id and n.kind = 'follow' and n.actor_id = new.follower_id) then
         insert into public.notifications (user_id, kind, actor_id) values (new.followed_id, 'follow', new.follower_id);
     end if;
     return new;
@@ -1261,7 +1286,7 @@ returns trigger
 language plpgsql security definer set search_path = ''
 as $$
 begin
-    if new.unlocked_at > now() - interval '2 days' then
+    if new.unlocked_at > now() - interval '2 days' and public.wants_notify(new.user_id, 'achievement') then
         insert into public.notifications (user_id, kind, title_id, ach_id) values (new.user_id, 'achievement', new.title_id, new.ach_id);
     end if;
     perform public.check_badges(new.user_id);
@@ -1356,3 +1381,35 @@ as $$
                     union select u.user_id from public.unlocks u where u.synced_at > now() - interval '24 hours') x));
 $$;
 grant execute on function public.activity_now() to anon, authenticated;
+
+
+-- -----------------------------------------------------------------------------
+-- 15. QUE AVISOS RECIBIR (desde la consola)
+-- -----------------------------------------------------------------------------
+create or replace function public.device_notify_prefs(device_token text)
+returns jsonb language sql stable security definer set search_path = ''
+as $$
+    select jsonb_build_object('like', public.wants_notify(d.user_id, 'like'), 'follow', public.wants_notify(d.user_id, 'follow'),
+                              'achievement', public.wants_notify(d.user_id, 'achievement'), 'badge', public.wants_notify(d.user_id, 'badge'))
+      from public.devices d where d.token_hash = public.hash_token(device_token) and d.user_id is not null;
+$$;
+grant execute on function public.device_notify_prefs(text) to anon, authenticated;
+
+create or replace function public.device_set_notify(device_token text, kind text, enabled boolean)
+returns boolean language plpgsql security definer set search_path = ''
+as $$
+declare v_uid uuid;
+begin
+    select d.user_id into v_uid from public.devices d where d.token_hash = public.hash_token(device_token);
+    if v_uid is null then raise exception 'consola sin vincular'; end if;
+    insert into public.notify_prefs (user_id) values (v_uid) on conflict do nothing;
+    update public.notify_prefs p set
+        like_on   = case when kind = 'like' then enabled else p.like_on end,
+        follow_on = case when kind = 'follow' then enabled else p.follow_on end,
+        unlock_on = case when kind = 'achievement' then enabled else p.unlock_on end,
+        badge_on  = case when kind = 'badge' then enabled else p.badge_on end
+     where p.user_id = v_uid;
+    return enabled;
+end;
+$$;
+grant execute on function public.device_set_notify(text, text, boolean) to anon, authenticated;

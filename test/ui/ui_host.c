@@ -189,6 +189,9 @@ int main(int argc, char **argv) {
                               .sync_en = "Up to date: 7 achievements sent, 2 new on your account." };
         ui_settings(&c, &a, &cfg, UI_TAB_ACCOUNT, 1, true, dark, &linked);
         save(&c, out, "settings_cuenta", sfx);
+        linked.notify[0] = true; linked.notify[1] = false; linked.notify[2] = true; linked.notify[3] = true;
+        ui_settings(&c, &a, &cfg, UI_TAB_NOTIFY, 1, true, dark, &linked);
+        save(&c, out, "settings_avisos", sfx);
         ui_profile prof = { .name = "Jhondy", .username = "megaJHONDY", .caption = "Coleccionista de logros", .friend_code = "GR-4821-0937-5516", .joined = "2025-04-11", .likes = 14, .country = "DO", .linked = true,
                             .social_known = true, .followers = 12, .following = 3,
                             .stats = { .games = m.games_played, .achievements = m.unlocked, .platinums = m.platinums, .points = m.points_got } };

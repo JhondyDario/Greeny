@@ -21,12 +21,14 @@ enum {
     UI_OPT_DIAG, UI_OPT_ABOUT, UI_OPT_SEARCH, UI_OPT_UPDATE,
     /* pestaña Cuenta: unas u otras segun si la consola esta vinculada */
     UI_OPT_ACC_LINK, UI_OPT_ACC_LOGIN, UI_OPT_ACC_INFO, UI_OPT_ACC_SYNC, UI_OPT_ACC_UNLINK, UI_OPT_ACC_PHOTO, UI_OPT_ACC_COUNTRY,
+    UI_OPT_NOTIFY_LIKE, UI_OPT_NOTIFY_FOLLOW, UI_OPT_NOTIFY_ACH, UI_OPT_NOTIFY_BADGE,
     UI_OPT_COUNT
 };
-#define UI_TABS 6
+#define UI_TABS 7
 #define UI_TAB_MUSIC 3
 #define UI_TAB_ACCOUNT 4
 #define UI_TAB_INGAME 2
+#define UI_TAB_NOTIFY 5 /* que avisos recibir; Ayuda queda la ultima */
 int ui_tab_count(int tab, bool linked);            /* cuantas opciones tiene la pestaña */
 int ui_tab_option(int tab, int row, bool linked);  /* cual UI_OPT_* esta en esa fila */
 
@@ -36,6 +38,7 @@ typedef struct {
     const char *username;   /* "" si no se sabe */
     const char *caption;
     const char *sync_es, *sync_en;  /* estado de la sincronizacion, ya redactado */
+    bool notify[4];                 /* avisos encendidos: me gusta, seguidores, logros, medallas */
 } ui_account;
 
 /* Imagenes PNG que la app lleva dentro; la lista la genera scripts/assets.py. */

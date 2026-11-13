@@ -938,11 +938,36 @@
     if (!session) { location.hash = "#/entrar"; return []; }
     if (!me) return [h("h1", {}, "Ajustes"), h("p", { class: "msg err" }, "No se encontró tu perfil. Cierra sesión y vuelve a entrar.")];
 
-    const [presetRes, deviceRes, identRes] = await Promise.all([
+    const [presetRes, deviceRes, identRes, prefRes] = await Promise.all([
       sb.from("caption_presets").select("text_es").order("sort"),
       sb.from("devices").select("id,name,created_at,last_seen_at").order("created_at"),
       sb.auth.getUserIdentities(),
+      sb.from("notify_prefs").select("*").eq("user_id", session.user.id).maybeSingle(),
     ]);
+    // que avisos quiere recibir: sin fila = todos
+    const prefs = { like_on: true, follow_on: true, unlock_on: true, badge_on: true, ...((prefRes && prefRes.data) || {}) };
+    const prefMsg = h("div", { role: "status", "aria-live": "polite" });
+    const prefRow = (key, title, help) => {
+      const input = h("input", { type: "checkbox", class: "switch", checked: prefs[key] ? true : null, onchange: async () => {
+        input.disabled = true;
+        const res = await sb.from("notify_prefs").upsert({ user_id: session.user.id, [key]: input.checked }, { onConflict: "user_id" });
+        input.disabled = false;
+        if (res.error) { input.checked = !input.checked; prefMsg.replaceChildren(h("p", { class: "msg err" }, explain(res.error))); return; }
+        prefs[key] = input.checked;
+        prefMsg.replaceChildren(h("p", { class: "msg ok" }, "Guardado."));
+      } });
+      return h("label", { class: "card row pref-row" }, h("div", { class: "grow" }, h("strong", {}, title), h("div", { class: "muted small" }, help)), input);
+    };
+    const prefsBody = [
+      h("h2", {}, "Avisos"),
+      h("p", { class: "muted" }, "Elige qué avisos quieres recibir. Salen en la campana de la web y en la app (ZL o ZR)."),
+      h("div", { class: "stack" },
+        prefRow("like_on", "Me gusta", "Cuando alguien le da me gusta a tu comentario."),
+        prefRow("follow_on", "Seguidores", "Cuando alguien empieza a seguirte."),
+        prefRow("unlock_on", "Logros", "Cuando desbloqueas un logro jugando y se sube a tu cuenta."),
+        prefRow("badge_on", "Medallas", "Cuando consigues una medalla nueva.")),
+      prefMsg,
+    ];
     const identities = (identRes.data && identRes.data.identities) || session.user.identities || [];
     const discord = identities.find((i) => i.provider === "discord");
 
@@ -1058,6 +1083,7 @@
           el.reset();
           return "Ahora sigues a @" + who + ".";
         }))] },
+        { id: "avisos", label: "Avisos", body: prefsBody },
         { id: "seguridad", label: "Seguridad", body: [
           h("h2", {}, "Contraseña"),
       h("div", { class: "card" }, form([passwordField("Contraseña nueva", "password", "new-password", "Mínimo 8 caracteres.")],

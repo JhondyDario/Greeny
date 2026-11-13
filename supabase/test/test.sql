@@ -637,4 +637,23 @@ begin
     assert public.device_review_save(tok, '0100ABCDEF100000', 'ya tiene logros'), 'en prueba si se comenta';
 end $$;
 
+-- preferencias de avisos: apagar los de seguir
+do $$
+declare a uuid := '00000000-0000-0000-0000-0000000000c3'; b uuid := '00000000-0000-0000-0000-0000000000c4'; tok text := 'llave-preferencias-avisos-0000000000000000'; j jsonb;
+begin
+    insert into public.devices (token_hash, user_id, name) values (public.hash_token(tok), a, 'S');
+    j := public.device_notify_prefs(tok);
+    assert (j ->> 'follow')::boolean and (j ->> 'like')::boolean, 'por defecto todos';
+    perform public.device_set_notify(tok, 'follow', false);
+    assert not (public.device_notify_prefs(tok) ->> 'follow')::boolean and (public.device_notify_prefs(tok) ->> 'like')::boolean, 'solo se apaga seguir';
+    delete from public.follows where follower_id = b and followed_id = a;
+    delete from public.notifications where user_id = a and kind = 'follow';
+    insert into public.follows (follower_id, followed_id) values (b, a);
+    assert not exists (select 1 from public.notifications where user_id = a and kind = 'follow'), 'con seguir apagado no llega aviso';
+    perform set_config('request.jwt.claim.sub', b::text, true);
+    set local role authenticated;
+    assert (select count(*) from public.notify_prefs where user_id = a) = 0, 'nadie ve las preferencias de otro';
+    reset role;
+end $$;
+
 select 'TODAS LAS PRUEBAS PASARON' as resultado;
