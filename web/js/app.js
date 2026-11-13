@@ -407,6 +407,10 @@
 
   function renderNav() {
     const slot = document.getElementById("nav-user");
+    // celular: la campana y tu foto quedan a la vista, fuera del menu
+    const quick = document.getElementById("nav-quick");
+    if (quick) quick.replaceChildren(...(session ? [bellLink(),
+      me ? h("a", { class: "quick-me", href: "#/u/" + encodeURIComponent(me.username), "aria-label": "Mi perfil", title: "Mi perfil" }, avatar(me, "tiny")) : null].filter(Boolean) : []));
     if (session) {
       // con sesion: tu nombre, y al abrirlo tu perfil, los ajustes y salir
       const menu = h("details", { class: "user-menu" },
