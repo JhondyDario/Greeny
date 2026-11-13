@@ -313,6 +313,7 @@
       case "badge": return en ? "New badge: " + badgeName(n.badge) : "Nueva medalla: " + badgeName(n.badge);
       case "friend": return en ? who + " has " + n.amount + " achievements in " + game : who + " lleva " + n.amount + " logros en " + game;
       case "ranking": return en ? "This week you're #" + n.amount + " in the " + game + " ranking" : "Esta semana vas #" + n.amount + " en el ranking de " + game;
+      case "game": return en ? game + " is now " + (STATUS[n.badge] ? STATUS[n.badge].label : n.badge) : game + " ahora está " + (STATUS[n.badge] ? STATUS[n.badge].label : n.badge);
       case "almost": return n.amount === 1 ? (en ? "Just 1 achievement left to platinum " + game : "Te falta 1 logro para platinar " + game)
                                           : (en ? n.amount + " achievements left to platinum " + game : "Te faltan " + n.amount + " logros para platinar " + game);
       default: return "";
@@ -322,6 +323,7 @@
     const box = h("span", { class: "notif-icon", "aria-hidden": "true" });
     if (n.kind === "like") box.append(h("img", { src: "img/corazon_lleno.png", alt: "" }));
     else if (n.kind === "friend" && n.actor_avatar) box.append(h("img", { src: avatarSrc(n.actor_avatar), alt: "" }));
+    else if (n.kind === "game") box.append(h("img", { src: "img/st_" + n.badge + ".png", alt: "" }));
     else if (n.kind === "ranking") box.append(h("img", { src: "img/medal_oro.png", alt: "" }));
     else if (n.kind === "almost") box.append(h("img", { src: "img/badges/primer_platino.png", alt: "" }));
     else if (n.kind === "follow") box.append(n.actor_avatar ? h("img", { src: avatarSrc(n.actor_avatar), alt: "" }) : h("img", { src: "img/stat_seguidores.png", alt: "" }));
@@ -387,10 +389,6 @@
   }
 
   // ---------- pie de pagina ----------
-  const SOCIAL = {
-    discord: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.3 4.4A19.6 19.6 0 0 0 15.4 3l-.6 1.3a18 18 0 0 0-5.6 0L8.6 3a19.5 19.5 0 0 0-4.9 1.5C.6 9 0 13.6.3 18.1A19.8 19.8 0 0 0 6.3 21l1.3-2a12.7 12.7 0 0 1-2-1l.5-.4a14 14 0 0 0 11.8 0l.5.4c-.6.4-1.3.7-2 1l1.3 2a19.7 19.7 0 0 0 6-3c.4-5.2-.7-9.8-3.4-13.6ZM8.5 15.3c-1.2 0-2.1-1.1-2.1-2.4s.9-2.4 2.1-2.4 2.1 1.1 2.1 2.4-.9 2.4-2.1 2.4Zm7 0c-1.2 0-2.1-1.1-2.1-2.4s.9-2.4 2.1-2.4 2.1 1.1 2.1 2.4-.9 2.4-2.1 2.4Z"/></svg>',
-    github: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 .5a11.5 11.5 0 0 0-3.6 22.4c.6.1.8-.3.8-.6v-2c-3.2.7-3.9-1.5-3.9-1.5-.5-1.3-1.3-1.7-1.3-1.7-1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.7-1.6-2.6-.3-5.3-1.3-5.3-5.7 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.2 1.2a11 11 0 0 1 5.8 0C17.3 4.7 18.3 5 18.3 5c.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.4-2.7 5.4-5.3 5.7.4.4.8 1.1.8 2.2v3.2c0 .3.2.7.8.6A11.5 11.5 0 0 0 12 .5Z"/></svg>',
-  };
   let discordUrl = "";
   function renderFooter() {
     const foot = document.getElementById("foot");
@@ -413,8 +411,9 @@
       h("div", { class: "foot-bottom" },
         h("p", { class: "foot-legal" }, "© " + new Date().getFullYear() + " Greeny. Proyecto de fans independiente, no afiliado ni avalado por Nintendo. «Nintendo Switch» es una marca de Nintendo. Greeny no proporciona juegos ni archivos de Nintendo."),
         h("div", { class: "foot-social" }, h("span", {}, "Síguenos"),
-          discordUrl ? h("a", { href: discordUrl, target: "_blank", rel: "noopener", "aria-label": "Discord" }, svgEl(SOCIAL.discord)) : null,
-          h("a", { href: cfg.repoUrl, target: "_blank", rel: "noopener", "aria-label": "GitHub" }, svgEl(SOCIAL.github)))))));
+          discordUrl ? h("a", { href: discordUrl, target: "_blank", rel: "noopener", "aria-label": "Discord", title: "Discord" }, h("img", { src: "img/plat_discord.png", alt: "" })) : null,
+          cfg.youtubeUrl ? h("a", { href: cfg.youtubeUrl, target: "_blank", rel: "noopener", "aria-label": "YouTube", title: "YouTube" }, h("img", { src: "img/plat_video_play.png", alt: "" })) : null,
+          h("a", { href: cfg.repoUrl, target: "_blank", rel: "noopener", "aria-label": "GitHub", title: "GitHub" }, h("img", { src: "img/plat_github.png", alt: "", class: "on-dark" })))))));
   }
 
   function renderNav() {
@@ -972,7 +971,7 @@
       sb.from("notify_prefs").select("*").eq("user_id", session.user.id).maybeSingle(),
     ]);
     // que avisos quiere recibir: sin fila = todos
-    const prefs = { like_on: true, follow_on: true, unlock_on: true, badge_on: true, friends_on: true, ranking_on: true, almost_on: true, ...((prefRes && prefRes.data) || {}) };
+    const prefs = { like_on: true, follow_on: true, unlock_on: true, badge_on: true, friends_on: true, ranking_on: true, almost_on: true, game_on: true, ...((prefRes && prefRes.data) || {}) };
     const prefMsg = h("div", { role: "status", "aria-live": "polite" });
     const prefRow = (key, title, help) => {
       const input = h("input", { type: "checkbox", class: "switch", checked: prefs[key] ? true : null, onchange: async () => {
@@ -992,7 +991,8 @@
         prefRow("like_on", "Me gusta", "Cuando alguien le da me gusta a tu comentario."),
         prefRow("follow_on", "Seguidores", "Cuando alguien empieza a seguirte."),
         prefRow("unlock_on", "Logros", "Cuando desbloqueas un logro jugando y se sube a tu cuenta."),
-        prefRow("badge_on", "Medallas", "Cuando consigues una medalla nueva.")),
+        prefRow("badge_on", "Medallas", "Cuando consigues una medalla nueva."),
+        prefRow("game_on", "Juegos que jugaste", "Cuando un juego tuyo cambia de estado, por ejemplo de En prueba a Jugable.")),
       h("h3", { style: "margin:22px 0 4px" }, "De vez en cuando"),
       h("p", { class: "muted small", style: "margin:0 0 10px" }, "Resúmenes que salen solos cada pocos días, si hay algo que contar."),
       h("div", { class: "stack" },

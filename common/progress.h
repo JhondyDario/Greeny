@@ -9,13 +9,14 @@ typedef struct {
     int achievements;  /* logros desbloqueados */
     int platinums;     /* juegos con todos sus logros */
     int points;        /* puntos ganados */
+    int likes;         /* me gusta recibidos en sus comentarios (solo con cuenta) */
 } gr_stats;
 
 /* Nivel segun los puntos (empieza en 1). *into = puntos ganados dentro del nivel,
  * *span = puntos que mide el nivel completo. */
 int gr_level(int points, int *into, int *span);
 
-typedef enum { GR_BADGE_ACHIEVEMENTS, GR_BADGE_PLATINUMS, GR_BADGE_GAMES, GR_BADGE_POINTS } gr_badge_kind;
+typedef enum { GR_BADGE_ACHIEVEMENTS, GR_BADGE_PLATINUMS, GR_BADGE_GAMES, GR_BADGE_POINTS, GR_BADGE_LIKES } gr_badge_kind;
 
 typedef struct {
     const char *id;        /* tambien es el nombre del dibujo: <id>.png */

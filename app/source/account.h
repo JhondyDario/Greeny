@@ -25,7 +25,7 @@ typedef enum {
     GR_NET_BAD,       /* respuesta que no se entiende */
 } gr_net_result;
 
-#define GR_NOTIFY_KINDS 7
+#define GR_NOTIFY_KINDS 8
 typedef struct {
     char token[80];      /* llave de esta consola; "" = nunca se vinculo */
     bool linked;         /* la ultima vez que se pregunto, estaba vinculada a un usuario */
@@ -124,7 +124,7 @@ gr_net_result gr_review_like(gr_http_fn http, const gr_account *a, long long id,
 
 /* ---- avisos (notificaciones) ---- */
 #define GR_NOTIFS_MAX 50
-typedef enum { GR_NOTIF_LIKE, GR_NOTIF_FOLLOW, GR_NOTIF_ACH, GR_NOTIF_BADGE, GR_NOTIF_FRIEND, GR_NOTIF_RANKING, GR_NOTIF_ALMOST, GR_NOTIF_OTHER } gr_notif_kind;
+typedef enum { GR_NOTIF_LIKE, GR_NOTIF_FOLLOW, GR_NOTIF_ACH, GR_NOTIF_BADGE, GR_NOTIF_FRIEND, GR_NOTIF_RANKING, GR_NOTIF_ALMOST, GR_NOTIF_GAME, GR_NOTIF_OTHER } gr_notif_kind;
 typedef struct {
     long long id;
     int  kind;            /* gr_notif_kind */

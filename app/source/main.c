@@ -508,7 +508,7 @@ static void refresh_greeting(void) {
     g_profile.followers = g_account.followers;
     g_profile.following = g_account.following;
     g_profile.stats = (gr_stats){ .games = g_model.games_played, .achievements = g_model.unlocked,
-                                  .platinums = g_model.platinums, .points = g_model.points_got };
+                                  .platinums = g_model.platinums, .points = g_model.points_got, .likes = linked ? g_account.likes : 0 };
     ui_set_profile(&g_profile);
 }
 
@@ -1179,6 +1179,7 @@ int main(int argc, char *argv[]) {
     ui_set_music(g_songs, NSONGS, -1);
     if (!g_config.splash) music_apply(); /* con presentacion, la musica empieza al terminarla */
     rescan();
+    ui_set_external_cursor(true); /* el aro de la seleccion lo pone el bucle, con su animacion */
     /* capa donde se dibuja la pantalla; el fondo se pinta aparte en cada cuadro */
     static u32 layer_px[UI_W * UI_H];
     gfx_canvas layer = { .px = layer_px, .w = UI_W, .h = UI_H, .stride = UI_W };
@@ -1402,7 +1403,7 @@ int main(int argc, char *argv[]) {
                 } else if (v->kind == GR_NOTIF_BADGE) {
                     screen = SCREEN_BADGES;
                     g_badges_return = SCREEN_NOTIF;
-                } else if ((v->kind == GR_NOTIF_ACH || v->kind == GR_NOTIF_ALMOST) && v->title_id[0]) {
+                } else if ((v->kind == GR_NOTIF_ACH || v->kind == GR_NOTIF_ALMOST || v->kind == GR_NOTIF_GAME) && v->title_id[0]) {
                     for (int i = 0; i < g_model.ngames; i++)
                         if (!strcmp(g_model.games[i].tid, v->title_id)) {
                             cursor = i;
@@ -1732,7 +1733,7 @@ int main(int argc, char *argv[]) {
                     case UI_OPT_SPLASH:     g_config.splash = !g_config.splash; break;
                     case UI_OPT_TOAST_TIME: g_config.toast_time = (g_config.toast_time + 1) % GR_TOAST_TIME_COUNT; break;
                     case UI_OPT_NOTIFY_LIKE: case UI_OPT_NOTIFY_FOLLOW: case UI_OPT_NOTIFY_ACH: case UI_OPT_NOTIFY_BADGE:
-                    case UI_OPT_NOTIFY_FRIEND: case UI_OPT_NOTIFY_RANKING: case UI_OPT_NOTIFY_ALMOST: {
+                    case UI_OPT_NOTIFY_FRIEND: case UI_OPT_NOTIFY_RANKING: case UI_OPT_NOTIFY_ALMOST: case UI_OPT_NOTIFY_GAME: {
                         int k = opt - UI_OPT_NOTIFY_LIKE;
                         char err[160] = "";
                         gr_net_result r = net_online() ? gr_set_notify(net_http, &g_account, k, g_account.notify_off[k], err, sizeof(err)) : GR_NET_OFFLINE;
@@ -2065,6 +2066,20 @@ int main(int argc, char *argv[]) {
         /* La pantalla (texto, tarjetas) solo se redibuja en su capa cuando algo cambia.
          * Con el fondo animado, cada cuadro se pinta el fondo y se pone la capa encima. */
         bool redraw = dirty;
+        /* aro amarillo de la seleccion: se dibuja encima al final y, al cambiar de elemento,
+         * hace un "pop" suave (empieza un poco mas grande y se asienta) durante 180 ms */
+        static int sel_px = -1, sel_py, sel_pw, sel_ph;
+        static u64 sel_anim_start;
+        int sel_x, sel_y, sel_w, sel_h;
+        bool has_sel = screen != SCREEN_SPLASH && ui_selected_rect(&sel_x, &sel_y, &sel_w, &sel_h);
+        if (has_sel && (sel_x != sel_px || sel_y != sel_py || sel_w != sel_pw || sel_h != sel_ph)) {
+            sel_px = sel_x; sel_py = sel_y; sel_pw = sel_w; sel_ph = sel_h;
+            sel_anim_start = armGetSystemTick();
+        }
+        int sel_ms = (int)(armTicksToNs(armGetSystemTick() - sel_anim_start) / 1000000ULL);
+        bool sel_anim = has_sel && sel_ms < 180;
+        int splash_ms = screen == SCREEN_SPLASH ? (int)(armTicksToNs(armGetSystemTick() - splash_start) / 1000000ULL) : 9999;
+        if (sel_anim || sel_ms < 220) redraw = true; /* un cuadro mas para dejarlo quieto */
         if (dirty) {
             if (screen == SCREEN_DETAIL) ui_detail(&layer, &g_assets, &g_model, &g_config, cursor, dcursor, dtop);
             else if (screen == SCREEN_ACH) {
@@ -2074,7 +2089,7 @@ int main(int argc, char *argv[]) {
             else if (screen == SCREEN_SETTINGS) {
                 ui_account acc = { .linked = g_account.linked, .username = g_account.username, .caption = (g_ui_en && g_account.caption_en[0]) ? g_account.caption_en : g_account.caption,
                                    .notify = { !g_account.notify_off[0], !g_account.notify_off[1], !g_account.notify_off[2], !g_account.notify_off[3],
-                                               !g_account.notify_off[4], !g_account.notify_off[5], !g_account.notify_off[6] } };
+                                               !g_account.notify_off[4], !g_account.notify_off[5], !g_account.notify_off[6], !g_account.notify_off[7] } };
                 sync_text(&acc.sync_es, &acc.sync_en);
                 ui_settings(&layer, &g_assets, &g_config, stab, srow, g_system_spanish, g_system_dark, &acc);
             }
@@ -2120,7 +2135,15 @@ int main(int argc, char *argv[]) {
             gfx_canvas c = { .px = px, .w = UI_W, .h = UI_H, .stride = (int)(stride / sizeof(u32)) };
             float t = g_config.animated_bg ? (float)(armTicksToNs(armGetSystemTick() - start_tick) / 1000000ull) / 1000.0f : 0.0f;
             ui_background(&c, t);
-            gfx_compose(&c, &layer);
+            /* la presentacion aparece fundiendose desde el fondo (0,6 s) */
+            if (splash_ms < 600) gfx_compose_fx(&c, &layer, 0, 0, (unsigned)(splash_ms * 256 / 600));
+            else gfx_compose(&c, &layer);
+            if (has_sel) {
+                float k = sel_anim ? 1.0f - sel_ms / 180.0f : 0.0f; /* 1 al empezar, 0 al asentarse */
+                int e = (int)(k * k * 8.0f);
+                gfx_ring(&c, sel_x - e, sel_y - e, sel_w + 2 * e, sel_h + 2 * e, 19 + e, 4, GFX_RGB(0xF7, 0xC9, 0x1E), 256);
+                if (k > 0) gfx_ring(&c, sel_x - e - 4, sel_y - e - 4, sel_w + 2 * e + 8, sel_h + 2 * e + 8, 23 + e, 3, GFX_RGB(0xF7, 0xC9, 0x1E), (unsigned)(k * 110));
+            }
         }
         framebufferEnd(&fb);
     }

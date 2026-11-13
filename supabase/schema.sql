@@ -1166,7 +1166,7 @@ create index if not exists notifications_user_idx on public.notifications (user_
 alter table public.notifications add column if not exists amount int;
 alter table public.notifications drop constraint if exists notifications_kind_check;
 alter table public.notifications add constraint notifications_kind_check
-    check (kind in ('like', 'follow', 'achievement', 'badge', 'friend', 'ranking', 'almost'));
+    check (kind in ('like', 'follow', 'achievement', 'badge', 'friend', 'ranking', 'almost', 'game'));
 alter table public.notifications enable row level security;
 drop policy if exists notifications_own on public.notifications;
 create policy notifications_own on public.notifications for select using ((select auth.uid()) = user_id);
@@ -1190,6 +1190,7 @@ create table if not exists public.notify_prefs (
 alter table public.notify_prefs add column if not exists friends_on boolean not null default true; -- como van tus amigos
 alter table public.notify_prefs add column if not exists ranking_on boolean not null default true; -- tu puesto de la semana
 alter table public.notify_prefs add column if not exists almost_on  boolean not null default true; -- te falta poco para platinar
+alter table public.notify_prefs add column if not exists game_on    boolean not null default true; -- un juego tuyo cambio de estado
 alter table public.notify_prefs enable row level security;
 drop policy if exists notify_prefs_own on public.notify_prefs;
 create policy notify_prefs_own on public.notify_prefs for all
@@ -1202,7 +1203,8 @@ returns boolean language sql stable security definer set search_path = ''
 as $$
     select coalesce((select case kind when 'like' then p.like_on when 'follow' then p.follow_on
                                       when 'achievement' then p.unlock_on when 'badge' then p.badge_on
-                                      when 'friend' then p.friends_on when 'ranking' then p.ranking_on when 'almost' then p.almost_on else true end
+                                      when 'friend' then p.friends_on when 'ranking' then p.ranking_on when 'almost' then p.almost_on
+                                      when 'game' then p.game_on else true end
                        from public.notify_prefs p where p.user_id = uid), true);
 $$;
 revoke all on function public.wants_notify(uuid, text) from public, anon, authenticated;
@@ -1224,13 +1226,14 @@ declare
     s record;
     b record;
 begin
-    select achievements, points, games, platinums into s from public.profile_stats where id = uid;
+    select achievements, points, games, platinums, likes into s from public.profile_stats where id = uid;
     if not found then return; end if;
     for b in select * from (values
         ('primer_logro', s.achievements >= 1), ('logros_10', s.achievements >= 10), ('logros_50', s.achievements >= 50),
         ('logros_200', s.achievements >= 200), ('primer_platino', s.platinums >= 1), ('platinos_5', s.platinums >= 5),
         ('juegos_3', s.games >= 3), ('juegos_10', s.games >= 10), ('puntos_100', s.points >= 100),
-        ('puntos_500', s.points >= 500), ('puntos_2000', s.points >= 2000)) as t(badge, earned)
+        ('puntos_500', s.points >= 500), ('puntos_2000', s.points >= 2000),
+        ('likes_3', s.likes >= 3), ('likes_15', s.likes >= 15), ('likes_50', s.likes >= 50)) as t(badge, earned)
     loop
         if b.earned then
             insert into public.badge_awards (user_id, badge) values (uid, b.badge) on conflict do nothing;
@@ -1401,7 +1404,7 @@ as $$
     select jsonb_build_object('like', public.wants_notify(d.user_id, 'like'), 'follow', public.wants_notify(d.user_id, 'follow'),
                               'achievement', public.wants_notify(d.user_id, 'achievement'), 'badge', public.wants_notify(d.user_id, 'badge'),
                               'friend', public.wants_notify(d.user_id, 'friend'), 'ranking', public.wants_notify(d.user_id, 'ranking'),
-                              'almost', public.wants_notify(d.user_id, 'almost'))
+                              'almost', public.wants_notify(d.user_id, 'almost'), 'game', public.wants_notify(d.user_id, 'game'))
       from public.devices d where d.token_hash = public.hash_token(device_token) and d.user_id is not null;
 $$;
 grant execute on function public.device_notify_prefs(text) to anon, authenticated;
@@ -1421,7 +1424,8 @@ begin
         badge_on  = case when kind = 'badge' then enabled else p.badge_on end,
         friends_on = case when kind = 'friend' then enabled else p.friends_on end,
         ranking_on = case when kind = 'ranking' then enabled else p.ranking_on end,
-        almost_on  = case when kind = 'almost' then enabled else p.almost_on end
+        almost_on  = case when kind = 'almost' then enabled else p.almost_on end,
+        game_on    = case when kind = 'game' then enabled else p.game_on end
      where p.user_id = v_uid;
     return enabled;
 end;
@@ -1518,3 +1522,28 @@ begin
 end;
 $$;
 grant execute on function public.device_notifications(text) to anon, authenticated;
+
+
+-- -----------------------------------------------------------------------------
+-- 17. AVISO CUANDO UN JUEGO CAMBIA DE ESTADO
+-- -----------------------------------------------------------------------------
+-- Si el desarrollador sube un juego publicado de estado (por ejemplo de En prueba a Jugable),
+-- les llega un aviso a quienes ya lo jugaron (tienen logros o un comentario en el).
+-- No avisa al pasar a "sin empezar" ni si el juego no esta visible para todos.
+create or replace function public.notify_game_status()
+returns trigger
+language plpgsql security definer set search_path = ''
+as $$
+begin
+    if new.published and new.status is distinct from old.status and coalesce(new.status, 'sin_empezar') <> 'sin_empezar' then
+        insert into public.notifications (user_id, kind, title_id, badge)
+        select x.uid, 'game', new.title_id, new.status
+          from (select u.user_id as uid from public.unlocks u where u.title_id = new.title_id
+                union select r.user_id from public.reviews r where r.title_id = new.title_id) x
+         where public.wants_notify(x.uid, 'game');
+    end if;
+    return new;
+end;
+$$;
+drop trigger if exists games_status_notify on public.games;
+create trigger games_status_notify after update of status, published on public.games for each row execute function public.notify_game_status();

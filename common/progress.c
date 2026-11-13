@@ -25,6 +25,9 @@ const gr_badge gr_badges[] = {
     { "puntos_100",     GR_BADGE_POINTS,       100,  "Cien puntos",        "One hundred",      "Llega a 100 puntos.",                  "Reach 100 points." },
     { "puntos_500",     GR_BADGE_POINTS,       500,  "Quinientos",         "Five hundred",     "Llega a 500 puntos.",                  "Reach 500 points." },
     { "puntos_2000",    GR_BADGE_POINTS,       2000, "Imparable",          "Unstoppable",      "Llega a 2000 puntos.",                 "Reach 2000 points." },
+    { "likes_3",        GR_BADGE_LIKES,        3,    "Bien recibido",      "Well received",    "Recibe 3 me gusta en tus comentarios.", "Get 3 likes on your comments." },
+    { "likes_15",       GR_BADGE_LIKES,        15,   "Popular",            "Popular",          "Recibe 15 me gusta en tus comentarios.", "Get 15 likes on your comments." },
+    { "likes_50",       GR_BADGE_LIKES,        50,   "Voz de la comunidad", "Community voice", "Recibe 50 me gusta en tus comentarios.", "Get 50 likes on your comments." },
 };
 const int gr_badge_count = (int)(sizeof(gr_badges) / sizeof(gr_badges[0]));
 
@@ -33,6 +36,7 @@ int gr_badge_value(const gr_badge *b, const gr_stats *s) {
         case GR_BADGE_ACHIEVEMENTS: return s->achievements;
         case GR_BADGE_PLATINUMS:    return s->platinums;
         case GR_BADGE_GAMES:        return s->games;
+        case GR_BADGE_LIKES:        return s->likes;
         default:                    return s->points;
     }
 }

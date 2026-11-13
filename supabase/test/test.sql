@@ -687,4 +687,18 @@ begin
     assert jsonb_array_length(j -> 'items') >= 2 and (j -> 'items' -> 0) ? 'amount', 'la lista trae el numero';
 end $$;
 
+-- cambiar el estado de un juego avisa a quien lo jugo; medallas de me gusta
+do $$
+declare jugador uuid := '00000000-0000-0000-0000-0000000000d1';
+begin
+    delete from public.notifications where user_id = jugador and kind = 'game';
+    update public.notify_prefs set game_on = true where user_id = jugador;
+    update public.games set status = 'prueba' where title_id = '010028600EBDA000';
+    update public.games set status = 'jugable' where title_id = '010028600EBDA000';
+    assert exists (select 1 from public.notifications where user_id = jugador and kind = 'game' and badge = 'jugable'), 'aviso de estado';
+    update public.games set status = 'sin_empezar' where title_id = '010028600EBDA000';
+    assert not exists (select 1 from public.notifications where user_id = jugador and kind = 'game' and badge = 'sin_empezar'), 'sin empezar no avisa';
+    update public.games set status = 'jugable' where title_id = '010028600EBDA000';
+end $$;
+
 select 'TODAS LAS PRUEBAS PASARON' as resultado;

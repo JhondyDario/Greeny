@@ -991,7 +991,7 @@ void ui_splash(gfx_canvas *c, const ui_assets *a, const char *name, bool first, 
     begin(c);
     /* el logo entra desde un poco mas abajo y el texto aparece despues */
     int rise = t < 250 ? (250 - t) * 40 / 250 : 0;
-    const int lw = 760, lh = 254, lx = (UI_W - lw) / 2, ly = 150 + rise;
+    const int lw = 760, lx = (UI_W - lw) / 2, ly = 150 + rise;
     if (!img(c, a, UI_IMG_splash_logo, lx, ly)) img(c, a, UI_IMG_logo, (UI_W - 300) / 2, 200);
     if (t > 300) {
         char line[160];
@@ -1090,6 +1090,7 @@ void ui_notif_text(const gr_notif *n, char *out, size_t cap) {
         }
         case GR_NOTIF_FRIEND:  snprintf(out, cap, T("%s lleva %d logros en %s", "%s has %d achievements in %s"), who, n->amount, n->game[0] ? n->game : n->title_id); break;
         case GR_NOTIF_RANKING: snprintf(out, cap, T("Esta semana vas #%d en el ranking de %s", "This week you're #%d in the %s ranking"), n->amount, n->game[0] ? n->game : n->title_id); break;
+        case GR_NOTIF_GAME: snprintf(out, cap, T("%s ahora está %s", "%s is now %s"), n->game[0] ? n->game : n->title_id, status_name(n->badge)); break;
         case GR_NOTIF_ALMOST:
             if (n->amount == 1) snprintf(out, cap, T("Te falta 1 logro para platinar %s", "Just 1 achievement left to platinum %s"), n->game[0] ? n->game : n->title_id);
             else snprintf(out, cap, T("Te faltan %d logros para platinar %s", "%d achievements left to platinum %s"), n->amount, n->game[0] ? n->game : n->title_id);
@@ -1123,7 +1124,8 @@ void ui_notifs(gfx_canvas *c, const ui_assets *a, const gr_notif *n, int count, 
             if (!v->read) gfx_circle(c, x + 18, y + h / 2, 6, C_GREEN);
             int ix = x + 34, iy = y + 8;
             bool drawn = false;
-            if (v->kind == GR_NOTIF_RANKING) drawn = img_fit(c, a, UI_IMG_medal_oro, ix, iy, 52);
+            if (v->kind == GR_NOTIF_GAME) drawn = img_fit(c, a, status_img(v->badge), ix + 6, iy + 6, 40);
+            else if (v->kind == GR_NOTIF_RANKING) drawn = img_fit(c, a, UI_IMG_medal_oro, ix, iy, 52);
             else if (v->kind == GR_NOTIF_ALMOST) drawn = img_fit(c, a, UI_IMG_badge_primer_platino, ix, iy, 52);
             else if ((v->kind == GR_NOTIF_FOLLOW || v->kind == GR_NOTIF_FRIEND) && v->actor_avatar >= 1 && v->actor_avatar <= UI_AVATAR_COUNT)
                 drawn = img_fit(c, a, UI_IMG_avatar_01 + v->actor_avatar - 1, ix, iy, 52);
@@ -1347,8 +1349,8 @@ static const struct { const char *es, *en; int n; int opt[8]; } k_tabs[UI_TABS] 
     { "En el juego", "In-game",  7, { UI_OPT_INGAME, UI_OPT_SOUND, UI_OPT_POPUP, UI_OPT_STARTPOP, UI_OPT_OVERLAY, UI_OPT_TOAST_POS, UI_OPT_TOAST_TIME } },
     { "Música",      "Music",    0, { 0 } },  /* una fila para encender y una por cancion */
     { "Cuenta",      "Account",  0, { 0 } },  /* sus filas dependen de si la consola esta vinculada */
-    { "Avisos",      "Alerts",   7, { UI_OPT_NOTIFY_LIKE, UI_OPT_NOTIFY_FOLLOW, UI_OPT_NOTIFY_ACH, UI_OPT_NOTIFY_BADGE,
-                                     UI_OPT_NOTIFY_FRIEND, UI_OPT_NOTIFY_RANKING, UI_OPT_NOTIFY_ALMOST } },
+    { "Avisos",      "Alerts",   8, { UI_OPT_NOTIFY_LIKE, UI_OPT_NOTIFY_FOLLOW, UI_OPT_NOTIFY_ACH, UI_OPT_NOTIFY_BADGE,
+                                     UI_OPT_NOTIFY_GAME, UI_OPT_NOTIFY_FRIEND, UI_OPT_NOTIFY_RANKING, UI_OPT_NOTIFY_ALMOST } },
     { "Ayuda",       "Help",     4, { UI_OPT_DIAG, UI_OPT_UPDATE, UI_OPT_ABOUT, UI_OPT_SEARCH } }, /* la ultima solo la ve un administrador */
 };
 
@@ -1356,7 +1358,7 @@ int ui_tab_count(int tab, bool linked) {
     if (tab == UI_TAB_MUSIC) return 1 + g_nsongs;
     if (tab == UI_TABS - 1) return g_admin ? 4 : 3;
     if (tab == UI_TAB_ACCOUNT) return linked ? 5 : 2;
-    if (tab == UI_TAB_NOTIFY) return linked ? 7 : 1; /* sin cuenta: solo la fila para vincular */
+    if (tab == UI_TAB_NOTIFY) return linked ? 8 : 1; /* sin cuenta: solo la fila para vincular */
     return k_tabs[tab].n;
 }
 
@@ -1479,6 +1481,7 @@ static int opt_icon(int opt, int row) {
         case UI_OPT_NOTIFY_FRIEND: return UI_IMG_stat_siguiendo;
         case UI_OPT_NOTIFY_RANKING: return UI_IMG_medal_oro;
         case UI_OPT_NOTIFY_ALMOST: return UI_IMG_badge_primer_platino;
+        case UI_OPT_NOTIFY_GAME: return UI_IMG_st_jugable;
         default: (void)row; return -1;
     }
 }
@@ -1701,17 +1704,20 @@ void ui_settings(gfx_canvas *c, const ui_assets *a, const gr_config *cfg, int ta
             case UI_OPT_NOTIFY_BADGE:
             case UI_OPT_NOTIFY_FRIEND:
             case UI_OPT_NOTIFY_RANKING:
-            case UI_OPT_NOTIFY_ALMOST: {
-                static const char *const t[7][2] = { { "Me gusta", "Likes" }, { "Seguidores", "Followers" }, { "Logros", "Achievements" }, { "Medallas", "Badges" },
-                                                     { "Tus amigos", "Your friends" }, { "Tu puesto de la semana", "Your weekly position" }, { "Casi platino", "Almost platinum" } };
-                static const char *const d[7][2] = {
+            case UI_OPT_NOTIFY_ALMOST:
+            case UI_OPT_NOTIFY_GAME: {
+                static const char *const t[8][2] = { { "Me gusta", "Likes" }, { "Seguidores", "Followers" }, { "Logros", "Achievements" }, { "Medallas", "Badges" },
+                                                     { "Tus amigos", "Your friends" }, { "Tu puesto de la semana", "Your weekly position" }, { "Casi platino", "Almost platinum" },
+                                                     { "Juegos que jugaste", "Games you played" } };
+                static const char *const d[8][2] = {
                     { "Cuando alguien le da me gusta a tu comentario.", "When someone likes your comment." },
                     { "Cuando alguien empieza a seguirte.", "When someone starts following you." },
                     { "Cuando desbloqueas un logro jugando y se sube a tu cuenta.", "When you unlock an achievement and it reaches your account." },
                     { "Cuando consigues una medalla nueva.", "When you earn a new badge." },
                     { "Cada pocos días: quién de los que sigues está subiendo más logros.", "Every few days: who you follow is unlocking the most." },
                     { "Cada semana: tu lugar en el ranking del juego que más jugaste.", "Every week: your place in the ranking of your most played game." },
-                    { "Cuando te faltan pocos logros para completar un juego.", "When you're a few achievements away from completing a game." } };
+                    { "Cuando te faltan pocos logros para completar un juego.", "When you're a few achievements away from completing a game." },
+                    { "Cuando un juego tuyo cambia de estado, por ejemplo a Jugable.", "When a game you played changes status, e.g. to Playable." } };
                 int k = ui_tab_option(tab, i, acc->linked) - UI_OPT_NOTIFY_LIKE;
                 option_row(c, y, sel, T(t[k][0], t[k][1]), T(d[k][0], d[k][1]), acc->notify[k] ? on : off, C_GREEN);
                 break;
@@ -1742,7 +1748,7 @@ void ui_settings(gfx_canvas *c, const ui_assets *a, const gr_config *cfg, int ta
 
     footer_bar(c);
     int cur = ui_tab_option(tab, row, acc->linked);
-    bool is_switch = cur < UI_OPT_DIAG || (cur >= UI_OPT_NOTIFY_LIKE && cur <= UI_OPT_NOTIFY_ALMOST);
+    bool is_switch = cur < UI_OPT_DIAG || (cur >= UI_OPT_NOTIFY_LIKE && cur <= UI_OPT_NOTIFY_GAME);
     int hx = hint(c, MARGIN, "A", is_switch ? T("Cambiar", "Change") : T("Abrir", "Open"));
     hx = hint(c, hx, "B", T("Volver", "Back"));
     hint(c, hx, "+", T("Salir", "Exit"));
@@ -2030,7 +2036,7 @@ static void star(gfx_canvas *c, int cx, int cy, int r, int thick, gfx_color col)
 static void medal(gfx_canvas *c, int cx, int cy, int r, const gr_badge *b, bool earned) {
     /* los dibujos van en el mismo orden que gr_badges; el ultimo es la medalla bloqueada */
     int idx = (int)(b - gr_badges);
-    if (idx >= 0 && idx < 11 && img_fit(c, g_a, earned ? UI_IMG_badge_primer_logro + idx : UI_IMG_badge_bloqueada, cx - r, cy - r, r * 2)) return;
+    if (idx >= 0 && idx < gr_badge_count && img_fit(c, g_a, earned ? UI_IMG_badge_primer_logro + idx : UI_IMG_badge_bloqueada, cx - r, cy - r, r * 2)) return;
     static const gfx_color kind_col[] = { GFX_RGB(0x2F, 0xA6, 0x3B), GFX_RGB(0xF7, 0xC9, 0x1E), GFX_RGB(0x2B, 0x8F, 0xD9), GFX_RGB(0xE5, 0x48, 0x4D) };
     if (!earned) {
         gfx_circle(c, cx, cy, r, P->gray_lt);
@@ -2082,10 +2088,10 @@ void ui_profile_screen(gfx_canvas *c, const ui_assets *a, const ui_profile *p) {
         snprintf(buf, sizeof(buf), "“%s”", p->caption);
         text_center(c, cx, ly + 290, 21, P->ink, buf, lw - 40);
     }
-    /* abajo: desde cuando esta en Greeny y el codigo de amigo, separados por una linea fina */
+    /* abajo: desde cuando esta en Greeny (el codigo de amigo va en su propia caja, a la derecha) */
     bool has_joined = p->linked && p->joined && strlen(p->joined) == 10;
     bool has_code = p->linked && p->friend_code && p->friend_code[0];
-    if (has_joined || has_code) gfx_glass(c, lx + 40, ly + 470, lw - 80, 1, 0, P->gray, P->gray, 90, 90);
+    if (has_joined) gfx_glass(c, lx + 40, ly + 480, lw - 80, 1, 0, P->gray, P->gray, 90, 90);
     if (has_joined) {
         static const char *const mes_es[12] = { "ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic" };
         static const char *const mes_en[12] = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
@@ -2094,13 +2100,9 @@ void ui_profile_screen(gfx_canvas *c, const ui_assets *a, const ui_profile *p) {
             char when[40];
             if (g_en) snprintf(when, sizeof(when), "%s %d, %d", mes_en[m2 - 1], d2, y4);
             else snprintf(when, sizeof(when), "%d %s %d", d2, mes_es[m2 - 1], y4);
-            text_center(c, cx, ly + 486, 16, P->gray, T("EN GREENY DESDE", "MEMBER SINCE"), lw - 40);
-            text_center(c, cx, ly + 506, 22, P->ink, when, lw - 40);
+            text_center(c, cx, ly + 506, 17, P->gray, T("EN GREENY DESDE", "MEMBER SINCE"), lw - 40);
+            text_center(c, cx, ly + 530, 26, P->ink, when, lw - 40);
         }
-    }
-    if (has_code) {
-        text_center(c, cx, ly + has_joined * 62 + 486, 16, P->gray, T("CÓDIGO DE AMIGO", "FRIEND CODE"), lw - 40);
-        text_center(c, cx, ly + has_joined * 62 + 506, 24, P->accent, p->friend_code, lw - 40);
     }
 
     /* el nivel y, a su izquierda, los corazones (me gusta recibidos); los dos juntos y centrados */
@@ -2150,26 +2152,55 @@ void ui_profile_screen(gfx_canvas *c, const ui_assets *a, const ui_profile *p) {
                  T("Seguidores y siguiendo aparecen al vincular tu cuenta (Opciones → Cuenta).",
                    "Followers and following appear once you link your account (Options → Account)."));
 
-    /* medallas */
-    /* pegadas a los numeros; solo se dejan mas abajo si hace falta el aviso de vincular la cuenta */
-    const int by = p->linked ? ly + 252 : ly + 296, bw = 3 * tw + 2 * gap;
-    card(c, rx, by, bw, ly + 600 - by, false);
-    snprintf(buf, sizeof(buf), T("Medallas  ·  %d de %d", "Badges  ·  %d of %d"), gr_badges_earned(&p->stats), gr_badge_count);
-    gfx_text(c, rx + 24, by + 16, 26, P->ink, buf);
-    const int per_row = 6, r = 40, cell = (bw - 48) / per_row, mdy = (ly + 600 - by - 304) / 2; /* medallas centradas en el alto que sobre */
-    int order[32], no = badge_order(&p->stats, order);
-    for (int i = 0; i < no; i++) {
-        const gr_badge *b = &gr_badges[order[i]];
-        int mx = rx + 24 + (i % per_row) * cell + cell / 2, my = by + 104 + mdy + (i / per_row) * 116;
-        bool earned = gr_badge_earned(b, &p->stats);
-        medal(c, mx, my, r, b, earned);
-        text_center(c, mx, my + r + 6, 15, earned ? P->ink : P->gray, T(b->name_es, b->name_en), cell - 6);
-    }
-    if (p->donor) { /* en el hueco que queda al final de la segunda fila */
-        int i = gr_badge_count, mx = rx + 24 + (i % per_row) * cell + cell / 2, my = by + 104 + mdy + (i / per_row) * 116;
+    /* medallas: una sola fila, las conseguidas primero (la mas alta antes) y candados en el resto.
+     * Todas, con su progreso, en X (Ver medallas). */
+    const int by = p->linked ? ly + 252 : ly + 296, bw = 3 * tw + 2 * gap, bh = 176;
+    card(c, rx, by, bw, bh, false);
+    snprintf(buf, sizeof(buf), T("Medallas  ·  %d de %d", "Badges  ·  %d of %d"), gr_badges_earned(&p->stats) + (p->donor ? 1 : 0),
+             gr_badge_count + (p->donor ? 1 : 0));
+    gfx_text(c, rx + 24, by + 14, 24, P->ink, buf);
+    const int per_row = 6, r = 36, cell = (bw - 48) / per_row;
+    int order[32], no = badge_order(&p->stats, order), earned_n = 0;
+    while (earned_n < no && gr_badge_earned(&gr_badges[order[earned_n]], &p->stats)) earned_n++;
+    int slot = 0;
+    if (p->donor) {
+        int mx = rx + 24 + cell / 2, my = by + 100;
         img_fit(c, a, UI_IMG_badge_donador, mx - r, my - r, r * 2);
-        text_center(c, mx, my + r + 6, 15, P->ink, T("Donador", "Supporter"), cell - 6);
+        text_center(c, mx, my + r + 4, 14, P->ink, T("Donador", "Supporter"), cell - 6);
+        slot++;
     }
+    for (int k = earned_n - 1; k >= 0 && slot < per_row; k--, slot++) { /* de la ultima conseguida hacia atras */
+        const gr_badge *b = &gr_badges[order[k]];
+        int mx = rx + 24 + slot * cell + cell / 2, my = by + 100;
+        medal(c, mx, my, r, b, true);
+        text_center(c, mx, my + r + 4, 14, P->ink, T(b->name_es, b->name_en), cell - 6);
+    }
+    for (; slot < per_row; slot++) { /* el resto: candados */
+        int mx = rx + 24 + slot * cell + cell / 2, my = by + 100;
+        if (!img_fit(c, a, UI_IMG_badge_bloqueada, mx - r, my - r, r * 2)) gfx_circle(c, mx, my, r, P->gray_lt);
+    }
+
+    /* dos cajas: donde esta conectado y el codigo de amigo */
+    const int cy2 = by + bh + 16, ch2 = ly + 600 - cy2, cw2 = (bw - gap) / 2;
+    card(c, rx, cy2, cw2, ch2, false);
+    gfx_text(c, rx + 22, cy2 + 14, 17, P->gray, T("CONECTADO EN", "CONNECTED ON"));
+    {
+        int px = rx + 22, py = cy2 + 40 + (ch2 - 40 - 44) / 2; /* centrado en lo que queda de la caja */
+        img_fit(c, a, UI_IMG_plat_switch, px, py, 44);
+        gfx_text(c, px + 52, py + 10, 20, P->ink, "Switch");
+        px += 52 + gfx_text_width(20, "Switch") + 26;
+        if (p->linked) {
+            img_fit(c, a, UI_IMG_plat_web, px, py, 44);
+            gfx_text(c, px + 52, py + 10, 20, P->ink, "Web");
+        } else gfx_text_fit(c, px, py + 12, 16, P->gray, T("Vincula la cuenta para la web", "Link your account for the web"), rx + cw2 - 16 - px);
+    }
+    const int fx = rx + cw2 + gap;
+    card(c, fx, cy2, cw2, ch2, false);
+    gfx_text(c, fx + 22, cy2 + 14, 17, P->gray, T("CÓDIGO DE AMIGO", "FRIEND CODE"));
+    const int fy = cy2 + 40 + (ch2 - 40 - 44) / 2;
+    img_fit(c, a, UI_IMG_plat_codigo, fx + 22, fy, 44);
+    if (has_code) gfx_text_fit(c, fx + 76, fy + 6, 26, P->accent, p->friend_code, cw2 - 96);
+    else gfx_text_fit(c, fx + 76, fy + 12, 16, P->gray, T("Vincula tu cuenta para tener uno", "Link your account to get one"), cw2 - 96);
 
     footer_bar(c);
     int hx = hint(c, MARGIN, "L", T("Mis trofeos", "My trophies"));

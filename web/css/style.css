@@ -811,3 +811,6 @@ input.switch:focus-visible { outline: 2px solid var(--yellow); outline-offset: 2
     background: #10231a !important; border: 1px solid var(--line) !important; border-radius: 14px; box-shadow: 0 16px 40px rgba(0, 0, 0, .5) !important; z-index: 70; }
   .nav-quick .lang-quick .lang-list button { text-align: left !important; justify-content: flex-start !important; display: block; width: 100%; }
 }
+.foot-social a { width: 42px; height: 42px; }
+.foot-social img { width: 30px; height: 30px; }
+.foot-social img.on-dark { filter: invert(1) brightness(1.4); }

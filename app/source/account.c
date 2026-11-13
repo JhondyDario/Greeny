@@ -467,7 +467,7 @@ int gr_parse_notifs(char *json, gr_notif *out, int max, int *unread) {
         gr_json_string(p, "kind", kind, sizeof(kind));
         r->kind = !strcmp(kind, "like") ? GR_NOTIF_LIKE : !strcmp(kind, "follow") ? GR_NOTIF_FOLLOW
                 : !strcmp(kind, "achievement") ? GR_NOTIF_ACH : !strcmp(kind, "badge") ? GR_NOTIF_BADGE
-                : !strcmp(kind, "friend") ? GR_NOTIF_FRIEND : !strcmp(kind, "ranking") ? GR_NOTIF_RANKING : !strcmp(kind, "almost") ? GR_NOTIF_ALMOST : GR_NOTIF_OTHER;
+                : !strcmp(kind, "friend") ? GR_NOTIF_FRIEND : !strcmp(kind, "ranking") ? GR_NOTIF_RANKING : !strcmp(kind, "almost") ? GR_NOTIF_ALMOST : !strcmp(kind, "game") ? GR_NOTIF_GAME : GR_NOTIF_OTHER;
         gr_json_int(p, "amount", &r->amount);
         gr_json_bool(p, "read", &r->read);
         gr_json_string(p, "actor", r->actor, sizeof(r->actor));
@@ -510,7 +510,7 @@ gr_net_result gr_notifications_read(gr_http_fn http, const gr_account *a, long l
     return call(http, "/rest/v1/rpc/device_notifications_read", NULL, body, resp, sizeof(resp), NULL, 0);
 }
 
-static const char *const k_notify_kinds[GR_NOTIFY_KINDS] = { "like", "follow", "achievement", "badge", "friend", "ranking", "almost" };
+static const char *const k_notify_kinds[GR_NOTIFY_KINDS] = { "like", "follow", "achievement", "badge", "friend", "ranking", "almost", "game" };
 
 gr_net_result gr_notify_prefs(gr_http_fn http, gr_account *a) {
     char body[160], resp[RESP_MAX];

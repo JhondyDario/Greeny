@@ -78,7 +78,7 @@ for name in ("usuario", "salir", "menu"):
 # La lista con sus tamaños se escribe en app/source/ui_images.h, que es lo que lee el codigo.
 A = os.path.join(ROOT, "assets")
 BADGES = ["primer_logro", "logros_10", "logros_50", "logros_200", "primer_platino", "platinos_5", "juegos_3", "juegos_10",
-          "puntos_100", "puntos_500", "puntos_2000"]
+          "puntos_100", "puntos_500", "puntos_2000", "likes_3", "likes_15", "likes_50"]
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from paises import PAISES  # los paises que se pueden elegir, con su bandera en assets/flags/
 
@@ -110,7 +110,9 @@ app_images = [  # (nombre, archivo en assets/, ancho, alto, espejo)
 ] + [("pill_" + c, "etiquetas/" + c + ".png", 240, 42, False) for c in ("verde", "amarilla", "gris", "roja")
 ] + [("opt_" + o, "opciones/" + o + ".png", 48, 48, False) for o in OPCIONES
 ] + [("splash_logo", "logo-greeny-mascota-grande.png", 760, 254, False),
-     ("bell", "icons/campana.png", 48, 48, False), ("heart_lleno", "corazon/lleno.png", 48, 48, False), ("heart_vacio", "corazon/vacio.png", 48, 48, False)]
+     ("bell", "icons/campana.png", 48, 48, False),
+     ("plat_switch", "plataformas/switch.png", 48, 48, False), ("plat_web", "plataformas/globo_web.png", 48, 48, False),
+     ("plat_codigo", "plataformas/codigo_amigo.png", 48, 48, False), ("heart_lleno", "corazon/lleno.png", 48, 48, False), ("heart_vacio", "corazon/vacio.png", 48, 48, False)]
 
 for old in os.listdir(os.path.join(ROOT, "app", "data")):
     if old.startswith("img_"):
@@ -167,6 +169,8 @@ web_copy("trofeo.png", "trophy.png", 96, 96)
 web_copy("icons/estrella.png", "estrella.png", 40, 40)
 web_copy("corazon/lleno.png", "corazon_lleno.png", 48, 48)
 web_copy("icons/campana.png", "campana.png", 48, 48)
+for p in ("discord", "github", "video_play", "switch", "globo_web", "pc", "celular", "codigo_amigo"):
+    web_copy("plataformas/%s.png" % p, "plat_%s.png" % p, 64, 64)
 web_copy("corazon/vacio.png", "corazon_vacio.png", 48, 48)
 web_copy("logo-greeny-detalles.png", "logo.png", 600, 304)
 web_copy("logo-greeny.png", "logo_simple.png", 360, 164)

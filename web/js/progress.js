@@ -23,6 +23,9 @@
     { id: "puntos_100",     kind: "points",       goal: 100,  name: "Cien puntos",    how: "Llega a 100 puntos." },
     { id: "puntos_500",     kind: "points",       goal: 500,  name: "Quinientos",     how: "Llega a 500 puntos." },
     { id: "puntos_2000",    kind: "points",       goal: 2000, name: "Imparable",      how: "Llega a 2000 puntos." },
+    { id: "likes_3",        kind: "likes",        goal: 3,    name: "Bien recibido",  how: "Recibe 3 me gusta en tus comentarios." },
+    { id: "likes_15",       kind: "likes",        goal: 15,   name: "Popular",        how: "Recibe 15 me gusta en tus comentarios." },
+    { id: "likes_50",       kind: "likes",        goal: 50,   name: "Voz de la comunidad", how: "Recibe 50 me gusta en tus comentarios." },
   ];
 
   // stats: { achievements, platinums, games, points }
