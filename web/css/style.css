@@ -793,3 +793,21 @@ input.switch:focus-visible { outline: 2px solid var(--yellow); outline-offset: 2
   .nav-quick .quick-me .avatar.tiny { width: 34px; height: 34px; }
   .top .nav .bell { display: none !important; } /* ya esta en la barra */
 }
+
+/* idioma abreviado en la barra (solo celular) y Salir junto a Editar perfil */
+.only-mobile { display: none !important; }
+.side-actions { display: flex; gap: 8px; }
+.side-actions .side-btn { flex: 1; margin-top: 4px; }
+@media (max-width: 1080px) {
+  .only-mobile { display: inline-flex !important; }
+  /* en el menu ya no van tu nombre ni el idioma: estan arriba o en tu perfil */
+  .top .nav .user-menu, .top .nav > .lang-menu { display: none !important; }
+  .nav-quick .lang-quick { position: relative; width: auto !important; }
+  .nav-quick .lang-quick summary { display: grid !important; place-items: center; width: 44px !important; height: 44px; padding: 0 !important; border-radius: 12px !important;
+    background: rgba(255, 255, 255, .06) !important; border: 1px solid var(--line) !important; font-size: .9rem !important; }
+  .nav-quick .lang-quick .lang-long, .nav-quick .lang-quick .caret { display: none !important; }
+  .nav-quick .lang-quick .lang-short { display: inline !important; }
+  .nav-quick .lang-quick .lang-list { position: absolute !important; right: 0; top: calc(100% + 8px); min-width: 150px !important; padding: 8px !important;
+    background: #10231a !important; border: 1px solid var(--line) !important; border-radius: 14px; box-shadow: 0 16px 40px rgba(0, 0, 0, .5) !important; z-index: 70; }
+  .nav-quick .lang-quick .lang-list button { text-align: left !important; justify-content: flex-start !important; display: block; width: 100%; }
+}

@@ -358,8 +358,12 @@
 
   // ---------- idioma ----------
   const LANGS = [["es", "Español"], ["en", "English"]]; // para añadir uno: agregarlo aqui y en i18n.js
+  // El selector de idioma: en la barra de la computadora y, en celular, abreviado (ES / EN) al lado del menu.
   function renderLang() {
-    const box = document.getElementById("lang-menu");
+    fillLang(document.getElementById("lang-menu"));
+    fillLang(document.getElementById("lang-quick"));
+  }
+  function fillLang(box) {
     if (!box || !window.GreenyI18n) return;
     const cur = window.GreenyI18n.lang;
     box.replaceChildren(
@@ -407,10 +411,18 @@
 
   function renderNav() {
     const slot = document.getElementById("nav-user");
-    // celular: la campana y tu foto quedan a la vista, fuera del menu
+    // celular: idioma, campana y tu foto quedan a la vista, fuera del menu
     const quick = document.getElementById("nav-quick");
-    if (quick) quick.replaceChildren(...(session ? [bellLink(),
-      me ? h("a", { class: "quick-me", href: "#/u/" + encodeURIComponent(me.username), "aria-label": "Mi perfil", title: "Mi perfil" }, avatar(me, "tiny")) : null].filter(Boolean) : []));
+    if (quick) {
+      const lang = h("details", { class: "lang-menu lang-quick", id: "lang-quick" });
+      quick.replaceChildren(...[lang, session ? bellLink() : null,
+        session && me ? h("a", { class: "quick-me", href: "#/u/" + encodeURIComponent(me.username), "aria-label": "Mi perfil", title: "Mi perfil" }, avatar(me, "tiny")) : null].filter(Boolean));
+      fillLang(lang);
+      if (!renderNav.langClose) { // una sola vez: tocar fuera cierra el selector
+        renderNav.langClose = true;
+        document.addEventListener("click", (ev) => { const l = document.getElementById("lang-quick"); if (l && !l.contains(ev.target)) l.open = false; });
+      }
+    }
     if (session) {
       // con sesion: tu nombre, y al abrirlo tu perfil, los ajustes y salir
       const menu = h("details", { class: "user-menu" },
@@ -737,7 +749,10 @@
           profile.friend_code ? h("div", { class: "side-row" }, h("span", { class: "side-label" }, "Código de amigo"),
             h("span", { class: "side-value" }, h("code", {}, profile.friend_code), copyButton(profile.friend_code))) : null,
           h("div", { class: "side-row" }, h("span", { class: "side-label" }, "En Greeny desde"), h("span", { class: "side-value" }, fmtDate(profile.created_at))),
-          isMe ? h("a", { class: "btn alt side-btn", href: "#/cuenta" }, "Editar perfil") : followBtn)),
+          isMe ? h("div", { class: "side-actions" },
+              h("a", { class: "btn alt side-btn", href: "#/cuenta" }, "Editar perfil"),
+              h("button", { class: "btn danger side-btn only-mobile", type: "button", onclick: async () => { await sb.auth.signOut(); location.hash = "#/"; } }, "Salir"))
+            : followBtn)),
       h("section", { class: "card level", style: "margin-top:14px" },
         h("div", { class: "row" },
           h("div", { class: "lvl-tags" },
