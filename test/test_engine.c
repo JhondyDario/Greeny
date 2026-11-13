@@ -464,9 +464,9 @@ static void test_progress(void) {
     gr_stats s = { .games = 1, .achievements = 7, .platinums = 0, .points = 70 };
     CHECK(gr_badges_earned(&s) == 1 && gr_badge_earned(&gr_badges[0], &s) && !gr_badge_earned(&gr_badges[1], &s));
     CHECK(gr_badge_value(&gr_badges[1], &s) == 7 && gr_badges[1].goal == 10);
-    gr_stats full = { .games = 10, .achievements = 200, .platinums = 5, .points = 2000 };
+    gr_stats full = { .games = 10, .achievements = 200, .platinums = 5, .points = 2000, .likes = 50 };
     CHECK(gr_badges_earned(&full) == gr_badge_count);
-    gr_stats none = { 0, 0, 0, 0 };
+    gr_stats none = { 0, 0, 0, 0, 0 };
     CHECK(gr_badges_earned(&none) == 0);
     /* ids unicos: son los nombres de los dibujos */
     for (int i = 0; i < gr_badge_count; i++)
