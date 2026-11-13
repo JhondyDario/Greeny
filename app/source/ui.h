@@ -190,7 +190,7 @@ void ui_set_unread(int n);
 
 /* Comentarios de un juego. state: 0 cargando, 1 listo, 2 sin conexion. */
 #define UI_REVIEW_ROWS 3
-void ui_reviews(gfx_canvas *c, const ui_assets *a, const char *game, const gr_review *r, int n, int cursor, int top, int state, bool linked);
+void ui_reviews(gfx_canvas *c, const ui_assets *a, const char *game, const gr_review *r, int n, int cursor, int top, int state, bool linked, bool closed);
 
 /* Un logro al detalle: imagen grande, puntos, dificultad y fecha. */
 void ui_achievement(gfx_canvas *c, const ui_assets *a, const gr_model *m, int game, int index);

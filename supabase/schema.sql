@@ -969,7 +969,12 @@ alter table public.review_likes enable row level security;
 drop policy if exists reviews_read on public.reviews;
 create policy reviews_read on public.reviews for select using (true);
 drop policy if exists reviews_insert_own on public.reviews;
-create policy reviews_insert_own on public.reviews for insert with check ((select auth.uid()) = user_id);
+-- en un juego "sin empezar" no se comenta: todavia no tiene logros de los que hablar
+create or replace function public.can_review(title text)
+returns boolean language sql stable security definer set search_path = ''
+as $$ select exists (select 1 from public.games g where g.title_id = title and coalesce(g.status, 'sin_empezar') <> 'sin_empezar'); $$;
+grant execute on function public.can_review(text) to anon, authenticated;
+create policy reviews_insert_own on public.reviews for insert with check ((select auth.uid()) = user_id and public.can_review(title_id));
 drop policy if exists reviews_update_own on public.reviews;
 create policy reviews_update_own on public.reviews for update
     using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
@@ -1037,6 +1042,7 @@ begin
         return true;
     end if;
     if char_length(v_body) > 500 then raise exception 'el comentario es muy largo'; end if;
+    if not public.can_review(title) then raise exception 'este juego todavia no tiene logros: no se puede comentar'; end if;
     insert into public.reviews (title_id, user_id, body) values (title, v_uid, v_body)
         on conflict (title_id, user_id) do update set body = excluded.body, updated_at = now();
     return true;

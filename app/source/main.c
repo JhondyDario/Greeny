@@ -794,11 +794,15 @@ static int rank_load(int scope, int mode) {
 static gr_review g_reviews[GR_REVIEWS_MAX];
 static int g_nrev, g_rev_state;
 static char g_rev_tid[17], g_rev_name[LG_NAME_LEN];
+static bool g_rev_closed; /* juego "sin empezar": no se comenta */
 static int g_rev_return, g_user_return = 0, g_badges_return = SCREEN_PROFILE; /* a donde vuelven Comentarios y el perfil de otro (0 = ranking) */
 
 /* 1 listo, 2 sin conexion */
+static bool cat_not_started(const char *tid);
 static int reviews_load(void) {
     g_nrev = 0;
+    /* el estado sale del catalogo si ya se consulto; si no se sabe, decide el servidor al guardar */
+    g_rev_closed = cat_not_started(g_rev_tid);
     if (!net_online()) return 2;
     if (gr_reviews(net_http, &g_account, g_rev_tid, g_reviews, GR_REVIEWS_MAX, &g_nrev) != GR_NET_OK) {
         trace("comentarios: fallo %s", net_last_error());
@@ -944,6 +948,13 @@ static bool contains_nocase(const char *text, const char *word) {
 /* Filtro por estado del catalogo: 0 = todos. No se guarda: al abrir la app vuelve a "todos". */
 static int g_cat_status;
 static const char *const k_cat_status[UI_BROWSE_FILTERS] = { "", "sin_empezar", "prueba", "jugable", "perfecto" };
+
+/* true si el catalogo dice que ese juego esta "sin empezar" (sin logros: no se comenta) */
+static bool cat_not_started(const char *tid) {
+    for (int i = 0; i < g_cat_n; i++)
+        if (!strcmp(g_cat[i].tid, tid)) return !g_cat[i].status[0] || !strcmp(g_cat[i].status, "sin_empezar");
+    return false;
+}
 
 static void browse_filter(void) {
     g_cat_nshown = 0;
@@ -1497,7 +1508,12 @@ int main(int argc, char *argv[]) {
                 screen = SCREEN_USER;
                 accepted = true;
             }
-            if ((down & HidNpadButton_Y) && g_account.linked) {
+            if ((down & HidNpadButton_Y) && g_account.linked && g_rev_closed) {
+                show_message(false, "Todavía no se puede comentar", "Este juego todavía no tiene logros (está Sin empezar).", "Se podrá comentar cuando pase a En prueba.");
+                g_msg_return = SCREEN_REVIEWS;
+                screen = SCREEN_MSG;
+                accepted_alt = true;
+            } else if ((down & HidNpadButton_Y) && g_account.linked) {
                 char text[504] = "", err[160] = "";
                 bool had = false;
                 for (int i = 0; i < g_nrev; i++) had = had || g_reviews[i].mine;
@@ -2000,7 +2016,7 @@ int main(int argc, char *argv[]) {
             }
             else if (screen == SCREEN_UPDATE) ui_update(&layer, &g_assets, g_dl_live ? UI_UPD_DOWNLOADING : g_upd, g_rel.version, g_rel.notes, g_dl_done, g_dl_total);
             else if (screen == SCREEN_NOTIF) ui_notifs(&layer, &g_assets, g_notifs, g_nnotif, g_unread, ncursor, ntop, notif_state);
-            else if (screen == SCREEN_REVIEWS) ui_reviews(&layer, &g_assets, g_rev_name, g_reviews, g_nrev, vcursor, vtop, g_rev_state, g_account.linked);
+            else if (screen == SCREEN_REVIEWS) ui_reviews(&layer, &g_assets, g_rev_name, g_reviews, g_nrev, vcursor, vtop, g_rev_state, g_account.linked, g_rev_closed);
             else if (screen == SCREEN_USER) ui_user(&layer, &g_assets, &g_rank_view, strcasecmp(g_rank_view.username, g_account.username) != 0);
             else if (screen == SCREEN_AVATARS) ui_avatars(&layer, &g_assets, &g_profile, acursor);
             else if (screen == SCREEN_BROWSE) ui_browse(&layer, &g_assets, g_cat, g_cat_shown, g_cat_nshown, g_cat_n, g_cat_have, (const uint8_t *const *)g_cat_cover, g_cat_status, g_cat_state, bcursor, btop);

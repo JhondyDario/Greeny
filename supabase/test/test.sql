@@ -617,4 +617,24 @@ begin
     assert j -> 0 ->> 'username' = 'orden_otro', 'sin sesion: el mas querido primero';
 end $$;
 
+-- en un juego sin empezar no se puede comentar
+do $$
+declare yo uuid := '00000000-0000-0000-0000-0000000000c1'; ok boolean := false; tok text := 'llave-comentarios-sin-empezar-000000000000';
+begin
+    insert into public.games (title_id, name, definition, published, status) values ('0100ABCDEF100000', 'Nuevo', 'game = Nuevo', true, 'sin_empezar');
+    perform set_config('request.jwt.claim.sub', yo::text, true);
+    set local role authenticated;
+    begin insert into public.reviews (title_id, user_id, body) values ('0100ABCDEF100000', yo, 'hola');
+    exception when insufficient_privilege then ok := true; end;
+    reset role;
+    assert ok, 'web: no se comenta un juego sin empezar';
+    insert into public.devices (token_hash, user_id, name) values (public.hash_token(tok), yo, 'S');
+    ok := false;
+    begin perform public.device_review_save(tok, '0100ABCDEF100000', 'hola');
+    exception when others then ok := sqlerrm like '%no se puede comentar%'; end;
+    assert ok, 'consola: no se comenta un juego sin empezar';
+    update public.games set status = 'prueba' where title_id = '0100ABCDEF100000';
+    assert public.device_review_save(tok, '0100ABCDEF100000', 'ya tiene logros'), 'en prueba si se comenta';
+end $$;
+
 select 'TODAS LAS PRUEBAS PASARON' as resultado;

@@ -173,6 +173,8 @@
     "Amigo": "Friend", "Tú": "You",
     "Ver todos": "See all", "Ningún juego tiene ese estado todavía.": "No game has that status yet.",
     "Código de amigo": "Friend code", "En Greeny desde": "On Greeny since", "Editar perfil": "Edit profile",
+    "Este juego todavía no tiene logros. Se podrá comentar cuando pase a En prueba.": "This game has no achievements yet. Comments open once it reaches Testing.",
+    "Este juego todavía no tiene logros: no se puede comentar.": "This game has no achievements yet: comments are closed.",
     "Comentarios": "Comments", "Tu comentario": "Your comment", "Escribe un comentario": "Write a comment", "Publicar": "Post",
     "Guardar": "Save", "Borrar": "Delete", "Listo.": "Done.", "Entra": "Sign in", " para comentar y dar me gusta.": " to comment and like.",
     "Nadie ha comentado este juego todavía. ¡Sé el primero!": "Nobody has commented on this game yet. Be the first!",

@@ -65,6 +65,7 @@
       [/manual linking is disabled/i, "Vincular Discord a una cuenta existente todavía no está activado en el servidor."],
       [/identity is already linked/i, "Esa cuenta de Discord ya está vinculada a otra cuenta de Greeny."],
       [/captcha/i, "La verificación de \"no soy un robot\" falló o venció. Márcala de nuevo."],
+      [/no se puede comentar/i, "Este juego todavía no tiene logros: no se puede comentar."],
       [/propio comentario/i, "No puedes darle me gusta a tu propio comentario."],
       [/rate limit|too many/i, "Demasiados intentos. Espera un momento y prueba de nuevo."],
       [/failed to fetch|networkerror/i, "No se pudo conectar. Revisa tu conexión."],
@@ -596,12 +597,13 @@
               pct == null ? "Nadie lo tiene aún" : pct + "% lo tiene")));
       }), 6, "stack"),
       h("h2", {}, "Comentarios"),
-      await reviewsBox(tid),
+      await reviewsBox(tid, game.status),
     ];
   }
 
   // Comentarios de un juego: uno por persona, y "me gusta" que dan 2 puntos al autor.
-  async function reviewsBox(tid) {
+  async function reviewsBox(tid, status) {
+    const closed = (status || "sin_empezar") === "sin_empezar"; // sin logros todavia: no hay de que comentar
     const box = h("div", { class: "reviews" });
     async function draw() {
       const res = await sb.rpc("game_reviews", { title: tid });
@@ -609,8 +611,9 @@
       const list = res.data || [];
       const mine = list.find((r) => r.mine);
       box.replaceChildren(
-        session ? writer(mine) : h("p", { class: "card muted" }, h("a", { href: "#/entrar" }, "Entra"), " para comentar y dar me gusta."),
-        list.length ? more(list.map(card), 5, "reviews") : h("p", { class: "muted" }, "Nadie ha comentado este juego todavía. ¡Sé el primero!"));
+        closed ? h("p", { class: "card muted" }, "Este juego todavía no tiene logros. Se podrá comentar cuando pase a En prueba.")
+          : session ? writer(mine) : h("p", { class: "card muted" }, h("a", { href: "#/entrar" }, "Entra"), " para comentar y dar me gusta."),
+        list.length ? more(list.map(card), 5, "reviews") : closed ? null : h("p", { class: "muted" }, "Nadie ha comentado este juego todavía. ¡Sé el primero!"));
     }
     function writer(mine) {
       const ta = h("textarea", { name: "body", maxlength: 500, required: true, placeholder: "¿Qué te parecen los logros de este juego?" });

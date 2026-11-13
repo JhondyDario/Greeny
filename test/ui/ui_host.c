@@ -275,9 +275,9 @@ int main(int argc, char **argv) {
                 { 8, "Me encanta el de la Supercampana", "megaJHONDY", "Jhondy", 4, "DO", false, 190, 12, 1, false, true, false, "2026-11-11" },
                 { 9, "Buenísimo", "luis", "", 15, "", false, 40, 2, 0, false, false, true, "2026-11-12" },
             };
-            ui_reviews(&c, &a, "Super Mario 3D World", rv, 3, 0, 0, 1, true);
+            ui_reviews(&c, &a, "Super Mario 3D World", rv, 3, 0, 0, 1, true, false);
             save(&c, out, "comentarios", sfx);
-            ui_reviews(&c, &a, "Super Mario 3D World", rv, 0, 0, 0, 1, true);
+            ui_reviews(&c, &a, "Luigi's Mansion 3", rv, 0, 0, 0, 1, true, true);
             save(&c, out, "comentarios_vacio", sfx);
             gr_rank_row from_rev = { 0, "Ana_99", "Ana", 9, "MX", 3, 310, 9 };
             ui_user(&c, &a, &from_rev, true);

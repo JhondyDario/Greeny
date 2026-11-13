@@ -504,7 +504,7 @@ static void home_grid(gfx_canvas *c, const ui_assets *a, const gr_model *m, int 
             pill(c, cx + UI_COVER_BIG / 2 - 6, y + 12 + UI_COVER_BIG - 34, C_ON_YELLOW, C_WHITE, buf);
         }
         progress(c, x + 20, y + 200, w - 40, g->unlocked, g->total);
-        snprintf(buf, sizeof(buf), "%d / %d  ·  %d pts  ·  %d%%", g->unlocked, g->total, g->points_got, g->total > 0 ? g->unlocked * 100 / g->total : 0);
+        snprintf(buf, sizeof(buf), "%d pts  ·  %d%%", g->points_got, g->total > 0 ? g->unlocked * 100 / g->total : 0);
         text_center(c, cx, y + 220, 17, P->gray, buf, w - 20);
     }
     scrollbar(c, 124, l.rows * (h + gy) - gy, top, l.rows, (m->ngames + l.cols - 1) / l.cols);
@@ -1166,7 +1166,7 @@ static void text_wrap(gfx_canvas *c, int x, int y, int size, int line_h, gfx_col
     }
 }
 
-void ui_reviews(gfx_canvas *c, const ui_assets *a, const char *game, const gr_review *r, int n, int cursor, int top, int state, bool linked) {
+void ui_reviews(gfx_canvas *c, const ui_assets *a, const char *game, const gr_review *r, int n, int cursor, int top, int state, bool linked, bool closed) {
     begin(c);
     char sub[160];
     bool wrote = false;
@@ -1179,11 +1179,13 @@ void ui_reviews(gfx_canvas *c, const ui_assets *a, const char *game, const gr_re
         img(c, a, state == 2 ? UI_IMG_m_triste : UI_IMG_m_buscando, MARGIN + 30, 210);
         const char *t1, *t2;
         if (state == 2) { t1 = T("No hay conexión", "No connection"); t2 = T("Conecta la consola a internet e inténtalo de nuevo.", "Connect the console to the internet and try again."); }
+        else if (closed) { t1 = T("Todavía no se puede comentar", "Comments are not open yet");
+               t2 = T("Este juego todavía no tiene logros. Se podrá comentar cuando pase a En prueba.", "This game has no achievements yet. Comments open once it reaches Testing."); }
         else { t1 = T("Nadie ha comentado todavía", "No comments yet");
                t2 = linked ? T("Pulsa Y para escribir el primero.", "Press Y to write the first one.")
                            : T("Vincula la consola en Opciones → Cuenta para comentar.", "Link the console in Options → Account to comment."); }
         gfx_text(c, MARGIN + 320, 290, 36, P->ink, t1);
-        gfx_text_fit(c, MARGIN + 320, 350, 23, P->gray, t2, CONTENT_W - 360);
+        text_wrap(c, MARGIN + 320, 350, 23, 32, P->gray, t2, CONTENT_W - 360, 2);
     } else {
         for (int i = top; i < n && i < top + UI_REVIEW_ROWS; i++) {
             const gr_review *v = &r[i];
@@ -1223,7 +1225,7 @@ void ui_reviews(gfx_canvas *c, const ui_assets *a, const char *game, const gr_re
     bool sel = state == 1 && n > 0 && cursor < n;
     if (sel && linked && !r[cursor].mine) hx = hint(c, hx, "A", r[cursor].liked ? T("Quitar me gusta", "Unlike") : T("Me gusta", "Like"));
     if (sel) hx = hint(c, hx, "X", T("Ver perfil", "View profile"));
-    if (linked) hx = hint(c, hx, "Y", wrote ? T("Editar el tuyo", "Edit yours") : T("Escribir", "Write"));
+    if (linked && !closed) hx = hint(c, hx, "Y", wrote ? T("Editar el tuyo", "Edit yours") : T("Escribir", "Write"));
     hx = hint(c, hx, "B", T("Volver", "Back"));
     hint(c, hx, "+", T("Salir", "Exit"));
 }
@@ -1308,7 +1310,7 @@ void ui_search(gfx_canvas *c, const ui_assets *a, unsigned value, int type_bits,
 /* ---------- opciones ---------- */
 
 static const struct { const char *es, *en; int n; int opt[5]; } k_tabs[UI_TABS] = {
-    { "General",     "General",  5, { UI_OPT_LANG, UI_OPT_THEME, UI_OPT_START, UI_OPT_ANIM, UI_OPT_APPSOUND } },
+    { "General",     "General",  5, { UI_OPT_ANIM, UI_OPT_APPSOUND, UI_OPT_LANG, UI_OPT_THEME, UI_OPT_START } }, /* los de encender/apagar arriba, como en Música */
     { "Vista",       "View",     4, { UI_OPT_SCOPE, UI_OPT_SHOW, UI_OPT_GAMES_VIEW, UI_OPT_ACH_VIEW } },
     { "En el juego", "In-game",  5, { UI_OPT_INGAME, UI_OPT_SOUND, UI_OPT_POPUP, UI_OPT_STARTPOP, UI_OPT_OVERLAY } },
     { "Música",      "Music",    0, { 0 } },  /* una fila para encender y una por cancion */
@@ -2038,21 +2040,22 @@ void ui_profile_screen(gfx_canvas *c, const ui_assets *a, const ui_profile *p) {
                    "Followers and following appear once you link your account (Options → Account)."));
 
     /* medallas */
-    const int by = ly + 296, bw = 3 * tw + 2 * gap;
-    card(c, rx, by, bw, 304, false);
+    /* pegadas a los numeros; solo se dejan mas abajo si hace falta el aviso de vincular la cuenta */
+    const int by = p->linked ? ly + 252 : ly + 296, bw = 3 * tw + 2 * gap;
+    card(c, rx, by, bw, ly + 600 - by, false);
     snprintf(buf, sizeof(buf), T("Medallas  ·  %d de %d", "Badges  ·  %d of %d"), gr_badges_earned(&p->stats), gr_badge_count);
     gfx_text(c, rx + 24, by + 16, 26, P->ink, buf);
-    const int per_row = 6, r = 40, cell = (bw - 48) / per_row;
+    const int per_row = 6, r = 40, cell = (bw - 48) / per_row, mdy = (ly + 600 - by - 304) / 2; /* medallas centradas en el alto que sobre */
     int order[32], no = badge_order(&p->stats, order);
     for (int i = 0; i < no; i++) {
         const gr_badge *b = &gr_badges[order[i]];
-        int mx = rx + 24 + (i % per_row) * cell + cell / 2, my = by + 104 + (i / per_row) * 116;
+        int mx = rx + 24 + (i % per_row) * cell + cell / 2, my = by + 104 + mdy + (i / per_row) * 116;
         bool earned = gr_badge_earned(b, &p->stats);
         medal(c, mx, my, r, b, earned);
         text_center(c, mx, my + r + 6, 15, earned ? P->ink : P->gray, T(b->name_es, b->name_en), cell - 6);
     }
     if (p->donor) { /* en el hueco que queda al final de la segunda fila */
-        int i = gr_badge_count, mx = rx + 24 + (i % per_row) * cell + cell / 2, my = by + 104 + (i / per_row) * 116;
+        int i = gr_badge_count, mx = rx + 24 + (i % per_row) * cell + cell / 2, my = by + 104 + mdy + (i / per_row) * 116;
         img_fit(c, a, UI_IMG_badge_donador, mx - r, my - r, r * 2);
         text_center(c, mx, my + r + 6, 15, P->ink, T("Donador", "Supporter"), cell - 6);
     }
