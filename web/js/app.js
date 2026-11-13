@@ -244,13 +244,18 @@
   // Campo de contraseña con boton para ver lo que se escribe.
   function passwordField(label, name, autocomplete, hint) {
     const input = h("input", { name, type: "password", autocomplete, required: true, minlength: autocomplete === "new-password" ? 8 : null });
-    const toggle = h("button", { type: "button", class: "peek", "aria-pressed": "false", onclick: () => {
+    // ojo dentro del campo: abierto = ver la contraseña, tachado = ocultarla
+    const EYE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5C6.5 5 2.7 9.1 1.5 12c1.2 2.9 5 7 10.5 7s9.3-4.1 10.5-7C21.3 9.1 17.5 5 12 5Zm0 11.5A4.5 4.5 0 1 1 12 7.5a4.5 4.5 0 0 1 0 9Zm0-7a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5Z"/></svg>';
+    const EYE_OFF = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.3 2.3 2 3.6l3.4 3.4C3.6 8.4 2.2 10.3 1.5 12c1.2 2.9 5 7 10.5 7 2 0 3.8-.5 5.3-1.4l3.1 3.1 1.3-1.3L3.3 2.3ZM12 16.5A4.5 4.5 0 0 1 7.6 11l1.6 1.6a2.5 2.5 0 0 0 3.2 3.2l1.6 1.6c-.6.1-1.3.1-2 .1Zm0-11.5c5.5 0 9.3 4.1 10.5 7-.6 1.5-1.8 3.1-3.4 4.4l-2.8-2.8A4.5 4.5 0 0 0 10.4 7.7L8.2 5.5C9.4 5.2 10.7 5 12 5Z"/></svg>';
+    const toggle = h("button", { type: "button", class: "peek", "aria-pressed": "false", title: "Ver contraseña", onclick: () => {
       const show = input.type === "password";
       input.type = show ? "text" : "password";
-      toggle.textContent = show ? "Ocultar" : "Ver";
+      toggle.replaceChildren(svgEl(show ? EYE_OFF : EYE));
       toggle.setAttribute("aria-pressed", String(show));
       toggle.setAttribute("aria-label", show ? "Ocultar contraseña" : "Ver contraseña");
-    }, "aria-label": "Ver contraseña" }, "Ver");
+      toggle.title = show ? "Ocultar contraseña" : "Ver contraseña";
+      input.focus();
+    }, "aria-label": "Ver contraseña" }, svgEl(EYE));
     return h("label", {}, label, hint ? h("span", { class: "hint" }, hint) : null, h("span", { class: "pw" }, input, toggle));
   }
 
