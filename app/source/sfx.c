@@ -5,7 +5,7 @@
 #include <string.h>
 #include <switch.h>
 
-#define SFX(n) extern const u8 sfx_##n##_bin[]; extern const u32 sfx_##n##_bin_size;
+#define SFX(n) extern const u8 sfx_##n##_bin[], sfx_##n##_bin_end[];
 #include "sfx_list.h"
 #undef SFX
 
@@ -49,7 +49,7 @@ bool sfx_init(void) {
 #include "sfx_list.h"
     };
 #undef SFX
-#define SFX(n) sfx_##n##_bin_size,
+#define SFX(n) (size_t)(sfx_##n##_bin_end - sfx_##n##_bin),
     size_t size[SFX_COUNT] = {
 #include "sfx_list.h"
     };
