@@ -135,10 +135,12 @@ static void draw_wrapped(toast_put_fn put, const tf_font *f, int x, int y, int m
  * Una barra lisa pegada a la esquina de arriba a la derecha, como los avisos de la consola
  * ("Amigos en linea"): dibujo redondo a la izquierda y el texto en tres lineas. */
 
-#define BAR_H 112 /* el resto de la capa queda transparente */
+#define BAR_H 96 /* el resto de la capa queda transparente */
 
 void toast_draw(const toast_view *v, toast_put_fn put) {
-    const rgb bar = v->dark ? RGB(0x2B3441) : RGB(0xF0F1F2);
+    /* oscuro: negro con un poco de transparencia, para que se intuya el juego detras */
+    const rgb bar = v->dark ? RGB(0x0B0B0B) : RGB(0xF0F1F2);
+    const unsigned bar_a = v->dark ? 205 : 240;
     const rgb ink = v->dark ? RGB(0xFFFFFF) : RGB(0x2D2D2D);
     const rgb soft = v->dark ? RGB(0xC3CBD6) : RGB(0x5A6470);
     const rgb yellow = v->dark ? RGB(0xF7C91E) : RGB(0x9A6B00);
@@ -185,7 +187,7 @@ void toast_draw(const toast_view *v, toast_put_fn put) {
                     c = mix(c, white, mark);
                 }
             }
-            put(x, y, (unsigned)c.r, (unsigned)c.g, (unsigned)c.b, 240);
+            put(x, y, (unsigned)c.r, (unsigned)c.g, (unsigned)c.b, bar_a);
         }
     }
 
@@ -202,15 +204,15 @@ void toast_draw(const toast_view *v, toast_put_fn put) {
         memcpy(tmp + k, " pts", 5);
         int npts = to_latin1(tmp, pts, sizeof(pts));
         pts_w = text_width(&tf_small, pts, npts);
-        draw_text(put, &tf_small, right - pts_w, 14, pts, npts, yellow, bar);
+        draw_text(put, &tf_small, right - pts_w, 9, pts, npts, yellow, bar);
     }
 
     /* si la descripcion cabe en una linea (o no hay), el texto baja para quedar centrado */
     const int tw = right - tx;
     uint8_t probe[160];
     int nprobe = to_latin1(v->desc, probe, sizeof(probe));
-    int dy = nprobe == 0 ? 17 : text_width(&tf_small, probe, nprobe) <= tw ? 8 : 0;
-    draw_wrapped(put, &tf_small, tx, 12 + dy, tw - (pts_w ? pts_w + 10 : 0), 18, 1, v->title, head, bar);
-    draw_wrapped(put, &tf_big, tx, 31 + dy, tw, 24, 1, v->name, ink, bar);
-    draw_wrapped(put, &tf_small, tx, 60 + dy, tw, 19, 2, v->desc, soft, bar);
+    int dy = nprobe == 0 ? 14 : text_width(&tf_small, probe, nprobe) <= tw ? 7 : 0;
+    draw_wrapped(put, &tf_small, tx, 7 + dy, tw - (pts_w ? pts_w + 10 : 0), 18, 1, v->title, head, bar);
+    draw_wrapped(put, &tf_big, tx, 25 + dy, tw, 24, 1, v->name, ink, bar);
+    draw_wrapped(put, &tf_small, tx, 51 + dy, tw, 19, 2, v->desc, soft, bar);
 }
