@@ -1547,3 +1547,36 @@ end;
 $$;
 drop trigger if exists games_status_notify on public.games;
 create trigger games_status_notify after update of status, published on public.games for each row execute function public.notify_game_status();
+
+
+-- -----------------------------------------------------------------------------
+-- 18. ACTIVIDAD DE AMIGOS: los ultimos logros de la gente que sigues
+-- -----------------------------------------------------------------------------
+create or replace function public.friend_activity_for(uid uuid)
+returns jsonb
+language sql stable security definer set search_path = ''
+as $$
+    select coalesce(jsonb_agg(x order by x.unlocked_at desc), '[]'::jsonb) from (
+        select p.username, coalesce(p.display_name, p.username) as name, p.avatar,
+               u.title_id, g.name as game, a.name_es as ach_name, coalesce(a.name_en, a.name_es) as ach_name_en,
+               a.points, u.unlocked_at
+          from public.follows f
+          join public.unlocks u on u.user_id = f.followed_id and u.unlocked_at > now() - interval '14 days'
+          join public.profiles p on p.id = u.user_id
+          join public.achievements a on a.title_id = u.title_id and a.ach_id = u.ach_id
+          left join public.games g on g.title_id = u.title_id
+         where f.follower_id = uid
+         order by u.unlocked_at desc
+         limit 15) x;
+$$;
+revoke all on function public.friend_activity_for(uuid) from public, anon, authenticated;
+
+create or replace function public.my_friend_activity()
+returns jsonb language sql stable security definer set search_path = ''
+as $$ select public.friend_activity_for((select auth.uid())); $$;
+grant execute on function public.my_friend_activity() to authenticated;
+
+create or replace function public.device_friend_activity(device_token text)
+returns jsonb language sql stable security definer set search_path = ''
+as $$ select public.friend_activity_for((select d.user_id from public.devices d where d.token_hash = public.hash_token(device_token))); $$;
+grant execute on function public.device_friend_activity(text) to anon, authenticated;

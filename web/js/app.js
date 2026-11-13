@@ -389,6 +389,11 @@
   }
 
   // ---------- pie de pagina ----------
+  const SOCIAL = {
+    youtube: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.6 12 3.6 12 3.6s-7.5 0-9.4.5A3 3 0 0 0 .5 6.2 31 31 0 0 0 0 12a31 31 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.5 9.4.5 9.4.5s7.5 0 9.4-.5a3 3 0 0 0 2.1-2.1A31 31 0 0 0 24 12a31 31 0 0 0-.5-5.8ZM9.6 15.6V8.4l6.3 3.6-6.3 3.6Z"/></svg>',
+    discord: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.3 4.4A19.6 19.6 0 0 0 15.4 3l-.6 1.3a18 18 0 0 0-5.6 0L8.6 3a19.5 19.5 0 0 0-4.9 1.5C.6 9 0 13.6.3 18.1A19.8 19.8 0 0 0 6.3 21l1.3-2a12.7 12.7 0 0 1-2-1l.5-.4a14 14 0 0 0 11.8 0l.5.4c-.6.4-1.3.7-2 1l1.3 2a19.7 19.7 0 0 0 6-3c.4-5.2-.7-9.8-3.4-13.6ZM8.5 15.3c-1.2 0-2.1-1.1-2.1-2.4s.9-2.4 2.1-2.4 2.1 1.1 2.1 2.4-.9 2.4-2.1 2.4Zm7 0c-1.2 0-2.1-1.1-2.1-2.4s.9-2.4 2.1-2.4 2.1 1.1 2.1 2.4-.9 2.4-2.1 2.4Z"/></svg>',
+    github: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 .5a11.5 11.5 0 0 0-3.6 22.4c.6.1.8-.3.8-.6v-2c-3.2.7-3.9-1.5-3.9-1.5-.5-1.3-1.3-1.7-1.3-1.7-1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.7-1.6-2.6-.3-5.3-1.3-5.3-5.7 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.2 1.2a11 11 0 0 1 5.8 0C17.3 4.7 18.3 5 18.3 5c.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.4-2.7 5.4-5.3 5.7.4.4.8 1.1.8 2.2v3.2c0 .3.2.7.8.6A11.5 11.5 0 0 0 12 .5Z"/></svg>',
+  };
   let discordUrl = "";
   function renderFooter() {
     const foot = document.getElementById("foot");
@@ -411,9 +416,9 @@
       h("div", { class: "foot-bottom" },
         h("p", { class: "foot-legal" }, "© " + new Date().getFullYear() + " Greeny. Proyecto de fans independiente, no afiliado ni avalado por Nintendo. «Nintendo Switch» es una marca de Nintendo. Greeny no proporciona juegos ni archivos de Nintendo."),
         h("div", { class: "foot-social" }, h("span", {}, "Síguenos"),
-          discordUrl ? h("a", { href: discordUrl, target: "_blank", rel: "noopener", "aria-label": "Discord", title: "Discord" }, h("img", { src: "img/plat_discord.png", alt: "" })) : null,
-          cfg.youtubeUrl ? h("a", { href: cfg.youtubeUrl, target: "_blank", rel: "noopener", "aria-label": "YouTube", title: "YouTube" }, h("img", { src: "img/plat_video_play.png", alt: "" })) : null,
-          h("a", { href: cfg.repoUrl, target: "_blank", rel: "noopener", "aria-label": "GitHub", title: "GitHub" }, h("img", { src: "img/plat_github.png", alt: "", class: "on-dark" })))))));
+          discordUrl ? h("a", { href: discordUrl, target: "_blank", rel: "noopener", "aria-label": "Discord", title: "Discord" }, svgEl(SOCIAL.discord)) : null,
+          cfg.youtubeUrl ? h("a", { href: cfg.youtubeUrl, target: "_blank", rel: "noopener", "aria-label": "YouTube", title: "YouTube" }, svgEl(SOCIAL.youtube)) : null,
+          h("a", { href: cfg.repoUrl, target: "_blank", rel: "noopener", "aria-label": "GitHub", title: "GitHub" }, svgEl(SOCIAL.github)))))));
   }
 
   function renderNav() {
@@ -435,13 +440,14 @@
       const menu = h("details", { class: "user-menu" },
         h("summary", {}, avatar(me, "tiny"), h("span", { class: "user-name" }, me ? shownName(me) : "Mi cuenta"), h("span", { class: "caret", "aria-hidden": "true" }, "▾")),
         h("div", { class: "user-menu-list" },
+          admin ? h("a", { href: "#/desarrollador" }, "Desarrollador") : null,
           me ? h("a", { href: "#/u/" + encodeURIComponent(me.username) }, "Mi perfil") : null,
           h("a", { href: "#/cuenta" }, "Ajustes"),
           h("button", { type: "button", onclick: async () => { await sb.auth.signOut(); location.hash = "#/"; } }, "Salir")));
       menu.addEventListener("click", (ev) => { if (ev.target.closest(".user-menu-list")) menu.open = false; });
       document.addEventListener("click", (ev) => { if (!menu.contains(ev.target)) menu.open = false; });
       slot.replaceChildren(...[
-        admin ? h("a", { href: "#/desarrollador", "data-nav": "desarrollador" }, "Desarrollador") : null,
+        admin ? h("a", { href: "#/desarrollador", "data-nav": "desarrollador", class: "only-mobile-link" }, "Desarrollador") : null,
         bellLink(),
         menu,
       ].filter(Boolean));
@@ -462,6 +468,7 @@
 
   async function viewHome() {
     const count = (table) => sb.from(table).select("*", { count: "exact", head: true });
+    const friendsRes = session ? sb.rpc("my_friend_activity") : Promise.resolve({ data: [] });
     const [players, unlocks, games, recent, live] = await Promise.all([
       count("profiles"), count("unlocks"), count("games"),
       sb.from("unlocks")
@@ -510,18 +517,31 @@
         h("img", { src: "img/m_celebrando.png", alt: "", width: 64, height: 64 }),
         h("div", {}, h("strong", {}, "¿Nuevo por aquí?"), h("div", { class: "muted small" }, "Mira en un minuto qué es Greeny y cómo empezar."),
           h("a", { href: "#/como-funciona", style: "font-weight:700" }, "Cómo funciona →")))) : null,
+      await friendFeed(friendsRes),
       h("h2", {}, "Greeny en números"), stats,
       h("h2", {}, "Últimos logros"),
       rows.length ? h("div", { class: "stack" }, rows)
                   : h("p", { class: "card muted" }, "Todavía nadie ha subido logros. ¡Sé el primero!"),
-      h("h2", {}, "Cómo funciona"),
-      h("div", { class: "card" }, h("ol", { class: "steps" },
-        h("li", {}, "Instala Greeny en tu Switch con Atmosphère (las instrucciones están en GitHub)."),
-        h("li", {}, "Juega. Los logros salen en pantalla y se guardan en la consola."),
-        h("li", {}, "Crea tu cuenta aquí y vincula tu consola con un código."),
-        h("li", {}, "Tu progreso aparece en tu perfil para que lo compartas."))),
       window.GreenyPages.faq(h, 5),
     ];
+  }
+
+  // Los ultimos logros de la gente que sigues (solo con sesion y si hay algo).
+  async function friendFeed(pending) {
+    const res = await pending;
+    const list = (res && !res.error && res.data) || [];
+    if (!list.length) return null;
+    const ago = (iso) => {
+      const s = Math.max(0, (Date.now() - new Date(iso)) / 1000), en = uiLang() === "en";
+      if (s < 3600) return en ? Math.max(1, s / 60 | 0) + " min ago" : "hace " + Math.max(1, s / 60 | 0) + " min";
+      if (s < 86400) return en ? (s / 3600 | 0) + " h ago" : "hace " + (s / 3600 | 0) + " h";
+      return en ? (s / 86400 | 0) + " d ago" : "hace " + (s / 86400 | 0) + " d";
+    };
+    return h("section", {}, h("h2", {}, "Actividad de tus amigos"),
+      more(list.map((a) => h("a", { class: "card feed-row", href: "#/u/" + encodeURIComponent(a.username) }, avatar(a),
+        h("div", { class: "grow" }, h("div", {}, h("strong", {}, a.name), " desbloqueó ", h("strong", {}, "“" + a.ach_name + "”"), " en " + (a.game || "")),
+          h("div", { class: "muted small" }, ago(a.unlocked_at))),
+        h("span", { class: "pill pts" }, a.points + " pts"))), 4, "feed"));
   }
 
   // ---------- juegos ----------
@@ -1639,9 +1659,6 @@
     const u = String((j && j.discord) || "");
     if (!/^https:\/\/(discord\.gg|discord\.com\/invite)\//.test(u)) return;
     discordUrl = u;
-    const nav = document.getElementById("nav-discord");
-    nav.href = u;
-    nav.hidden = false;
     renderFooter();
     if (/^#\/contribuir/.test(location.hash)) render();
   }).catch(() => {});

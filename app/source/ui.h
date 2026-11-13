@@ -17,7 +17,7 @@
 
 /* opciones, agrupadas en pestañas que se cambian con L y R */
 enum {
-    UI_OPT_LANG, UI_OPT_THEME, UI_OPT_ANIM, UI_OPT_GAMES_VIEW, UI_OPT_ACH_VIEW, UI_OPT_SOUND, UI_OPT_POPUP, UI_OPT_START, UI_OPT_SCOPE, UI_OPT_SHOW, UI_OPT_INGAME, UI_OPT_MUSIC, UI_OPT_SONG, UI_OPT_APPSOUND, UI_OPT_STARTPOP, UI_OPT_OVERLAY, UI_OPT_TOAST_POS, UI_OPT_TOAST_TIME, UI_OPT_SPLASH,
+    UI_OPT_LANG, UI_OPT_THEME, UI_OPT_ANIM, UI_OPT_GAMES_VIEW, UI_OPT_ACH_VIEW, UI_OPT_SOUND, UI_OPT_POPUP, UI_OPT_START, UI_OPT_SCOPE, UI_OPT_SHOW, UI_OPT_INGAME, UI_OPT_MUSIC, UI_OPT_SONG, UI_OPT_APPSOUND, UI_OPT_STARTPOP, UI_OPT_OVERLAY, UI_OPT_TOAST_POS, UI_OPT_TOAST_TIME, UI_OPT_SPLASH, UI_OPT_ACTIVITY,
     UI_OPT_DIAG, UI_OPT_ABOUT, UI_OPT_SEARCH, UI_OPT_UPDATE,
     /* pestaña Cuenta: unas u otras segun si la consola esta vinculada */
     UI_OPT_ACC_LINK, UI_OPT_ACC_LOGIN, UI_OPT_ACC_INFO, UI_OPT_ACC_SYNC, UI_OPT_ACC_UNLINK, UI_OPT_ACC_PHOTO, UI_OPT_ACC_COUNTRY,
@@ -192,6 +192,9 @@ void ui_update(gfx_canvas *c, const ui_assets *a, int state, const char *version
 #define UI_NOTIF_ROWS 7
 void ui_notifs(gfx_canvas *c, const ui_assets *a, const gr_notif *n, int count, int unread, int cursor, int top, int state);
 void ui_notif_text(const gr_notif *n, char *out, size_t cap);
+/* Actividad de amigos para la franja del inicio: la lista, cual se ve ahora y la hora actual (segundos
+ * desde 1970). n = 0 o apagada = sin franja (y el inicio en lista vuelve a 5 juegos). */
+void ui_set_activity(const gr_activity *list, int n, int index, long long now);
 /* Avisos sin leer para la campana de la cabecera; -1 = no hay cuenta (sin campana). */
 void ui_set_unread(int n);
 

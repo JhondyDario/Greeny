@@ -4,6 +4,7 @@
  */
 #include <stdarg.h>
 #include <stdio.h>
+#include <time.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
@@ -585,6 +586,9 @@ static bool download_start(void) {
 static gr_notif g_notifs[GR_NOTIFS_MAX], g_sync_notifs[GR_NOTIFS_MAX];
 static int g_nnotif, g_unread, g_sync_nnotif, g_sync_unread;
 static bool g_sync_notifs_ok;
+static gr_activity g_activity[GR_ACTIVITY_MAX], g_sync_activity[GR_ACTIVITY_MAX];
+static int g_nact, g_sync_nact, g_act_index;
+static bool g_sync_act_ok;
 static u64 g_last_sync_tick; /* para volver a sincronizar cada 5 minutos */
 
 static bool g_upd_checked;
@@ -608,6 +612,8 @@ static void sync_thread(void *arg) {
             /* despues de subir, para que ya salgan los avisos de los logros recien subidos */
             if (gr_notifications(net_http, &g_sync_account, g_sync_notifs, GR_NOTIFS_MAX, &g_sync_nnotif, &g_sync_unread) == GR_NET_OK)
                 g_sync_notifs_ok = true;
+            if (gr_friend_activity(net_http, &g_sync_account, g_sync_activity, GR_ACTIVITY_MAX, &g_sync_nact) == GR_NET_OK)
+                g_sync_act_ok = true;
         }
     }
     g_bg_done = true;
@@ -616,6 +622,7 @@ static void sync_thread(void *arg) {
 static void sync_start(void) {
     g_last_sync_tick = armGetSystemTick();
     g_sync_notifs_ok = false;
+    g_sync_act_ok = false;
     bool linked = g_account.token[0] && g_account.linked;
     if (g_sync_thread_live) return;
     if (!net_online()) { if (linked) g_sync = SYNC_OFFLINE; return; }
@@ -658,6 +665,12 @@ static bool sync_collect(void) {
     }
     ui_set_unread(g_account.token[0] && g_account.linked ? g_unread : -1);
     ui_set_update(g_upd, g_rel.version);
+    if (g_sync_act_ok) {
+        memcpy(g_activity, g_sync_activity, sizeof(g_activity));
+        g_nact = g_sync_nact;
+        g_act_index = 0;
+    }
+    ui_set_activity(g_activity, g_config.activity ? g_nact : 0, g_act_index, (long long)time(NULL));
     if (g_cat_downloaded > 0) rescan();  /* llegaron juegos nuevos: que aparezcan en la lista */
     else refresh_greeting();
     return true;
@@ -1309,6 +1322,18 @@ int main(int argc, char *argv[]) {
         /* cada 5 minutos, sincronizar otra vez (sube logros nuevos y trae avisos) */
         if (!g_sync_thread_live && g_account.linked && armTicksToNs(armGetSystemTick() - g_last_sync_tick) > 300000000000ULL) sync_start();
 
+        /* franja de amigos en el inicio: cambia de logro cada 6 segundos */
+        if (screen == SCREEN_HOME && g_config.activity && g_nact > 1) {
+            static u64 act_last;
+            u64 nowt = armGetSystemTick();
+            if (!act_last) act_last = nowt;
+            if (armTicksToNs(nowt - act_last) > 6000000000ULL) {
+                act_last = nowt;
+                g_act_index = (g_act_index + 1) % g_nact;
+                ui_set_activity(g_activity, g_nact, g_act_index, (long long)time(NULL));
+                dirty = true;
+            }
+        }
         if (screen == SCREEN_SPLASH) {
             int ms = (int)(armTicksToNs(armGetSystemTick() - splash_start) / 1000000ULL);
             dirty = true;
@@ -1731,6 +1756,11 @@ int main(int argc, char *argv[]) {
                     case UI_OPT_STARTPOP:   g_config.start_popup = !g_config.start_popup; break;
                     case UI_OPT_TOAST_POS:  g_config.toast_pos = (g_config.toast_pos + 1) % GR_TOAST_POS_COUNT; break;
                     case UI_OPT_SPLASH:     g_config.splash = !g_config.splash; break;
+                    case UI_OPT_ACTIVITY:
+                        g_config.activity = !g_config.activity;
+                        ui_set_activity(g_activity, g_config.activity ? g_nact : 0, g_act_index, (long long)time(NULL));
+                        cursor = top = 0;
+                        break;
                     case UI_OPT_TOAST_TIME: g_config.toast_time = (g_config.toast_time + 1) % GR_TOAST_TIME_COUNT; break;
                     case UI_OPT_NOTIFY_LIKE: case UI_OPT_NOTIFY_FOLLOW: case UI_OPT_NOTIFY_ACH: case UI_OPT_NOTIFY_BADGE:
                     case UI_OPT_NOTIFY_FRIEND: case UI_OPT_NOTIFY_RANKING: case UI_OPT_NOTIFY_ALMOST: case UI_OPT_NOTIFY_GAME: {
@@ -1820,7 +1850,7 @@ int main(int argc, char *argv[]) {
                     accepted = true;
                     if (g_sfx_next < 0) {
                         bool is_toggle = opt == UI_OPT_ANIM || opt == UI_OPT_APPSOUND || opt == UI_OPT_INGAME || opt == UI_OPT_SOUND ||
-                                         opt == UI_OPT_POPUP || opt == UI_OPT_STARTPOP || opt == UI_OPT_OVERLAY || opt == UI_OPT_MUSIC || opt == UI_OPT_SPLASH;
+                                         opt == UI_OPT_POPUP || opt == UI_OPT_STARTPOP || opt == UI_OPT_OVERLAY || opt == UI_OPT_MUSIC || opt == UI_OPT_SPLASH || opt == UI_OPT_ACTIVITY;
                         if (opt != UI_OPT_SONG) sfx_next(is_toggle ? SFX_TOGGLE : SFX_OPTION);
                     }
                     save_config();

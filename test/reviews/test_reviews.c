@@ -25,6 +25,13 @@ int main(void) {
     assert(nn == 2 && unread == 1);
     assert(nt[0].id == 5 && nt[0].kind == GR_NOTIF_LIKE && !nt[0].read && nt[0].actor_avatar == 9 && !strcmp(nt[0].game, "Mario {3D}") && !strcmp(nt[0].date, "2026-11-12"));
     assert(nt[1].kind == GR_NOTIF_BADGE && nt[1].read && !strcmp(nt[1].badge, "logros_10"));
-    printf("comentarios y avisos: OK\n");
+    assert(gr_parse_time("1970-01-01T00:00:00+00:00") == 0);
+    assert(gr_parse_time("2026-11-12T10:00:00.123+00:00") == 1794477600LL);
+    assert(gr_parse_time("2026-11-12T06:00:00-04:00") == 1794477600LL);
+    char aj[] = "[{\"username\": \"luis\", \"name\": \"Luis\", \"avatar\": 15, \"title_id\": \"010028600EBDA000\", \"game\": \"Mario\", "
+                "\"ach_name\": \"Medio camino\", \"ach_name_en\": \"Halfway\", \"points\": 10, \"unlocked_at\": \"2026-11-12T10:00:00+00:00\"}]";
+    gr_activity act[3];
+    assert(gr_parse_activity(aj, act, 3) == 1 && act[0].avatar == 15 && !strcmp(act[0].ach_en, "Halfway") && act[0].when == 1794477600LL);
+    printf("comentarios, avisos y actividad: OK\n");
     return 0;
 }

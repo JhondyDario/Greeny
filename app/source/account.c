@@ -535,6 +535,60 @@ gr_net_result gr_set_notify(gr_http_fn http, gr_account *a, int kind, bool on, c
     return r;
 }
 
+long long gr_parse_time(const char *s) {
+    int y, mo, d, h = 0, mi = 0, se = 0;
+    if (!s || sscanf(s, "%4d-%2d-%2dT%2d:%2d:%2d", &y, &mo, &d, &h, &mi, &se) < 3 || mo < 1 || mo > 12) return 0;
+    /* dias desde 1970 (calendario gregoriano) */
+    int yy = y - (mo <= 2), era = (yy >= 0 ? yy : yy - 399) / 400, yoe = yy - era * 400;
+    int doy = (153 * (mo + (mo > 2 ? -3 : 9)) + 2) / 5 + d - 1, doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    long long days = (long long)era * 146097 + doe - 719468;
+    long long t = days * 86400 + h * 3600 + mi * 60 + se;
+    /* zona horaria: +hh:mm o -hh:mm despues de los segundos (y las fracciones) */
+    const char *z = strchr(s + 19 > s + strlen(s) ? s + strlen(s) : s + 19, '+');
+    if (!z) { z = strrchr(s, '-'); if (z && z < s + 19) z = NULL; }
+    if (z) { int zh = 0, zm = 0; if (sscanf(z + 1, "%2d:%2d", &zh, &zm) >= 1) t -= (*z == '+' ? 1 : -1) * (zh * 3600 + zm * 60); }
+    return t;
+}
+
+int gr_parse_activity(char *json, gr_activity *out, int max) {
+    int n = 0;
+    for (char *p = strchr(json, '{'); p && n < max; ) {
+        char *end = object_end(p);
+        if (!end) break;
+        char saved = end[1];
+        end[1] = 0;
+        gr_activity *r = &out[n];
+        memset(r, 0, sizeof(*r));
+        gr_json_string(p, "username", r->username, sizeof(r->username));
+        gr_json_string(p, "name", r->name, sizeof(r->name));
+        gr_json_int(p, "avatar", &r->avatar);
+        gr_json_string(p, "game", r->game, sizeof(r->game));
+        gr_json_string(p, "ach_name", r->ach, sizeof(r->ach));
+        gr_json_string(p, "ach_name_en", r->ach_en, sizeof(r->ach_en));
+        gr_json_int(p, "points", &r->points);
+        char t[40] = "";
+        gr_json_string(p, "unlocked_at", t, sizeof(t));
+        r->when = gr_parse_time(t);
+        if (r->username[0] && r->ach[0]) n++;
+        end[1] = saved;
+        p = strchr(end + 1, '{');
+    }
+    return n;
+}
+
+gr_net_result gr_friend_activity(gr_http_fn http, const gr_account *a, gr_activity *out, int max, int *count) {
+    char body[160];
+    *count = 0;
+    if (!a->token[0] || !a->linked) return GR_NET_OK;
+    char *resp = malloc(24 * 1024);
+    if (!resp) return GR_NET_BAD;
+    snprintf(body, sizeof(body), "{\"device_token\":\"%s\"}", a->token);
+    gr_net_result r = call(http, "/rest/v1/rpc/device_friend_activity", NULL, body, resp, 24 * 1024, NULL, 0);
+    if (r == GR_NET_OK) *count = gr_parse_activity(resp, out, max);
+    free(resp);
+    return r;
+}
+
 gr_net_result gr_set_avatar(gr_http_fn http, gr_account *a, int picture, char *err, size_t errlen) {
     char body[160], resp[RESP_MAX];
     if (!a->token[0] || !a->linked) { snprintf(err, errlen, "Esta consola no está vinculada."); return GR_NET_REJECTED; }

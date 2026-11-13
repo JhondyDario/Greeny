@@ -186,6 +186,7 @@
     "En qué lugar vas en el ranking del juego que más jugaste.": "Your place in the ranking of the game you played the most.",
     "Cuando te faltan pocos logros para completar un juego.": "When you're a few achievements away from completing a game.",
     "Juegos que jugaste": "Games you played", "Cuando un juego tuyo cambia de estado, por ejemplo de En prueba a Jugable.": "When a game you played changes status, for example from Testing to Playable.",
+    "Actividad de tus amigos": "Your friends' activity", " desbloqueó ": " unlocked ",
     "Comentarios": "Comments", "Tu comentario": "Your comment", "Escribe un comentario": "Write a comment", "Publicar": "Post",
     "Guardar": "Save", "Borrar": "Delete", "Listo.": "Done.", "Entra": "Sign in", " para comentar y dar me gusta.": " to comment and like.",
     "Nadie ha comentado este juego todavía. ¡Sé el primero!": "Nobody has commented on this game yet. Be the first!",

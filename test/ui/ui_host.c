@@ -232,6 +232,15 @@ int main(int argc, char **argv) {
         /* el mismo inicio en otros dos instantes, para ver que el fondo se mueve */
         cfg.games_view = GR_VIEW_LIST;
         ui_set_user("Jhondy");
+        {
+            static gr_activity act[2] = { { "luis", "Luis", 15, "Super Mario 3D World", "Medio camino", "Halfway", 10, 1794470000LL },
+                                          { "ana_99", "Ana", 9, "Kirby and the Forgotten Land", "Primera partida", "First game", 5, 1794300000LL } };
+            ui_set_activity(act, 2, 0, 1794477600LL);
+            cfg.activity = true;
+            ui_home(&c, &a, &m, &cfg, 0, 0);
+            save(&c, out, "home_actividad", sfx);
+            ui_set_activity(NULL, 0, 0, 0);
+        }
         ui_home(&c, &a, &m, &cfg, 0, 0);
         ui_set_user(NULL);
         g_time = 12.0f; save(&c, out, "home_t12", sfx);

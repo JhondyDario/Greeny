@@ -159,8 +159,40 @@ void ui_set_profile(const ui_profile *p) { g_profile = p; }
 static char g_user[40];
 void ui_set_user(const char *name) { snprintf(g_user, sizeof(g_user), "%s", name ? name : ""); }
 
+static void glass(gfx_canvas *c, int x, int y, int w, int h, int r, bool selected);
+static const gr_activity *g_act;
+static int g_act_n, g_act_i;
+static long long g_act_now;
+void ui_set_activity(const gr_activity *list, int n, int index, long long now) { g_act = list; g_act_n = n; g_act_i = index; g_act_now = now; }
+
 ui_layout ui_home_layout(const gr_config *cfg) {
-    return cfg->games_view == GR_VIEW_GRID ? (ui_layout){ 5, 2 } : (ui_layout){ 1, 5 };
+    bool strip = cfg->activity && g_act_n > 0; /* la franja de amigos le quita una fila a la lista */
+    return cfg->games_view == GR_VIEW_GRID ? (ui_layout){ 5, 2 } : (ui_layout){ 1, strip ? 4 : 5 };
+}
+
+/* Franja de abajo del inicio: el ultimo logro de un amigo, uno distinto cada pocos segundos. */
+static void activity_strip(gfx_canvas *c, const ui_assets *a) {
+    if (g_act_n <= 0) return;
+    const gr_activity *v = &g_act[g_act_i % g_act_n];
+    const int x = MARGIN, y = 588, w = CONTENT_W, h = 58;
+    glass(c, x, y, w, h, 14, false);
+    if (!(v->avatar >= 1 && v->avatar <= UI_AVATAR_COUNT && img_fit(c, a, UI_IMG_avatar_01 + v->avatar - 1, x + 12, y + 7, 44)))
+        gfx_circle(c, x + 34, y + 29, 20, C_GREEN_DK);
+    char line[200], ago[40] = "";
+    snprintf(line, sizeof(line), T("%s desbloqueó “%s” en %s", "%s unlocked “%s” in %s"), v->name[0] ? v->name : v->username,
+             g_en && v->ach_en[0] ? v->ach_en : v->ach, v->game[0] ? v->game : "?");
+    long long d = v->when && g_act_now > v->when ? g_act_now - v->when : -1;
+    if (d < 0) ago[0] = 0;
+    else if (d < 3600) snprintf(ago, sizeof(ago), T("hace %lld min", "%lld min ago"), d / 60 > 0 ? d / 60 : 1);
+    else if (d < 86400) snprintf(ago, sizeof(ago), T("hace %lld h", "%lld h ago"), d / 3600);
+    else snprintf(ago, sizeof(ago), T("hace %lld d", "%lld d ago"), d / 86400);
+    int aw = ago[0] ? gfx_text_width(17, ago) + 20 : 0;
+    gfx_text(c, x + 68, y + 6, 14, P->accent, T("ACTIVIDAD DE AMIGOS", "FRIENDS' ACTIVITY"));
+    gfx_text_fit(c, x + 68, y + 24, 20, P->ink, line, w - 68 - aw - 60);
+    if (ago[0]) gfx_text_right(c, x + w - 46, y + 26, 17, P->gray, ago);
+    /* puntitos: cuantos hay y cual se ve */
+    int nd = g_act_n > 5 ? 5 : g_act_n;
+    for (int k = 0; k < nd; k++) gfx_circle(c, x + w - 30, y + 12 + k * 9, 3, k == (g_act_i % g_act_n) % nd ? C_GREEN : P->gray_lt);
 }
 
 ui_layout ui_detail_layout(const gr_config *cfg) {
@@ -541,6 +573,7 @@ void ui_home(gfx_canvas *c, const ui_assets *a, const gr_model *m, const gr_conf
         ui_layout l = ui_home_layout(cfg);
         if (l.cols > 1) home_grid(c, a, m, cursor, top, l);
         else home_list(c, a, m, cursor, top, l.rows);
+        if (cfg->activity) activity_strip(c, a);
     }
 
     footer_bar(c);
@@ -1345,7 +1378,7 @@ void ui_search(gfx_canvas *c, const ui_assets *a, unsigned value, int type_bits,
 
 static const struct { const char *es, *en; int n; int opt[8]; } k_tabs[UI_TABS] = {
     { "General",     "General",  6, { UI_OPT_ANIM, UI_OPT_APPSOUND, UI_OPT_SPLASH, UI_OPT_LANG, UI_OPT_THEME, UI_OPT_START } }, /* los de encender/apagar arriba, como en Música */
-    { "Vista",       "View",     4, { UI_OPT_SCOPE, UI_OPT_SHOW, UI_OPT_GAMES_VIEW, UI_OPT_ACH_VIEW } },
+    { "Vista",       "View",     5, { UI_OPT_ACTIVITY, UI_OPT_SCOPE, UI_OPT_SHOW, UI_OPT_GAMES_VIEW, UI_OPT_ACH_VIEW } },
     { "En el juego", "In-game",  7, { UI_OPT_INGAME, UI_OPT_SOUND, UI_OPT_POPUP, UI_OPT_STARTPOP, UI_OPT_OVERLAY, UI_OPT_TOAST_POS, UI_OPT_TOAST_TIME } },
     { "Música",      "Music",    0, { 0 } },  /* una fila para encender y una por cancion */
     { "Cuenta",      "Account",  0, { 0 } },  /* sus filas dependen de si la consola esta vinculada */
@@ -1462,6 +1495,7 @@ static int opt_icon(int opt, int row) {
         case UI_OPT_TOAST_POS: return UI_IMG_opt_toast_pos;
         case UI_OPT_TOAST_TIME: return UI_IMG_opt_toast_time;
         case UI_OPT_SPLASH: return UI_IMG_opt_inicio;
+        case UI_OPT_ACTIVITY: return UI_IMG_stat_siguiendo;
         case UI_OPT_OVERLAY: return UI_IMG_opt_ver_logros_juego;
         case UI_OPT_MUSIC: return UI_IMG_opt_musica;
         case UI_OPT_SONG: return -1;
@@ -1636,6 +1670,11 @@ void ui_settings(gfx_canvas *c, const ui_assets *a, const gr_config *cfg, int ta
                            T("Mensajes en pantalla mientras juegas. Se aplica al abrir un juego.",
                              "On-screen messages while you play. Applies when a game starts."),
                            cfg->popup ? on : off, cfg->popup ? C_GREEN : C_NEUTRAL);
+                break;
+            case UI_OPT_ACTIVITY:
+                option_row(c, y, sel, T("Actividad de amigos", "Friends' activity"),
+                           T("Abajo en el inicio: los últimos logros de la gente que sigues.", "At the bottom of the home screen: the latest achievements of people you follow."),
+                           cfg->activity ? on : off, C_GREEN);
                 break;
             case UI_OPT_SPLASH:
                 option_row(c, y, sel, T("Presentación al abrir", "Intro when opening"),

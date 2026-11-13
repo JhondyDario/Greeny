@@ -148,6 +148,22 @@ gr_net_result gr_notifications_read(gr_http_fn http, const gr_account *a, long l
 gr_net_result gr_notify_prefs(gr_http_fn http, gr_account *a);
 gr_net_result gr_set_notify(gr_http_fn http, gr_account *a, int kind, bool on, char *err, size_t errlen);
 
+/* ---- actividad de amigos: los ultimos logros de la gente que sigues ---- */
+#define GR_ACTIVITY_MAX 15
+typedef struct {
+    char username[24];
+    char name[36];
+    int  avatar;
+    char game[64];
+    char ach[48], ach_en[48];
+    int  points;
+    long long when;   /* segundos desde 1970 (UTC); 0 si no se sabe */
+} gr_activity;
+int gr_parse_activity(char *json, gr_activity *out, int max);
+gr_net_result gr_friend_activity(gr_http_fn http, const gr_account *a, gr_activity *out, int max, int *count);
+/* "2026-11-12T10:00:00+00:00" -> segundos desde 1970; 0 si no se entiende */
+long long gr_parse_time(const char *iso);
+
 /* Entra con correo y contraseña y registra la consola de una vez. */
 gr_net_result gr_login_password(gr_http_fn http, const char *email, const char *password, const char *device_name,
                                 gr_account *a, char *err, size_t errlen);

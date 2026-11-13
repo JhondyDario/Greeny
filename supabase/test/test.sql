@@ -701,4 +701,14 @@ begin
     update public.games set status = 'jugable' where title_id = '010028600EBDA000';
 end $$;
 
+-- actividad de amigos: los logros recientes de a quien sigues
+do $$
+declare yo uuid := '00000000-0000-0000-0000-0000000000d1'; j jsonb;
+begin
+    update public.unlocks set unlocked_at = now() - interval '2 hours' where user_id = '00000000-0000-0000-0000-0000000000d2';
+    j := public.friend_activity_for(yo);
+    assert jsonb_array_length(j) >= 1 and j -> 0 ->> 'username' = 'resumen_amigo' and j -> 0 ? 'ach_name', 'actividad: ' || j::text;
+    assert jsonb_array_length(public.friend_activity_for('00000000-0000-0000-0000-0000000000d2')) = 0, 'sin seguidos, sin actividad';
+end $$;
+
 select 'TODAS LAS PRUEBAS PASARON' as resultado;
