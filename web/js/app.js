@@ -509,18 +509,37 @@
     }
     if (!list.length) return [h("h1", {}, "Juegos"), h("p", { class: "card muted" }, "Todavía no hay juegos publicados.")];
 
-    return [
-      h("h1", {}, "Juegos"),
-      h("p", { class: "muted" }, "Cada lista de logros sirve para una versión concreta del juego."),
-      h("div", { class: "grid games" }, list.map((g) => {
+    // filtro por estado: no se guarda, al volver a entrar se ven todos
+    const grid = h("div", { class: "grid games" });
+    const empty = h("p", { class: "card muted", hidden: true }, "Ningún juego tiene ese estado todavía.");
+    const order = ["", "sin_empezar", "prueba", "jugable", "perfecto"];
+    const count = (st) => (st ? list.filter((g) => (g.status || "sin_empezar") === st).length : list.length);
+    const chips = h("div", { class: "tabs status-filter", role: "group", "aria-label": "Filtrar por estado" });
+    function apply(st) {
+      for (const b of chips.children) { const on = b.dataset.st === st; b.classList.toggle("on", on); b.setAttribute("aria-pressed", String(on)); }
+      let shown = 0;
+      for (const card of grid.children) { const ok = !st || card.dataset.st === st; card.hidden = !ok; if (ok) shown++; }
+      empty.hidden = shown > 0;
+    }
+    for (const st of order) {
+      const label = st ? STATUS[st].label : "Ver todos";
+      chips.append(h("button", { type: "button", class: "tab", "data-st": st, onclick: () => apply(st) },
+        st ? h("img", { src: "img/st_" + st + ".png", alt: "", width: 18, height: 18 }) : null, label, h("span", { class: "tab-count" }, String(count(st)))));
+    }
+    grid.append(...list.map((g) => {
         const t = totals[g.title_id] || { n: 0, pts: 0 };
-        return h("a", { class: "card", href: "#/juego/" + g.title_id },
+        return h("a", { class: "card", href: "#/juego/" + g.title_id, "data-st": g.status || "sin_empezar" },
           cover(g),
           h("strong", { class: "clip", style: "display:block" }, g.name),
           h("div", { style: "margin:4px 0" }, statusPill(g.status)),
           h("div", { class: "muted small" }, g.version ? "Versión " + g.version : "Versión sin indicar", g.published ? "" : " · sin publicar"),
           h("div", { class: "small", style: "margin-top:6px" }, t.n + " logros · " + t.pts + " pts"));
-      })),
+      }));
+    apply("");
+    return [
+      h("h1", {}, "Juegos"),
+      h("p", { class: "muted" }, "Cada lista de logros sirve para una versión concreta del juego."),
+      chips, grid, empty,
     ];
   }
 

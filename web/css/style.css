@@ -673,3 +673,9 @@ a.card.notif { display: flex; }
 @media (max-width: 1080px) { .level .lvl-tags { justify-content: center; width: 100%; } }
 .pill.tag-friend { background: rgba(67, 208, 88, .2); color: #8ff09c; font-size: .72rem; }
 .pill.tag-mine { background: rgba(247, 201, 30, .2); color: #ffe169; font-size: .72rem; }
+.status-filter { margin: 14px 0 18px; }
+.status-filter .tab { display: inline-flex; align-items: center; gap: 7px; }
+.status-filter .tab img { width: 18px; height: 18px; }
+.tab-count { font-size: .75rem; opacity: .75; background: rgba(255, 255, 255, .12); border-radius: 999px; padding: 1px 7px; }
+.grid.games > [hidden] { display: none; }
+@media (max-width: 1080px) { .status-filter { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 8px; scrollbar-width: none; } .status-filter .tab { flex: none; } }

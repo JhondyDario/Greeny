@@ -879,11 +879,13 @@ static const char *status_name(const char *status) {
 }
 
 void ui_browse(gfx_canvas *c, const ui_assets *a, const gr_cat_game *games, const int *shown, int nshown, int total,
-               const bool *have, const uint8_t *const *covers, const char *query, ui_browse_state state, int cursor, int top) {
-    (void)query;
+               const bool *have, const uint8_t *const *covers, int status_filter, ui_browse_state state, int cursor, int top) {
+    static const char *const k_filter[UI_BROWSE_FILTERS] = { "", "sin_empezar", "prueba", "jugable", "perfecto" };
     begin(c);
-    char sub[96];
-    if (state == UI_BROWSE_OK) snprintf(sub, sizeof(sub), T("%d juegos con logros, de la A a la Z", "%d games with achievements, A to Z"), total);
+    char sub[128];
+    if (state == UI_BROWSE_OK && status_filter > 0)
+        snprintf(sub, sizeof(sub), T("Mostrando: %s  ·  %d de %d juegos", "Showing: %s  ·  %d of %d games"), status_name(k_filter[status_filter]), nshown, total);
+    else if (state == UI_BROWSE_OK) snprintf(sub, sizeof(sub), T("%d juegos con logros, de la A a la Z", "%d games with achievements, A to Z"), total);
     else snprintf(sub, sizeof(sub), "%s", T("Catálogo de Greeny", "Greeny catalogue"));
     header(c, a, NULL, T("Buscar juegos", "Find games"), sub);
 
@@ -896,6 +898,9 @@ void ui_browse(gfx_canvas *c, const ui_assets *a, const gr_cat_game *games, cons
         else if (state == UI_BROWSE_OFFLINE) {
             t1 = T("No hay conexión", "No connection");
             t2 = T("Conecta la consola a internet y pulsa Y para intentarlo de nuevo.", "Connect the console to the internet and press Y to try again.");
+        } else if (status_filter > 0 && total > 0) {
+            t1 = T("Ningún juego con ese estado", "No games with that status");
+            t2 = T("Pulsa − para cambiar el filtro y ver los demás.", "Press − to change the filter and see the others.");
         } else { t1 = T("El catálogo está vacío", "The catalogue is empty"); t2 = T("Todavía no se ha publicado ningún juego.", "No games have been published yet."); }
         gfx_text(c, MARGIN + 320, 290, 36, P->ink, t1);
         gfx_text_fit(c, MARGIN + 320, 350, 23, P->gray, t2, CONTENT_W - 360);
@@ -942,6 +947,11 @@ void ui_browse(gfx_canvas *c, const ui_assets *a, const gr_cat_game *games, cons
     footer_bar(c);
     int hx = MARGIN;
     if (state == UI_BROWSE_OK && nshown > 0) hx = hint(c, hx, "A", T("Ver logros", "View achievements"));
+    if (state == UI_BROWSE_OK) {
+        char f[64];
+        snprintf(f, sizeof(f), T("Filtro: %s", "Filter: %s"), status_filter > 0 ? status_name(k_filter[status_filter]) : T("Todos", "All"));
+        hx = hint(c, hx, "−", f);
+    }
     hx = hint(c, hx, "R", T("Mis juegos", "My games"));
     if (state == UI_BROWSE_OK && nshown > UI_BROWSE_ROWS) hx = hint(c, hx, "X", T("Siguiente letra", "Next letter"));
     hx = hint(c, hx, "Y", T("Recargar", "Reload"));

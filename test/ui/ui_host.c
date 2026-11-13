@@ -322,11 +322,13 @@ int main(int argc, char **argv) {
             for (int i = 0; i < UI_BROWSE_COVER * UI_BROWSE_COVER; i++) { fake[i * 4] = 230; fake[i * 4 + 1] = (uint8_t)(60 + i % UI_BROWSE_COVER * 2); fake[i * 4 + 2] = 70; fake[i * 4 + 3] = 255; }
             gfx_round_corners(fake, UI_BROWSE_COVER, UI_BROWSE_COVER, 10);
             const uint8_t *bc[5] = { fake, NULL, fake, NULL, NULL };
-            ui_browse(&c, &a, cat, all, 5, 5, have, bc, "", UI_BROWSE_OK, 1, 0);
+            ui_browse(&c, &a, cat, all, 5, 5, have, bc, 0, UI_BROWSE_OK, 1, 0);
+            save(&c, out, "browse_todos", sfx);
+            ui_browse(&c, &a, cat, all, 5, 5, have, bc, 3, UI_BROWSE_OK, 1, 0);
             save(&c, out, "browse", sfx);
-            ui_browse(&c, &a, cat, all, 0, 5, have, NULL, "zelda", UI_BROWSE_OK, 0, 0);
+            ui_browse(&c, &a, cat, all, 0, 5, have, NULL, 4, UI_BROWSE_OK, 0, 0);
             save(&c, out, "browse_nada", sfx);
-            ui_browse(&c, &a, cat, all, 0, 0, have, NULL, "", UI_BROWSE_OFFLINE, 0, 0);
+            ui_browse(&c, &a, cat, all, 0, 0, have, NULL, 0, UI_BROWSE_OFFLINE, 0, 0);
             save(&c, out, "browse_sin_red", sfx);
             gr_open(&m, m.ngames - 1, root);
             ui_browse_game(&c, &a, &cat[0], &m.cur, 1, 0);

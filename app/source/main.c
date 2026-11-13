@@ -941,10 +941,16 @@ static bool contains_nocase(const char *text, const char *word) {
     return n == 0;
 }
 
+/* Filtro por estado del catalogo: 0 = todos. No se guarda: al abrir la app vuelve a "todos". */
+static int g_cat_status;
+static const char *const k_cat_status[UI_BROWSE_FILTERS] = { "", "sin_empezar", "prueba", "jugable", "perfecto" };
+
 static void browse_filter(void) {
     g_cat_nshown = 0;
-    for (int i = 0; i < g_cat_n; i++)
+    for (int i = 0; i < g_cat_n; i++) {
+        if (g_cat_status > 0 && strcmp(g_cat[i].status, k_cat_status[g_cat_status]) != 0) continue;
         if (contains_nocase(g_cat[i].name, g_cat_query) || contains_nocase(g_cat[i].tid, g_cat_query)) g_cat_shown[g_cat_nshown++] = i;
+    }
 }
 
 /* ---- caratulas del catalogo: se bajan en segundo plano y se cargan solo las que se ven ---- */
@@ -1407,6 +1413,12 @@ int main(int argc, char *argv[]) {
             if (bcursor >= btop + UI_BROWSE_ROWS) btop = bcursor - UI_BROWSE_ROWS + 1;
             if (down & (HidNpadButton_B | HidNpadButton_R)) { screen = SCREEN_HOME; back = true; }
             if (down & HidNpadButton_Y) { browse_load(); bcursor = btop = 0; accepted_alt = true; }
+            if ((down & HidNpadButton_Minus) && g_cat_state == UI_BROWSE_OK) { /* filtro: todos -> sin empezar -> en prueba -> jugable -> perfecto */
+                g_cat_status = (g_cat_status + 1) % UI_BROWSE_FILTERS;
+                browse_filter();
+                bcursor = btop = 0;
+                accepted_alt = true;
+            }
             if ((down & HidNpadButton_X) && g_cat_state == UI_BROWSE_OK && g_cat_nshown > 0) {
                 /* saltar al primer juego de la letra siguiente; al final vuelve al principio */
                 char now = (char)toupper((unsigned char)g_cat[g_cat_shown[bcursor]].name[0]);
@@ -1991,7 +2003,7 @@ int main(int argc, char *argv[]) {
             else if (screen == SCREEN_REVIEWS) ui_reviews(&layer, &g_assets, g_rev_name, g_reviews, g_nrev, vcursor, vtop, g_rev_state, g_account.linked);
             else if (screen == SCREEN_USER) ui_user(&layer, &g_assets, &g_rank_view, strcasecmp(g_rank_view.username, g_account.username) != 0);
             else if (screen == SCREEN_AVATARS) ui_avatars(&layer, &g_assets, &g_profile, acursor);
-            else if (screen == SCREEN_BROWSE) ui_browse(&layer, &g_assets, g_cat, g_cat_shown, g_cat_nshown, g_cat_n, g_cat_have, (const uint8_t *const *)g_cat_cover, g_cat_query, g_cat_state, bcursor, btop);
+            else if (screen == SCREEN_BROWSE) ui_browse(&layer, &g_assets, g_cat, g_cat_shown, g_cat_nshown, g_cat_n, g_cat_have, (const uint8_t *const *)g_cat_cover, g_cat_status, g_cat_state, bcursor, btop);
             else if (screen == SCREEN_SEARCH) {
                 static const int bits[3] = { 32, 8, 16 };
                 struct stat pst;

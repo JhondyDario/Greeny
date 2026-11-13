@@ -171,6 +171,7 @@
     "¿Greeny me da juegos o los modifica?": "Does Greeny give me games or change them?", "¿Puedo usarlo jugando en línea?": "Can I use it while playing online?",
     "Me gusta recibidos en sus comentarios": "Likes received on their comments",
     "Amigo": "Friend", "Tú": "You",
+    "Ver todos": "See all", "Ningún juego tiene ese estado todavía.": "No game has that status yet.",
     "Comentarios": "Comments", "Tu comentario": "Your comment", "Escribe un comentario": "Write a comment", "Publicar": "Post",
     "Guardar": "Save", "Borrar": "Delete", "Listo.": "Done.", "Entra": "Sign in", " para comentar y dar me gusta.": " to comment and like.",
     "Nadie ha comentado este juego todavía. ¡Sé el primero!": "Nobody has commented on this game yet. Be the first!",
