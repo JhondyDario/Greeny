@@ -879,7 +879,7 @@ static const char *status_name(const char *status) {
 }
 
 void ui_browse(gfx_canvas *c, const ui_assets *a, const gr_cat_game *games, const int *shown, int nshown, int total,
-               const bool *have, const char *query, ui_browse_state state, int cursor, int top) {
+               const bool *have, const uint8_t *const *covers, const char *query, ui_browse_state state, int cursor, int top) {
     (void)query;
     begin(c);
     char sub[96];
@@ -906,12 +906,17 @@ void ui_browse(gfx_canvas *c, const ui_assets *a, const gr_cat_game *games, cons
             int y = 116 + (i - top) * (h + 10);
             card(c, x, y, w, h, i == cursor);
             zone(x, y, w, h, UI_ZONE_ITEM, i);
-            img(c, a, status_img(g->status), x + 22, y + h / 2 - 20);
-            gfx_text_fit(c, x + 82, y + 10, 27, P->ink, g->name, w - 82 - 380);
+            /* primero la caratula pequeña; luego el nombre y, debajo, el estado con su icono */
+            const int cs = UI_BROWSE_COVER, cx = x + 10, cy = y + (h - cs) / 2;
+            if (covers && covers[shown[i]]) gfx_image(c, cx, cy, covers[shown[i]], cs, cs);
+            else if (!img_fit(c, a, UI_IMG_cover_fill, cx, cy, cs)) gfx_round_rect(c, cx, cy, cs, cs, 10, P->gray_lt);
+            const int tx = cx + cs + 16;
+            gfx_text_fit(c, tx, y + 8, 27, P->ink, g->name, w - (tx - x) - 300);
+            img_fit(c, a, status_img(g->status), tx, y + 44, 24);
             char line[96];
             if (g->version[0]) snprintf(line, sizeof(line), T("%s  ·  versión %s", "%s  ·  version %s"), status_name(g->status), g->version);
             else snprintf(line, sizeof(line), "%s", status_name(g->status));
-            gfx_text_fit(c, x + 82, y + 45, 19, P->gray, line, w - 82 - 380);
+            gfx_text_fit(c, tx + 32, y + 45, 19, P->gray, line, w - (tx - x) - 32 - 300);
             if (have[shown[i]]) pill(c, x + w - 22, y + h / 2 - 14, C_GREEN, C_WHITE, T("EN TU CONSOLA", "ON YOUR CONSOLE"));
         }
 

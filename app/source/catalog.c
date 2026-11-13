@@ -106,6 +106,10 @@ static bool fetch_cover(gr_get_fn get, const char *root, const char *tid, const 
     return ok;
 }
 
+bool gr_catalog_fetch_cover(gr_get_fn get, const char *root, const char *tid, const char *cover_path) {
+    return valid_tid(tid) && cover_path[0] && fetch_cover(get, root, tid, cover_path);
+}
+
 int gr_catalog_sync(gr_get_fn get, const char *root, const char (*tids)[17], int count, int *downloaded) {
     *downloaded = 0;
     char *list = malloc(LIST_MAX), *json = malloc(DEF_JSON_MAX), *text = malloc(DEF_MAX);
@@ -174,7 +178,7 @@ int gr_catalog_list(gr_get_fn get, gr_cat_game *out, int max, int *count) {
     if (!list) return -1;
     size_t len = 0;
     long status = 0;
-    int rc = get(GR_BACKEND_URL "/rest/v1/games?select=title_id,name,version,status,updated_at&published=eq.true&order=name&limit=300",
+    int rc = get(GR_BACKEND_URL "/rest/v1/games?select=title_id,name,version,status,updated_at,cover_path&published=eq.true&order=name&limit=300",
                  list, cap - 1, &len, &status);
     if (rc != 0) { free(list); return -1; }
     list[len] = 0;
@@ -194,6 +198,7 @@ int gr_catalog_list(gr_get_fn get, gr_cat_game *out, int max, int *count) {
                 gr_json_string(p, "status", g->status, sizeof(g->status));
                 char up[40] = "";
                 if (gr_json_string(p, "updated_at", up, sizeof(up))) snprintf(g->updated, sizeof(g->updated), "%.10s", up);
+                gr_json_string(p, "cover_path", g->cover_path, sizeof(g->cover_path));
                 (*count)++;
             }
             end[1] = saved;

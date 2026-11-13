@@ -947,7 +947,58 @@ static void browse_filter(void) {
         if (contains_nocase(g_cat[i].name, g_cat_query) || contains_nocase(g_cat[i].tid, g_cat_query)) g_cat_shown[g_cat_nshown++] = i;
 }
 
+/* ---- caratulas del catalogo: se bajan en segundo plano y se cargan solo las que se ven ---- */
+static uint8_t *g_cat_cover[CAT_MAX];
+static uint8_t g_cat_cover_state[CAT_MAX]; /* 0 sin probar, 1 cargada, 2 todavia no hay */
+static Thread g_cov_thread;
+static bool g_cov_live;
+static volatile bool g_cov_done;
+
+static void cover_thread(void *arg) {
+    (void)arg;
+    for (int i = 0; i < g_cat_n; i++)
+        if (g_cat[i].cover_path[0]) gr_catalog_fetch_cover(net_get, ROOT, g_cat[i].tid, g_cat[i].cover_path);
+    g_cov_done = true;
+}
+
+static void browse_covers_reset(void) {
+    if (g_cov_live) { threadWaitForExit(&g_cov_thread); threadClose(&g_cov_thread); g_cov_live = false; }
+    for (int i = 0; i < CAT_MAX; i++) { free(g_cat_cover[i]); g_cat_cover[i] = NULL; g_cat_cover_state[i] = 0; }
+}
+
+/* Carga las caratulas de las filas que se ven. Devuelve true si cargo alguna (hay que redibujar). */
+static bool browse_covers_tick(int top) {
+    bool changed = false;
+    if (g_cov_live && g_cov_done) { /* termino de bajar: probar otra vez las que faltaban */
+        threadWaitForExit(&g_cov_thread);
+        threadClose(&g_cov_thread);
+        g_cov_live = false;
+        for (int i = 0; i < g_cat_n; i++) if (g_cat_cover_state[i] == 2) g_cat_cover_state[i] = 0;
+    }
+    for (int k = top; k < g_cat_nshown && k < top + UI_BROWSE_ROWS; k++) {
+        int i = g_cat_shown[k];
+        if (g_cat_cover_state[i] != 0) continue;
+        int w, h, n;
+        uint8_t *img = catalog_cover(g_cat[i].tid, &w, &h);
+        if (!img && g_ns_ok) { /* sin caratula en el catalogo: el icono del juego si esta instalado */
+            static NsApplicationControlData ctrl;
+            u64 size = 0;
+            if (R_SUCCEEDED(nsGetApplicationControlData(NsApplicationControlSource_Storage, strtoull(g_cat[i].tid, NULL, 16), &ctrl, sizeof(ctrl), &size)) &&
+                size > sizeof(ctrl.nacp))
+                img = stbi_load_from_memory(ctrl.icon, (int)(size - sizeof(ctrl.nacp)), &w, &h, &n, 4);
+        }
+        if (img && w > 0 && h > 0 && w <= 2048 && h <= 2048) {
+            g_cat_cover[i] = make_cover(img, w, h, UI_BROWSE_COVER);
+            g_cat_cover_state[i] = g_cat_cover[i] ? 1 : 2;
+            changed = true;
+        } else g_cat_cover_state[i] = 2;
+        stbi_image_free(img);
+    }
+    return changed;
+}
+
 static void browse_load(void) {
+    browse_covers_reset();
     g_cat_n = 0;
     if (!net_online() || gr_catalog_list(net_get, g_cat, CAT_MAX, &g_cat_n) != 0) { g_cat_state = UI_BROWSE_OFFLINE; g_cat_nshown = 0; return; }
     for (int i = 0; i < g_cat_n; i++) {
@@ -958,6 +1009,9 @@ static void browse_load(void) {
     }
     g_cat_state = UI_BROWSE_OK;
     browse_filter();
+    g_cov_done = false;
+    if (R_SUCCEEDED(threadCreate(&g_cov_thread, cover_thread, NULL, NULL, 0x20000, 0x2D, -2)) && R_SUCCEEDED(threadStart(&g_cov_thread)))
+        g_cov_live = true;
 }
 
 /* Baja y lee los logros de un juego del catalogo. false si no se pudo. */
@@ -1345,6 +1399,7 @@ int main(int argc, char *argv[]) {
             }
         } else if (screen == SCREEN_BROWSE) {
             if (browse_pending && --browse_pending == 0) { browse_load(); dirty = true; }
+            if (g_cat_state == UI_BROWSE_OK && browse_covers_tick(btop)) dirty = true;
             else if (browse_pending) dirty = true;
             TAP_SELECT(bcursor, g_cat_nshown);
             if (g_cat_nshown > 0) moved = move_cursor(&bcursor, g_cat_nshown, 1, nav);
@@ -1936,7 +1991,7 @@ int main(int argc, char *argv[]) {
             else if (screen == SCREEN_REVIEWS) ui_reviews(&layer, &g_assets, g_rev_name, g_reviews, g_nrev, vcursor, vtop, g_rev_state, g_account.linked);
             else if (screen == SCREEN_USER) ui_user(&layer, &g_assets, &g_rank_view, strcasecmp(g_rank_view.username, g_account.username) != 0);
             else if (screen == SCREEN_AVATARS) ui_avatars(&layer, &g_assets, &g_profile, acursor);
-            else if (screen == SCREEN_BROWSE) ui_browse(&layer, &g_assets, g_cat, g_cat_shown, g_cat_nshown, g_cat_n, g_cat_have, g_cat_query, g_cat_state, bcursor, btop);
+            else if (screen == SCREEN_BROWSE) ui_browse(&layer, &g_assets, g_cat, g_cat_shown, g_cat_nshown, g_cat_n, g_cat_have, (const uint8_t *const *)g_cat_cover, g_cat_query, g_cat_state, bcursor, btop);
             else if (screen == SCREEN_SEARCH) {
                 static const int bits[3] = { 32, 8, 16 };
                 struct stat pst;

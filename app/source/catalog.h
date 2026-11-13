@@ -21,7 +21,10 @@ typedef struct {
     char version[16];
     char status[16]; /* sin_empezar, prueba, jugable o perfecto */
     char updated[11]; /* AAAA-MM-DD: ultima vez que se cambiaron sus logros */
+    char cover_path[128]; /* caratula en el catalogo; "" = no tiene */
 } gr_cat_game;
+/* Baja la caratula de un juego del catalogo a root/cache/<tid>/cover.img si no esta al dia. */
+bool gr_catalog_fetch_cover(gr_get_fn get, const char *root, const char *tid, const char *cover_path);
 
 /* Lista los juegos publicados, por nombre. 0 si respondio el catalogo, -1 sin conexion. */
 int gr_catalog_list(gr_get_fn get, gr_cat_game *out, int max, int *count);

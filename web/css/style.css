@@ -192,10 +192,12 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fo
 .locked .icon { border-color: var(--line); }
 
 /* estado de los juegos */
-.pill.st-sin_empezar { background: var(--line); color: var(--ink); }
-.pill.st-prueba { background: #e8912d; color: #1e2a1f; }
-.pill.st-jugable { background: var(--green); color: #fff; }
-.pill.st-perfecto { background: var(--yellow); color: var(--on-yellow); }
+/* estado del juego: el color de su icono (gris, amarillo, azul, verde), transparente y con borde */
+.pill.st-sin_empezar, .pill.st-prueba, .pill.st-jugable, .pill.st-perfecto { border: 1px solid; font-weight: 700; padding-left: 4px; }
+.pill.st-sin_empezar { background: rgba(255, 255, 255, .1); border-color: rgba(255, 255, 255, .28); color: var(--ink); }
+.pill.st-prueba { background: rgba(247, 201, 30, .16); border-color: rgba(247, 201, 30, .55); color: #ffe169; }
+.pill.st-jugable { background: rgba(59, 130, 246, .2); border-color: rgba(96, 165, 250, .6); color: #a5cdff; }
+.pill.st-perfecto { background: rgba(67, 208, 88, .18); border-color: rgba(67, 208, 88, .6); color: #8ff09c; }
 /* frases sugeridas (Desarrollador) */
 .preset-row { display: grid; grid-template-columns: 1fr 1fr auto auto; gap: 8px; align-items: center; }
 @media (max-width: 620px) { .preset-row { grid-template-columns: 1fr; } }

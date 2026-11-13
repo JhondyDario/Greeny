@@ -142,8 +142,9 @@ void ui_detail(gfx_canvas *c, const ui_assets *a, const gr_model *m, const gr_co
 #include "catalog.h"
 typedef enum { UI_BROWSE_LOADING, UI_BROWSE_OK, UI_BROWSE_OFFLINE } ui_browse_state;
 #define UI_BROWSE_ROWS 6
+#define UI_BROWSE_COVER 62 /* caratula pequeña a la izquierda de cada juego del catalogo */
 void ui_browse(gfx_canvas *c, const ui_assets *a, const gr_cat_game *games, const int *shown, int nshown, int total,
-               const bool *have, const char *query, ui_browse_state state, int cursor, int top);
+               const bool *have, const uint8_t *const *covers, const char *query, ui_browse_state state, int cursor, int top);
 /* Los logros de un juego del catalogo que no esta en la consola (solo para mirar). */
 void ui_browse_game(gfx_canvas *c, const ui_assets *a, const gr_cat_game *game, const lg_game *def, int cursor, int top);
 
