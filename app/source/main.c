@@ -1765,6 +1765,7 @@ int main(int argc, char *argv[]) {
                     case UI_OPT_TOAST_POS:  g_config.toast_pos = (g_config.toast_pos + 1) % GR_TOAST_POS_COUNT; break;
                     case UI_OPT_SPLASH:     g_config.splash = !g_config.splash; break;
                     case UI_OPT_GRID_VERSION: g_config.grid_version = !g_config.grid_version; break;
+                    case UI_OPT_BAR_ANIM:   g_config.bar_anim = !g_config.bar_anim; break;
                     case UI_OPT_ACTIVITY:
                         g_config.activity = !g_config.activity;
                         ui_set_activity(g_activity, g_config.activity ? g_nact : 0, g_act_index, (long long)time(NULL));
@@ -1859,7 +1860,7 @@ int main(int argc, char *argv[]) {
                     accepted = true;
                     if (g_sfx_next < 0) {
                         bool is_toggle = opt == UI_OPT_ANIM || opt == UI_OPT_APPSOUND || opt == UI_OPT_INGAME || opt == UI_OPT_SOUND ||
-                                         opt == UI_OPT_POPUP || opt == UI_OPT_STARTPOP || opt == UI_OPT_OVERLAY || opt == UI_OPT_MUSIC || opt == UI_OPT_SPLASH || opt == UI_OPT_ACTIVITY || opt == UI_OPT_GRID_VERSION;
+                                         opt == UI_OPT_POPUP || opt == UI_OPT_STARTPOP || opt == UI_OPT_OVERLAY || opt == UI_OPT_MUSIC || opt == UI_OPT_SPLASH || opt == UI_OPT_ACTIVITY || opt == UI_OPT_GRID_VERSION || opt == UI_OPT_BAR_ANIM;
                         if (opt != UI_OPT_SONG) sfx_next(is_toggle ? SFX_TOGGLE : SFX_OPTION);
                     }
                     save_config();
@@ -2075,6 +2076,17 @@ int main(int argc, char *argv[]) {
 
         /* que suena: lo que pidio la accion; si no, segun a que pantalla se fue */
         bool went = screen != screen_before;
+        /* las barras de progreso se llenan en medio segundo al entrar a una pantalla */
+        {
+            static u64 bar_start;
+            if (went && g_config.bar_anim) bar_start = armGetSystemTick();
+            if (bar_start) {
+                int ms = (int)(armTicksToNs(armGetSystemTick() - bar_start) / 1000000ULL);
+                if (ms >= 500 || !g_config.bar_anim) { bar_start = 0; ui_set_bar_anim(1000); }
+                else { int r = 1000 - ms * 2; ui_set_bar_anim(1000 - (int)((long)r * r * r / 1000000)); } /* rapido al principio, suave al final */
+                dirty = true;
+            }
+        }
         if (quiet) { /* nada: ya suena la musica */ }
         else if (g_sfx_next >= 0) sfx_play((sfx_id)g_sfx_next);
         else if (back) sfx_play(screen == SCREEN_HOME ? SFX_BACK2 : SFX_BACK1);

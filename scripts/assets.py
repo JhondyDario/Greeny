@@ -85,7 +85,7 @@ from paises import PAISES  # los paises que se pueden elegir, con su bandera en 
 # iconos de las filas de Opciones (assets/opciones/), en el orden que usa ui.c
 OPCIONES = ["idioma", "tema", "inicio", "fondo_animado", "sonido_app", "vista_juegos", "vista_logros", "juegos_inicio", "mostrar",
             "logros_juego", "sonido_juego", "avisos", "aviso_inicio", "musica", "foto", "pais", "sincronizar", "desvincular",
-            "diagnostico", "acerca", "ver_logros_juego", "toast_pos", "toast_time"]
+            "diagnostico", "acerca", "ver_logros_juego", "toast_pos", "toast_time", "disco", "disco_sonando", "descargar"]
 AVATARS = sorted(f[:-4] for f in os.listdir(os.path.join(A, "avatars")) if f.endswith(".png"))
 app_images = [  # (nombre, archivo en assets/, ancho, alto, espejo)
     ("medal_bronce", "medals/bronce.png", 64, 64, False), ("medal_plata", "medals/plata.png", 64, 64, False),

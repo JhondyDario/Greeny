@@ -22,6 +22,7 @@ typedef struct {
     bool overlay;     /* overlay de Tesla para ver los logros en el juego (hace falta Tesla) */
     bool splash;      /* presentacion con el logo y el sonido de bienvenida al abrir la app */
     bool activity;    /* franja con los ultimos logros de tus amigos en el inicio */
+    bool bar_anim;    /* las barras de progreso se llenan al abrir la pantalla */
     bool grid_version; /* etiqueta con la version sobre la caratula, en la cuadricula de Mis juegos */
     int  toast_pos;   /* gr_toast_pos: donde sale el aviso dentro del juego */
     int  toast_time;  /* gr_toast_time: cuanto dura en pantalla */

@@ -137,7 +137,10 @@ bool ui_selected_rect(int *x, int *y, int *w, int *h) {
 /* toda pantalla empieza por aqui */
 static bool g_chip_opens_profile; /* solo en el inicio, donde R abre el perfil */
 
+static bool g_footer_version; /* la version al pie: solo en el perfil y en Opciones */
+
 static void begin(gfx_canvas *c) {
+    g_footer_version = false;
     gfx_clear_transparent(c);
     g_nzones = 0;
     g_sel_set = false;
@@ -361,7 +364,7 @@ static int hint(gfx_canvas *c, int x, const char *btn, const char *label) {
     int next = x + 46 + gfx_text_width(22, label) + 28;
     if (icon >= 0) zone(x - 8, FOOTER_Y, next - x - 4, UI_H - FOOTER_Y, UI_ZONE_BUTTON, icon);
     /* "+" es siempre la ultima pista: la version va a la derecha solo si queda sitio */
-    if (icon == UI_BTN_PLUS && next + gfx_text_width(18, UI_APP_NAME " " UI_APP_VERSION) < UI_W - MARGIN)
+    if (g_footer_version && icon == UI_BTN_PLUS && next + gfx_text_width(18, UI_APP_NAME " " UI_APP_VERSION) < UI_W - MARGIN)
         gfx_text_right(c, UI_W - MARGIN, FOOTER_Y + 20, 18, C_GREEN_LT, UI_APP_NAME " " UI_APP_VERSION);
     return next;
 }
@@ -387,9 +390,13 @@ static void footer_bar(gfx_canvas *c) {
     }
 }
 
+/* Las barras se llenan al abrir la pantalla: main sube esto de 0 a 1000 en medio segundo. */
+static int g_bar_k = 1000;
+void ui_set_bar_anim(int permil) { g_bar_k = permil < 0 ? 0 : permil > 1000 ? 1000 : permil; }
+
 static void progress(gfx_canvas *c, int x, int y, int w, int done, int total) {
     gfx_round_rect(c, x, y, w, 14, 7, P->gray_lt);
-    if (total > 0 && done > 0) gfx_round_rect(c, x, y, 14 + (w - 14) * done / total, 14, 7, C_GREEN);
+    if (total > 0 && done > 0) gfx_round_rect(c, x, y, 14 + (int)((long)(w - 14) * done / total * g_bar_k / 1000), 14, 7, C_GREEN);
 }
 
 /* Tarjeta de vidrio, como en la web: semitransparente con degradado de arriba abajo,
@@ -679,7 +686,7 @@ static bool ach_progress(const lg_ach *ac, char *buf, size_t cap, int *permil) {
 
 static void progress_bar(gfx_canvas *c, int x, int y, int w, int h, int permil) {
     gfx_round_rect(c, x, y, w, h, h / 2, P->gray_lt);
-    if (permil > 0) gfx_round_rect(c, x, y, h + (w - h) * permil / 1000, h, h / 2, C_YELLOW);
+    if (permil > 0) gfx_round_rect(c, x, y, h + (int)((long)(w - h) * permil / 1000 * g_bar_k / 1000), h, h / 2, C_YELLOW);
 }
 
 /* a la derecha de cada logro: los puntos y un check o un candado */
@@ -1402,7 +1409,7 @@ void ui_search(gfx_canvas *c, const ui_assets *a, unsigned value, int type_bits,
 /* ---------- opciones ---------- */
 
 static const struct { const char *es, *en; int n; int opt[8]; } k_tabs[UI_TABS] = {
-    { "General",     "General",  6, { UI_OPT_ANIM, UI_OPT_APPSOUND, UI_OPT_SPLASH, UI_OPT_LANG, UI_OPT_THEME, UI_OPT_START } }, /* los de encender/apagar arriba, como en Música */
+    { "General",     "General",  7, { UI_OPT_ANIM, UI_OPT_BAR_ANIM, UI_OPT_APPSOUND, UI_OPT_SPLASH, UI_OPT_LANG, UI_OPT_THEME, UI_OPT_START } }, /* los de encender/apagar arriba, como en Música */
     { "Vista",       "View",     6, { UI_OPT_ACTIVITY, UI_OPT_GRID_VERSION, UI_OPT_SCOPE, UI_OPT_SHOW, UI_OPT_GAMES_VIEW, UI_OPT_ACH_VIEW } },
     { "En el juego", "In-game",  7, { UI_OPT_INGAME, UI_OPT_SOUND, UI_OPT_POPUP, UI_OPT_STARTPOP, UI_OPT_OVERLAY, UI_OPT_TOAST_POS, UI_OPT_TOAST_TIME } },
     { "Música",      "Music",    0, { 0 } },  /* una fila para encender y una por cancion */
@@ -1479,7 +1486,7 @@ static void option_row(gfx_canvas *c, int y, bool selected, const char *label, c
     int px = x + w - 28 - vw;
     /* la etiqueta de su color (imagenes de assets/etiquetas); el amarillo y el gris llevan letra oscura */
     int pid = value_bg == C_YELLOW ? UI_IMG_pill_amarilla : value_bg == C_NEUTRAL ? UI_IMG_pill_gris : value_bg == C_RED ? UI_IMG_pill_roja : UI_IMG_pill_verde;
-    gfx_color fg = pid == UI_IMG_pill_amarilla || pid == UI_IMG_pill_gris ? C_ON_YELLOW : C_WHITE;
+    gfx_color fg = pid == UI_IMG_pill_roja ? C_WHITE : pid == UI_IMG_pill_verde ? GFX_RGB(0x04, 0x24, 0x0A) : C_ON_YELLOW; /* sobre el verde claro la letra blanca no se leia */
     if (!pill_img(c, pid, px, y + 23, vw)) {
         gfx_color lt = 0;
         for (int k = 0; k < 24; k += 8) { unsigned v = (value_bg >> k) & 255; lt |= (v + (255 - v) * 2 / 7) << k; }
@@ -1522,6 +1529,7 @@ static int opt_icon(int opt, int row) {
         case UI_OPT_SPLASH: return UI_IMG_opt_inicio;
         case UI_OPT_ACTIVITY: return UI_IMG_stat_siguiendo;
         case UI_OPT_GRID_VERSION: return UI_IMG_opt_vista_juegos;
+        case UI_OPT_BAR_ANIM: return UI_IMG_opt_fondo_animado;
         case UI_OPT_OVERLAY: return UI_IMG_opt_ver_logros_juego;
         case UI_OPT_MUSIC: return UI_IMG_opt_musica;
         case UI_OPT_SONG: return -1;
@@ -1549,6 +1557,7 @@ static int opt_icon(int opt, int row) {
 void ui_settings(gfx_canvas *c, const ui_assets *a, const gr_config *cfg, int tab, int row, bool system_spanish,
                  bool system_dark, const ui_account *acc) {
     begin(c);
+    g_footer_version = true;
     header(c, a, NULL, T("Opciones", "Options"), T("Se guardan en la tarjeta SD", "Saved to the SD card"));
 
     /* pestañas */
@@ -1610,6 +1619,7 @@ void ui_settings(gfx_canvas *c, const ui_assets *a, const gr_config *cfg, int ta
                 else if (sg->have) snprintf(help, sizeof(help), "%s", current ? T("Es la que suena ahora. Y la borra de la SD.", "This one is playing now. Y removes it from the SD card.")
                                                                               : T("Descargada. A la pone; Y la borra de la SD.", "Downloaded. A plays it; Y removes it from the SD card."));
                 else snprintf(help, sizeof(help), T("Sin descargar · %d.%d MB", "Not downloaded · %d.%d MB"), sg->kb / 1024, sg->kb % 1024 * 10 / 1024);
+                g_opt_icon = !sg->have ? UI_IMG_opt_descargar : current ? UI_IMG_opt_disco_sonando : UI_IMG_opt_disco;
                 option_row(c, y, sel, sg->title, help,
                            g_song_busy == i ? T("Descargando…", "Downloading…") : !sg->have ? T("Descargar", "Download")
                            : current ? (cfg->music ? T("Sonando", "Playing") : T("Elegida", "Chosen")) : T("Usar", "Use"),
@@ -1700,6 +1710,11 @@ void ui_settings(gfx_canvas *c, const ui_assets *a, const gr_config *cfg, int ta
                 option_row(c, y, sel, T("Actividad de amigos", "Friends' activity"),
                            T("Abajo en el inicio: los últimos logros de la gente que sigues.", "At the bottom of the home screen: the latest achievements of people you follow."),
                            cfg->activity ? on : off, C_GREEN);
+                break;
+            case UI_OPT_BAR_ANIM:
+                option_row(c, y, sel, T("Barras animadas", "Animated bars"),
+                           T("Las barras de progreso se llenan al abrir cada pantalla.", "Progress bars fill up when each screen opens."),
+                           cfg->bar_anim ? on : off, C_GREEN);
                 break;
             case UI_OPT_GRID_VERSION:
                 option_row(c, y, sel, T("Versión en la cuadrícula", "Version on the grid"),
@@ -1893,7 +1908,7 @@ static bool qr_draw(gfx_canvas *c, int x, int y, int size, const char *text) {
 
 void ui_about(gfx_canvas *c, const ui_assets *a, const char *discord) {
     begin(c);
-    header(c, a, NULL, T("Acerca de", "About"), UI_APP_NAME " " UI_APP_VERSION);
+    header(c, a, NULL, T("Acerca de", "About"), T("Créditos y contacto", "Credits and contact"));
 
     const int x = MARGIN, w = 880;
     card(c, x, 126, w, 500, false);
@@ -2128,6 +2143,7 @@ static void stat_tile(gfx_canvas *c, const ui_assets *a, int x, int y, int w, in
 
 void ui_profile_screen(gfx_canvas *c, const ui_assets *a, const ui_profile *p) {
     begin(c);
+    g_footer_version = true;
     g_buttons = a->buttons; /* esta pantalla no usa la cabecera, que es la que suele dejarlos listos */
     g_a = a;
 
@@ -2194,7 +2210,7 @@ void ui_profile_screen(gfx_canvas *c, const ui_assets *a, const ui_profile *p) {
     gfx_round_rect(c, gx, ly + 340, pw, 46, 23, C_YELLOW);
     gfx_text(c, gx + 22, ly + 348, 26, C_ON_YELLOW, buf);
     gfx_round_rect(c, lx + 40, ly + 406, lw - 80, 18, 9, P->gray_lt);
-    if (into > 0) gfx_round_rect(c, lx + 40, ly + 406, 18 + (lw - 98) * into / span, 18, 9, C_GREEN);
+    if (into > 0) gfx_round_rect(c, lx + 40, ly + 406, 18 + (int)((long)(lw - 98) * into / span * g_bar_k / 1000), 18, 9, C_GREEN);
     snprintf(buf, sizeof(buf), T("%d / %d pts para el nivel %d", "%d / %d pts to level %d"), into, span, level + 1);
     {
         int tw = gfx_text_width(18, buf), sx = cx - (tw + 30) / 2;

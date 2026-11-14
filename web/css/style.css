@@ -850,3 +850,6 @@ input.switch:focus-visible { outline: 2px solid var(--yellow); outline-offset: 2
   .shelf-row { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 6px; }
   .shelf-item { flex: 0 0 42%; scroll-snap-align: start; }
 }
+
+/* barras de progreso sin animacion: se apaga en Ajustes */
+.no-bar-anim .bar > i { animation: none !important; }

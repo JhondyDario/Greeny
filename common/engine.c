@@ -465,8 +465,8 @@ static bool same_address(const lg_cond *x, const lg_cond *y) {
 
 /* Anota el progreso del logro: el valor de su condicion meta, si se mantiene 10 segundos
  * y respeta los limites que el mismo logro pone a esa direccion. */
-static void track_progress(lg_game *g, lg_ach *a, uint64_t now_ms) {
-    const lg_cond *pc = &a->cond[a->prog_cond];
+static void track_progress(lg_game *g, lg_ach *a, int pk, uint64_t now_ms) {
+    const lg_cond *pc = &a->cond[pk];
     bool ok = pc->dbg_ok;
     uint64_t v = pc->dbg_raw;
     if (ok && type_is_signed(pc->type)) {
@@ -481,7 +481,7 @@ static void track_progress(lg_game *g, lg_ach *a, uint64_t now_ms) {
     }
     for (int k = 0; ok && k < a->ncond; k++) {
         const lg_cond *q = &a->cond[k];
-        if (k == a->prog_cond || !same_address(q, pc) || type_is_float(q->type)) continue;
+        if (k == pk || !same_address(q, pc) || type_is_float(q->type)) continue;
         uint64_t lim = type_is_signed(q->type) ? (q->s < 0 ? 0 : (uint64_t)q->s) : q->u;
         if (q->op == LG_LE && v > lim) ok = false;
         if (q->op == LG_LT && v >= lim) ok = false;
@@ -513,8 +513,16 @@ int lg_tick(lg_game *g, const lg_bases *b, lg_read_fn rd, void *ctx,
         for (int k = 0; k < a->ncond && (all || g->debug); k++, evaluated++)
             if (!lg_eval_cond(&a->cond[k], b, rd, ctx)) all = false;
         if (a->prog_cond >= 0) {
-            if (a->prog_cond >= evaluated) lg_eval_cond(&a->cond[a->prog_cond], b, rd, ctx);
-            track_progress(g, a, now_ms);
+            int pk = a->prog_cond;
+            if (pk >= evaluated) lg_eval_cond(&a->cond[pk], b, rd, ctx);
+            /* si esa direccion no se puede leer y el logro pide lo mismo por otra cadena de repuesto, vale la otra */
+            for (int k = 0; k < a->ncond && !a->cond[pk].dbg_ok; k++) {
+                const lg_cond *q = &a->cond[k], *pc = &a->cond[a->prog_cond];
+                if (k == a->prog_cond || q->type != pc->type || q->op != pc->op || q->u != pc->u || q->s != pc->s) continue;
+                if (k >= evaluated) lg_eval_cond(&a->cond[k], b, rd, ctx);
+                if (a->cond[k].dbg_ok) pk = k;
+            }
+            track_progress(g, a, pk, now_ms);
         }
 
         if (!all) { a->holding = false; continue; }

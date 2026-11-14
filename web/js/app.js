@@ -49,6 +49,11 @@
     return st ? h("img", { src: "img/st_" + status + ".png", alt: st.label, title: st.label, width: 16, height: 16 }) : null;
   }
 
+  // barras de progreso animadas: encendidas salvo que la persona las apague en Ajustes
+  function barAnim() { try { return localStorage.getItem("greeny-bar-anim") !== "0"; } catch (e) { return true; } }
+  function applyBarAnim() { document.documentElement.classList.toggle("no-bar-anim", !barAnim()); }
+  applyBarAnim();
+
   const uiLang = () => (window.GreenyI18n && window.GreenyI18n.lang) || "es";
   const fmtDate = (iso) => new Date(iso).toLocaleDateString(uiLang(), { day: "numeric", month: "short", year: "numeric" });
   const fmtNum = (n) => Number(n || 0).toLocaleString(uiLang());
@@ -1036,6 +1041,15 @@
         prefRow("ranking_on", "Tu puesto de la semana", "En qué lugar vas en el ranking del juego que más jugaste."),
         prefRow("almost_on", "Casi platino", "Cuando te faltan pocos logros para completar un juego.")),
       prefMsg,
+      h("h3", { style: "margin:22px 0 4px" }, "Animaciones"),
+      h("div", { class: "stack" }, (() => { // se guarda en este navegador, no en la cuenta
+        const input = h("input", { type: "checkbox", class: "switch", checked: barAnim() ? true : null, onchange: () => {
+          try { localStorage.setItem("greeny-bar-anim", input.checked ? "1" : "0"); } catch (e) { /* da igual */ }
+          applyBarAnim();
+        } });
+        return h("label", { class: "card row pref-row" }, h("div", { class: "grow" }, h("strong", {}, "Barras animadas"),
+          h("div", { class: "muted small" }, "Las barras de progreso se llenan al abrir la página. Se guarda en este navegador.")), input);
+      })()),
     ];
     const identities = (identRes.data && identRes.data.identities) || session.user.identities || [];
     const discord = identities.find((i) => i.provider === "discord");
