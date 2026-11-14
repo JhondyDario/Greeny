@@ -23,3 +23,4 @@ test/search/test_search
 app/data/overlay.bin
 overlay/build/
 overlay/*.ovl
+__pycache__/
