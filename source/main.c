@@ -229,13 +229,16 @@ static void debug_report(u64 tid) {
 static u8 g_watch_prev[LG_MAX_WATCH][LG_WATCH_MAX];
 static u8 g_watch_cur[LG_WATCH_MAX];
 static u64 g_watch_addr[LG_MAX_WATCH];
-static u8 g_watch_state[LG_MAX_WATCH]; /* 0 = sin leer aun, 1 = leido, 2 = no se pudo leer */
+static u8 g_watch_state[LG_MAX_WATCH]; /* 0 = sin leer aun, 1 = leido, 2 = no se pudo leer, 3 = callado por ruidoso */
+#define WATCH_MAX_FULL 40                /* un trozo que se reescribe entero tantas veces es ruido: llenaria el archivo */
+static u8 g_watch_fulls[LG_MAX_WATCH];
 static u64 g_watch_t0;
 static bool g_watch_full;
 
-static void watch_reset(u64 tid) {
+static void watch_reset(u64 tid, u64 now) {
     memset(g_watch_state, 0, sizeof(g_watch_state));
-    g_watch_t0 = now_ms();
+    memset(g_watch_fulls, 0, sizeof(g_watch_fulls));
+    g_watch_t0 = now;
     g_watch_full = false;
     if (!g_game.nwatch) return;
     FILE *f = fopen(WATCH_PATH, "a");
@@ -248,6 +251,7 @@ static void watch_report(u64 now) {
     FILE *f = NULL;
     for (int i = 0; i < g_game.nwatch && !g_watch_full; i++) {
         const lg_watch *w = &g_game.watch[i];
+        if (g_watch_state[i] == 3) continue;
         u64 addr = 0;
         bool ok = lg_resolve(&w->addr, &g_bases, mem_read, NULL, &addr) && mem_read(NULL, addr, g_watch_cur, w->size);
         if (!ok && g_watch_state[i] == 2) continue;
@@ -271,6 +275,12 @@ static void watch_report(u64 now) {
         if (moved || changed > 96) { /* entero: primera vez, se mudo, o cambio casi todo */
             fprintf(f, " @0x%lX FULL ", addr);
             for (u32 k = 0; k < w->size; k++) fprintf(f, "%02X", g_watch_cur[k]);
+            if (++g_watch_fulls[i] >= WATCH_MAX_FULL) {
+                fprintf(f, "\nt=%lu w%d CALLADO: cambia entero demasiadas veces", now - g_watch_t0, i);
+                g_watch_state[i] = 3;
+                fputc('\n', f);
+                continue;
+            }
         } else { /* solo lo que cambio: +desplazamiento:bytes nuevos */
             for (u32 k = 0; k < w->size; k++) {
                 if (g_watch_cur[k] == g_watch_prev[i][k]) continue;
@@ -525,7 +535,7 @@ int main(int argc, char *argv[]) {
                     g_loaded = true;
                     combo_init();
                     g_debug_lines = 0;
-                    watch_reset(cur_tid);
+                    watch_reset(cur_tid, now);
                     watch_at = now;
                     g_scan_lines = 0;
                     scan_at = now + SCAN_PERIOD_MS;
