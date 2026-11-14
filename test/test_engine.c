@@ -329,6 +329,29 @@ static void test_debug(void) {
     CHECK(g.ach[0].cond[0].dbg_seen && !g.ach[0].cond[1].dbg_seen);
 }
 
+static void test_watch(void) {
+    static lg_game g;
+    char err[128];
+    uint64_t addr = 0;
+    memset(g_main, 0, sizeof(g_main));
+    memset(g_heap, 0, sizeof(g_heap));
+
+    CHECK(bad("watch=main+0x100->0x8\n", "watch"));
+    CHECK(bad("watch=main+0x100->0x8 0\n", "watch"));
+    CHECK(bad("watch=main+0x100->0x8 0x801\n", "watch"));
+    CHECK(bad("watch=libc+0x100 0x40\n", "main+ o heap+"));
+
+    CHECK(parse(&g, "watch = main+0x7A8->0x18->0x0 0x400\nwatch = heap+0x20 16\n", err, sizeof(err)) == 0);
+    CHECK(g.nwatch == 2 && g.watch[0].size == 0x400 && g.watch[0].addr.nderef == 2 && g.watch[1].size == 16);
+
+    /* main+0x7A8 -> heap+0x100 (+0x18) -> heap+0x200 (+0): la direccion final es heap+0x200, sin leerla */
+    CHECK(!lg_resolve(&g.watch[0].addr, &g_bases, fake_read, NULL, &addr)); /* puntero nulo */
+    PUT(g_main, 0x7A8, uint64_t, HEAP_BASE + 0x100);
+    PUT(g_heap, 0x118, uint64_t, HEAP_BASE + 0x200);
+    CHECK(lg_resolve(&g.watch[0].addr, &g_bases, fake_read, NULL, &addr) && addr == HEAP_BASE + 0x200);
+    CHECK(lg_resolve(&g.watch[1].addr, &g_bases, fake_read, NULL, &addr) && addr == HEAP_BASE + 0x20);
+}
+
 static void test_scan(void) {
     static lg_game g;
     char err[128];
@@ -557,6 +580,7 @@ int main(void) {
     test_tick();
     test_debug();
     test_scan();
+    test_watch();
     test_i18n_config();
     test_progress();
     test_store();

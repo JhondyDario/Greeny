@@ -220,6 +220,72 @@ static void debug_report(u64 tid) {
     }
 }
 
+/* ---------- vigilante: copia trozos de memoria a la SD cuando cambian ----------
+ * Para investigar un juego sin el buscador: se juega normal y luego se mira en watch.txt que
+ * byte cambio en cada momento (entrar a un nivel, recibir daño, tocar la meta...). */
+#define WATCH_PATH      DIR_ROOT "/watch.txt"
+#define WATCH_PERIOD_MS 500
+#define WATCH_MAX_FILE  (8 * 1024 * 1024)
+static u8 g_watch_prev[LG_MAX_WATCH][LG_WATCH_MAX];
+static u8 g_watch_cur[LG_WATCH_MAX];
+static u64 g_watch_addr[LG_MAX_WATCH];
+static u8 g_watch_state[LG_MAX_WATCH]; /* 0 = sin leer aun, 1 = leido, 2 = no se pudo leer */
+static u64 g_watch_t0;
+static bool g_watch_full;
+
+static void watch_reset(u64 tid) {
+    memset(g_watch_state, 0, sizeof(g_watch_state));
+    g_watch_t0 = now_ms();
+    g_watch_full = false;
+    if (!g_game.nwatch) return;
+    FILE *f = fopen(WATCH_PATH, "a");
+    if (!f) return;
+    fprintf(f, "=== sesion %016lX main=0x%lX ===\n", tid, g_bases.main_base);
+    fclose(f);
+}
+
+static void watch_report(u64 now) {
+    FILE *f = NULL;
+    for (int i = 0; i < g_game.nwatch && !g_watch_full; i++) {
+        const lg_watch *w = &g_game.watch[i];
+        u64 addr = 0;
+        bool ok = lg_resolve(&w->addr, &g_bases, mem_read, NULL, &addr) && mem_read(NULL, addr, g_watch_cur, w->size);
+        if (!ok && g_watch_state[i] == 2) continue;
+        bool moved = ok && (g_watch_state[i] != 1 || addr != g_watch_addr[i]);
+        if (ok && !moved && !memcmp(g_watch_cur, g_watch_prev[i], w->size)) continue;
+
+        if (!f) {
+            f = fopen(WATCH_PATH, "a");
+            if (!f) return;
+            fseek(f, 0, SEEK_END);
+            if (ftell(f) > WATCH_MAX_FILE) { fprintf(f, "=== limite de tamaño: no anoto mas ===\n"); g_watch_full = true; break; }
+        }
+        fprintf(f, "t=%lu w%d", now - g_watch_t0, i);
+        if (!ok) {
+            fprintf(f, " NULL\n");
+            g_watch_state[i] = 2;
+            continue;
+        }
+        int changed = 0;
+        for (u32 k = 0; k < w->size; k++) changed += g_watch_cur[k] != g_watch_prev[i][k];
+        if (moved || changed > 96) { /* entero: primera vez, se mudo, o cambio casi todo */
+            fprintf(f, " @0x%lX FULL ", addr);
+            for (u32 k = 0; k < w->size; k++) fprintf(f, "%02X", g_watch_cur[k]);
+        } else { /* solo lo que cambio: +desplazamiento:bytes nuevos */
+            for (u32 k = 0; k < w->size; k++) {
+                if (g_watch_cur[k] == g_watch_prev[i][k]) continue;
+                fprintf(f, " +%X:", k);
+                for (; k < w->size && g_watch_cur[k] != g_watch_prev[i][k]; k++) fprintf(f, "%02X", g_watch_cur[k]);
+            }
+        }
+        fputc('\n', f);
+        memcpy(g_watch_prev[i], g_watch_cur, w->size);
+        g_watch_addr[i] = addr;
+        g_watch_state[i] = 1;
+    }
+    if (f) fclose(f);
+}
+
 #define SCAN_PERIOD_MS 10000
 #define SCAN_MAX_HITS  12
 #define SCAN_MAX_LINES 600
@@ -407,7 +473,7 @@ int main(int argc, char *argv[]) {
     log_line("Greeny iniciado");
     if (migrated) log_line("progreso migrado desde config/logros");
 
-    u64 cur_pid = 0, cur_tid = 0, attach_at = 0, scan_at = 0, search_at = 0, progress_at = 0;
+    u64 cur_pid = 0, cur_tid = 0, attach_at = 0, scan_at = 0, watch_at = 0, search_at = 0, progress_at = 0;
     int retries = 0;
     bool pending = false, bad_defs = false, toast_fail_logged = false, sound_fail_logged = false;
 
@@ -459,6 +525,8 @@ int main(int argc, char *argv[]) {
                     g_loaded = true;
                     combo_init();
                     g_debug_lines = 0;
+                    watch_reset(cur_tid);
+                    watch_at = now;
                     g_scan_lines = 0;
                     scan_at = now + SCAN_PERIOD_MS;
                     memset(g_scan_prev, 0, sizeof(g_scan_prev));
@@ -513,6 +581,10 @@ int main(int argc, char *argv[]) {
                 search_poll(g_bases.main_base, g_main_size, g_bases.heap_base, g_space_end);
             }
             if (g_game.debug) debug_report(cur_tid);
+            if (g_game.nwatch && now >= watch_at) {
+                watch_report(now);
+                watch_at = now + WATCH_PERIOD_MS;
+            }
             if (g_game.nscan && now >= scan_at) {
                 scan_report(cur_tid);
                 scan_at = now_ms() + SCAN_PERIOD_MS;

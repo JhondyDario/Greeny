@@ -287,10 +287,22 @@ int lg_parse(lg_game *g, char *text, char *err, size_t errlen) {
                 const char *e = parse_scan(val, &g->scan[g->nscan]);
                 if (e) FAIL(e);
                 g->nscan++;
+            } else if (!strcmp(key, "watch")) { /* "<direccion> <bytes>" */
+                if (g->nwatch >= LG_MAX_WATCH) FAIL("demasiados watch (max 16)");
+                char *sp = strrchr(val, ' ');
+                uint64_t size = 0;
+                if (!sp || !parse_u64(trim(sp + 1), &size) || size == 0 || size > LG_WATCH_MAX) FAIL("watch: falta el tamaño (de 1 a 0x800 bytes)");
+                *sp = 0;
+                lg_watch *w = &g->watch[g->nwatch];
+                memset(w, 0, sizeof(*w));
+                const char *e = parse_addr(trim(val), &w->addr);
+                if (e) FAIL(e);
+                w->size = (uint32_t)size;
+                g->nwatch++;
             } else if (!strcmp(key, "debug")) {
                 if (strcmp(val, "0") && strcmp(val, "1")) FAIL("debug debe ser 0 o 1");
                 g->debug = val[0] == '1';
-            } else FAIL("clave desconocida antes del primer logro (game, version, build, debug, scan)");
+            } else FAIL("clave desconocida antes del primer logro (game, version, build, debug, scan, watch)");
             continue;
         }
 
@@ -325,7 +337,7 @@ int lg_parse(lg_game *g, char *text, char *err, size_t errlen) {
 
     lineno++;
     if (cur && cur->ncond == 0) FAIL("el ultimo logro no tiene ninguna condicion when=");
-    if (g->nach == 0 && g->nscan == 0) FAIL("el archivo no define ningun logro");
+    if (g->nach == 0 && g->nscan == 0 && g->nwatch == 0) FAIL("el archivo no define ningun logro");
 
     /* la meta de cada logro, para mostrar su progreso */
     for (int i = 0; i < g->nach; i++) {
@@ -359,8 +371,7 @@ static void dbg_record(lg_cond *c, bool ok, uint64_t raw) {
     c->dbg_raw = raw;
 }
 
-/* Resuelve la direccion final y lee el dato crudo. */
-static bool read_raw(const lg_cond *c, const lg_bases *b, lg_read_fn rd, void *ctx, uint8_t raw[8]) {
+bool lg_resolve(const lg_cond *c, const lg_bases *b, lg_read_fn rd, void *ctx, uint64_t *out) {
     uint64_t base = c->region == LG_REGION_MAIN ? b->main_base : b->heap_base;
     if (!base) return false;
     uint64_t addr = base + c->offset;
@@ -370,7 +381,14 @@ static bool read_raw(const lg_cond *c, const lg_bases *b, lg_read_fn rd, void *c
         if (!rd(ctx, addr, &ptr, sizeof(ptr)) || ptr == 0) return false;
         addr = ptr + c->deref[i];
     }
-    return rd(ctx, addr, raw, type_size(c->type));
+    *out = addr;
+    return true;
+}
+
+/* Resuelve la direccion final y lee el dato crudo. */
+static bool read_raw(const lg_cond *c, const lg_bases *b, lg_read_fn rd, void *ctx, uint8_t raw[8]) {
+    uint64_t addr;
+    return lg_resolve(c, b, rd, ctx, &addr) && rd(ctx, addr, raw, type_size(c->type));
 }
 
 bool lg_eval_cond(lg_cond *c, const lg_bases *b, lg_read_fn rd, void *ctx) {

@@ -1,0 +1,270 @@
+# Super Mario 3D World + Bowser's Fury v1.1.0 (modo 3D World)
+# Va en  sdmc:/config/greeny/games/010028600EBDA000.txt
+#
+# Todas las direcciones cuelgan del mismo puntero: main+0x1386C00->0x18->0x0
+# (en la v1.0.0 estaba en main+0x137EAA0; el scan lo reubico en la 1.1.0).
+# Las tres estan verificadas en consola:
+#   monedas           (...->0x138->0x48)  0..99, vuelve a 0 al llegar a 100
+#   vidas             (...->0x78->0x20)
+#   objeto en reserva (...->0x228->0x90)  1 hongo, 2 gato, 3 flor de fuego,
+#                     4 tanuki, 5 bumeran, 6 hoja dorada, 7 campana de la suerte
+#
+# Para depurar pon debug = 1: anota en log.txt el valor que lee cada condicion.
+
+game    = Super Mario 3D World + Bowser's Fury
+version = 1.1.0
+build   = 891687F016A18F17
+
+# ---------- SOLO PARA INVESTIGAR: vigilantes ----------
+# El sysmodule copia estos trozos de memoria a sdmc:/config/greeny/watch.txt cada vez que cambian.
+# No es el archivo que va al catalogo.
+# w0 nivel en curso? (trucos 1.0.0: tiempo +0x38, puntaje +0x40, objeto +0x168)
+watch = main+0x1386C00->0x20->0xD8->0x0 0x400
+# w1 jugador? (trucos 1.0.0: traje en +0x18)
+watch = main+0x1386C00->0x80->0x20->0x18->0x78->0x0 0x200
+# w2 datos de la partida (de aqui cuelgan vidas, monedas y reserva)
+watch = main+0x1386C00->0x18->0x0->0x0 0x400
+# w3 (truco 1.0.0: otro tiempo en +0xC0)
+watch = main+0x1386C00->0x18->0x0->0x18->0x0 0x200
+# w4 vidas (+0x20, comprobado)
+watch = main+0x1386C00->0x18->0x0->0x78->0x0 0x100
+# w5 objeto raiz
+watch = main+0x1386C00->0x0 0x400
+# w6 partida guardada? (total de estrellas en +0x684, comprobado)
+watch = main+0x180A4A0->0x28->0x300 0x800
+# w7 (trucos 1.0.0: monedas v2, soles felinos +0xC4)
+watch = main+0x1386C00->0x30->0x0 0x200
+# w8 
+watch = main+0x1386C00->0x18->0x0 0x200
+# w9 
+watch = main+0x1386C00->0x20->0x0 0x400
+# w10 sellos (total en +0x264, comprobado)
+watch = main+0x180A9B8->0x420->0x8->0x0->0x8->0x0 0x400
+# w11 
+watch = main+0x1386C00->0x80->0x0 0x200
+# w12 monedas (+0x48, comprobado)
+watch = main+0x1386C00->0x18->0x0->0x138->0x0 0x100
+# w13 objeto en reserva (+0x90, comprobado)
+watch = main+0x1386C00->0x18->0x0->0x228->0x0 0x200
+# w14 
+watch = main+0x180A4A0->0x28->0x0 0x300
+# w15 (truco 1.1.0: reloj de la Casa Misteriosa en +0x18)
+watch = main+0x1A11EF0->0x118->0x98->0x0->0x40->0x98->0x0 0x100
+
+[prueba_de_vida]
+name = Estamos vivos
+desc = El sistema de logros lee la memoria del juego
+name.en = We're alive
+desc.en = The achievement system can read the game's memory
+points = 5
+# sale a los 2 minutos de partida, no nada mas abrir el juego
+hold    = 120000
+when = main+0x4 u32 != 0
+
+# ---------- monedas ----------
+# El contador va de 0 a 99 y vuelve a 0 al llegar a 100.
+
+[monedas_5]
+name = Cinco cheles
+desc = Ten 5 monedas
+name.en = Pocket change
+desc.en = Have 5 coins
+points = 5
+when = main+0x1386C00->0x18->0x0->0x138->0x48 u32 >= 5
+when = main+0x1386C00->0x18->0x0->0x138->0x48 u32 <= 99
+
+[monedas_50]
+name = Medio camino
+desc = Ten 50 monedas
+name.en = Halfway there
+desc.en = Have 50 coins
+points = 10
+when = main+0x1386C00->0x18->0x0->0x138->0x48 u32 >= 50
+when = main+0x1386C00->0x18->0x0->0x138->0x48 u32 <= 99
+
+[monedas_90]
+name = Casi una vida
+desc = Ten 90 monedas sin gastarlas en una vida
+name.en = Almost a life
+desc.en = Have 90 coins without cashing them in for a life
+points = 20
+when = main+0x1386C00->0x18->0x0->0x138->0x48 u32 >= 90
+when = main+0x1386C00->0x18->0x0->0x138->0x48 u32 <= 99
+
+# ---------- vidas ----------
+# El juego llega hasta 1110 vidas; el tope evita falsos positivos.
+
+[vidas_10]
+name = Siete vidas tiene el gato
+desc = Acumula 10 vidas
+name.en = Nine lives and then some
+desc.en = Stock up 10 lives
+points = 10
+when = main+0x1386C00->0x18->0x0->0x78->0x20 u32 >= 10
+when = main+0x1386C00->0x18->0x0->0x78->0x20 u32 <= 1110
+
+[vidas_30]
+name = Bien cubierto
+desc = Acumula 30 vidas
+name.en = Well covered
+desc.en = Stock up 30 lives
+points = 25
+when = main+0x1386C00->0x18->0x0->0x78->0x20 u32 >= 30
+when = main+0x1386C00->0x18->0x0->0x78->0x20 u32 <= 1110
+
+[vidas_99]
+name = Inmortal
+desc = Acumula 99 vidas
+name.en = Immortal
+desc.en = Stock up 99 lives
+points = 50
+when = main+0x1386C00->0x18->0x0->0x78->0x20 u32 >= 99
+when = main+0x1386C00->0x18->0x0->0x78->0x20 u32 <= 1110
+
+# ---------- objeto en reserva ----------
+
+[reserva_gato]
+name = Miau
+desc = Guarda una Supercampana en la reserva
+name.en = Meow
+desc.en = Keep a Super Bell in reserve
+points = 10
+hold = 1000
+when = main+0x1386C00->0x18->0x0->0x228->0x90 u32 == 2
+
+[reserva_fuego]
+name = Candela
+desc = Guarda una Flor de Fuego en la reserva
+name.en = Fired up
+desc.en = Keep a Fire Flower in reserve
+points = 10
+hold = 1000
+when = main+0x1386C00->0x18->0x0->0x228->0x90 u32 == 3
+
+[reserva_tanuki]
+name = Rabo de mapache
+desc = Guarda una Superhoja en la reserva
+name.en = Raccoon tail
+desc.en = Keep a Super Leaf in reserve
+points = 10
+hold = 1000
+when = main+0x1386C00->0x18->0x0->0x228->0x90 u32 == 4
+
+[reserva_bumeran]
+name = Va y viene
+desc = Guarda una Flor Bumerán en la reserva
+name.en = Comes right back
+desc.en = Keep a Boomerang Flower in reserve
+points = 10
+hold = 1000
+when = main+0x1386C00->0x18->0x0->0x228->0x90 u32 == 5
+
+[reserva_suerte]
+name = Con suerte
+desc = Guarda una Campana de la Suerte en la reserva
+name.en = Feeling lucky
+desc.en = Keep a Lucky Bell in reserve
+points = 25
+hold = 1000
+when = main+0x1386C00->0x18->0x0->0x228->0x90 u32 == 7
+
+# ---------- estrellas verdes y sellos ----------
+# Son los totales de la partida (los numeros del mapa del mundo). Suben al terminar el nivel,
+# no al coger la estrella o el sello. Encontrados con el buscador de valores y comprobados
+# tras reiniciar el juego.
+#
+# OJO: fuera de la partida (titulo, pantallas de carga) esas cadenas pueden apuntar a otra
+# cosa y dar un numero cualquiera: asi salto "Constelacion" con 14 estrellas. Por eso cada
+# logro pide tres cosas a la vez, durante 15 segundos seguidos (en la pantalla de titulo esas
+# cadenas dan un numero distinto cada instante, de 0 a 36; nunca aguantan mas de 2 segundos):
+#   1. que haya una partida cargada (el contador de vidas se puede leer y tiene sentido),
+#   2. que DOS cadenas distintas den un total que cumpla, y
+#   3. que ese total no pase del maximo del juego (380 estrellas, 85 sellos).
+
+# Sellos: la primera direccion que salio (main+0x1386C00->0x90->0x10) NO era el total de sellos;
+# se habia buscado con un solo paso. Estas salieron de buscar 9 y luego 10, y siguieron dando 10
+# tras reiniciar el juego. Repuesto: main+0x180A9C0->0x7E0->0x8->0x0->0x8->0x264
+
+[estrellas_5]
+name = Primeros pasos
+desc = Consigue tus primeras 5 Estrellas Verdes
+name.en = First steps
+desc.en = Collect your first 5 Green Stars
+points = 10
+hold = 15000
+when = main+0x1386C00->0x18->0x0->0x78->0x20 u32 >= 1
+when = main+0x1386C00->0x18->0x0->0x78->0x20 u32 <= 1110
+when = main+0x180A4A0->0x28->0x684 u32 >= 5
+when = main+0x180A4A0->0x28->0x684 u32 <= 380
+when = main+0x180A9C0->0x10->0x320->0x474 u32 >= 5
+when = main+0x180A9C0->0x10->0x320->0x474 u32 <= 380
+
+[estrellas_30]
+name = Constelación
+desc = Junta 30 Estrellas Verdes en total
+name.en = Constellation
+desc.en = Collect 30 Green Stars in total
+points = 25
+hold = 15000
+when = main+0x1386C00->0x18->0x0->0x78->0x20 u32 >= 1
+when = main+0x1386C00->0x18->0x0->0x78->0x20 u32 <= 1110
+when = main+0x180A4A0->0x28->0x684 u32 >= 30
+when = main+0x180A4A0->0x28->0x684 u32 <= 380
+when = main+0x180A9C0->0x10->0x320->0x474 u32 >= 30
+when = main+0x180A9C0->0x10->0x320->0x474 u32 <= 380
+
+[estrellas_127]
+name = Cielo estrellado
+desc = Junta 127 Estrellas Verdes: un tercio de todas
+name.en = Starry sky
+desc.en = Collect 127 Green Stars: a third of them all
+points = 50
+hold = 15000
+when = main+0x1386C00->0x18->0x0->0x78->0x20 u32 >= 1
+when = main+0x1386C00->0x18->0x0->0x78->0x20 u32 <= 1110
+when = main+0x180A4A0->0x28->0x684 u32 >= 127
+when = main+0x180A4A0->0x28->0x684 u32 <= 380
+when = main+0x180A9C0->0x10->0x320->0x474 u32 >= 127
+when = main+0x180A9C0->0x10->0x320->0x474 u32 <= 380
+
+[sellos_5]
+name = Primeras estampas
+desc = Colecciona 5 sellos
+name.en = First stamps
+desc.en = Collect 5 stamps
+points = 10
+hold = 15000
+when = main+0x1386C00->0x18->0x0->0x78->0x20 u32 >= 1
+when = main+0x1386C00->0x18->0x0->0x78->0x20 u32 <= 1110
+when = main+0x180A9B8->0x420->0x8->0x0->0x8->0x264 u32 >= 5
+when = main+0x180A9B8->0x420->0x8->0x0->0x8->0x264 u32 <= 85
+when = main+0x180A9D0->0x588->0x8->0x0->0x8->0x264 u32 >= 5
+when = main+0x180A9D0->0x588->0x8->0x0->0x8->0x264 u32 <= 85
+
+[sellos_10]
+name = Álbum lleno
+desc = Colecciona 10 sellos
+name.en = Full album
+desc.en = Collect 10 stamps
+points = 15
+hold = 15000
+when = main+0x1386C00->0x18->0x0->0x78->0x20 u32 >= 1
+when = main+0x1386C00->0x18->0x0->0x78->0x20 u32 <= 1110
+when = main+0x180A9B8->0x420->0x8->0x0->0x8->0x264 u32 >= 10
+when = main+0x180A9B8->0x420->0x8->0x0->0x8->0x264 u32 <= 85
+when = main+0x180A9D0->0x588->0x8->0x0->0x8->0x264 u32 >= 10
+when = main+0x180A9D0->0x588->0x8->0x0->0x8->0x264 u32 <= 85
+
+[sellos_28]
+name = Coleccionista de sellos
+desc = Colecciona 28 sellos: un tercio de todos
+name.en = Stamp collector
+desc.en = Collect 28 stamps: a third of them all
+points = 30
+hold = 15000
+when = main+0x1386C00->0x18->0x0->0x78->0x20 u32 >= 1
+when = main+0x1386C00->0x18->0x0->0x78->0x20 u32 <= 1110
+when = main+0x180A9B8->0x420->0x8->0x0->0x8->0x264 u32 >= 28
+when = main+0x180A9B8->0x420->0x8->0x0->0x8->0x264 u32 <= 85
+when = main+0x180A9D0->0x588->0x8->0x0->0x8->0x264 u32 >= 28
+when = main+0x180A9D0->0x588->0x8->0x0->0x8->0x264 u32 <= 85

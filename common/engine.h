@@ -16,6 +16,8 @@
 #define LG_DEFAULT_HOLD_MS 500
 #define LG_DEFAULT_POINTS 10
 #define LG_MAX_SCAN   4
+#define LG_MAX_WATCH  16      /* trozos de memoria vigilados (para investigar un juego) */
+#define LG_WATCH_MAX  0x800   /* bytes por trozo */
 #define LG_SCAN_MAX_LEN 0x100000
 
 typedef enum { LG_REGION_MAIN, LG_REGION_HEAP } lg_region;
@@ -94,6 +96,12 @@ typedef struct {
     int64_t  value;
 } lg_scan_hit;
 
+/* Un trozo de memoria que el sysmodule copia a la SD cada vez que cambia. Solo usa la direccion de `addr`. */
+typedef struct {
+    lg_cond  addr;
+    uint32_t size;
+} lg_watch;
+
 typedef struct {
     char   game[LG_NAME_LEN];
     char   version[16]; /* version del juego para mostrar, ej. "1.1.0" */
@@ -101,6 +109,8 @@ typedef struct {
     bool   debug;      /* evalua todas las condiciones y marca los cambios de valor */
     int    nscan;
     lg_scan scan[LG_MAX_SCAN];
+    int    nwatch;
+    lg_watch watch[LG_MAX_WATCH];
     int    nach;
     lg_ach ach[LG_MAX_ACH];
     bool   prog_dirty; /* algun progreso cambio desde la ultima vez que se guardo */
@@ -122,6 +132,9 @@ int lg_parse(lg_game *g, char *text, char *err, size_t errlen);
  * se acaban de desbloquear y devuelve cuantos fueron. */
 int lg_tick(lg_game *g, const lg_bases *b, lg_read_fn rd, void *ctx,
             uint64_t now_ms, int *out, int max_out);
+
+/* Resuelve la cadena de punteros de `c` y deja en `addr` la direccion final, sin leerla. */
+bool lg_resolve(const lg_cond *c, const lg_bases *b, lg_read_fn rd, void *ctx, uint64_t *addr);
 
 /* Evalua una sola condicion (expuesto para pruebas). */
 bool lg_eval_cond(lg_cond *c, const lg_bases *b, lg_read_fn rd, void *ctx);

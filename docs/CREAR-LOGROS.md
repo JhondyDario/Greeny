@@ -35,6 +35,7 @@ when = main+0x2F00A8->0x18->0x3C u8 & 0x04
 | `build` | Primeros dígitos del build id del juego. Si no coincide, los logros se desactivan. Sale en `log.txt` la primera vez que Greeny se engancha. |
 | `debug` | `1` anota en `log.txt` el valor que lee cada condición cada vez que cambia. |
 | `scan` | Busca a dónde se mudó un puntero (ver abajo). |
+| `watch` | Copia un trozo de memoria a la SD cuando cambia, para investigar (ver abajo). |
 
 ### Cada logro
 
@@ -141,6 +142,23 @@ desaparece al cerrar el juego, y la comprobación da cero. Lo que funcionó:
 
 Mientras el buscador trabaja, Greeny no revisa logros. Cuando termines, borra el plan
 (X en esa pantalla): mientras exista, el sistema de logros lee los botones del mando.
+
+### Sin buscar nada: `watch`
+
+Cuando ya tienes un puntero que funciona (o uno sacado de un truco público), lo normal es que lo
+demás que te interesa viva en la misma estructura o en una vecina. Con `watch` el sysmodule copia
+ese trozo de memoria a `sdmc:/config/greeny/watch.txt` cada vez que cambia, y luego se mira qué
+byte cambió en cada momento (al entrar a un nivel, al recibir daño, al tocar la meta).
+
+```ini
+# antes del primer logro; hasta 16, de hasta 0x800 bytes cada uno
+watch = main+0x1386C00->0x20->0xD8->0x0 0x400
+```
+
+La dirección se escribe igual que en `when`, pero el último `->0x…` no se lee: es desde dónde
+empieza la copia. El archivo trae una línea `FULL` con el trozo entero la primera vez (o si se
+mudó) y después solo lo que cambia: `t=<ms> w<n> +<desplazamiento>:<bytes nuevos>`. Se revisa
+dos veces por segundo y para al llegar a 8 MB. Es solo para investigar: quítalo del archivo final.
 
 ### Cuando el juego se actualiza: `scan`
 
