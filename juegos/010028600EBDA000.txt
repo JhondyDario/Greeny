@@ -204,6 +204,34 @@ when = main+0x180A4A0->0x28->0x684 u32 <= 380
 when = main+0x180A9C0->0x10->0x320->0x474 u32 >= 30
 when = main+0x180A9C0->0x10->0x320->0x474 u32 <= 380
 
+[estrellas_60]
+name = Lluvia de estrellas
+desc = Junta 60 Estrellas Verdes
+name.en = Star shower
+desc.en = Collect 60 Green Stars
+points = 30
+hold = 15000
+when = main+0x1386C00->0x18->0x0->0x78->0x20 u32 >= 1
+when = main+0x1386C00->0x18->0x0->0x78->0x20 u32 <= 1110
+when = main+0x180A4A0->0x28->0x684 u32 >= 60
+when = main+0x180A4A0->0x28->0x684 u32 <= 380
+when = main+0x180A9C0->0x10->0x320->0x474 u32 >= 60
+when = main+0x180A9C0->0x10->0x320->0x474 u32 <= 380
+
+[estrellas_90]
+name = Cazador de estrellas
+desc = Junta 90 Estrellas Verdes
+name.en = Star hunter
+desc.en = Collect 90 Green Stars
+points = 40
+hold = 15000
+when = main+0x1386C00->0x18->0x0->0x78->0x20 u32 >= 1
+when = main+0x1386C00->0x18->0x0->0x78->0x20 u32 <= 1110
+when = main+0x180A4A0->0x28->0x684 u32 >= 90
+when = main+0x180A4A0->0x28->0x684 u32 <= 380
+when = main+0x180A9C0->0x10->0x320->0x474 u32 >= 90
+when = main+0x180A9C0->0x10->0x320->0x474 u32 <= 380
+
 [estrellas_127]
 name = Cielo estrellado
 desc = Junta 127 Estrellas Verdes: un tercio de todas
@@ -260,6 +288,34 @@ when = main+0x180A9B8->0x420->0x8->0x0->0x8->0x264 u32 <= 85
 when = main+0x180A9D0->0x588->0x8->0x0->0x8->0x264 u32 >= 28
 when = main+0x180A9D0->0x588->0x8->0x0->0x8->0x264 u32 <= 85
 
+
+[sellos_40]
+name = Media colección
+desc = Colecciona 40 sellos
+name.en = Half the collection
+desc.en = Collect 40 stamps
+points = 40
+hold = 15000
+when = main+0x1386C00->0x18->0x0->0x78->0x20 u32 >= 1
+when = main+0x1386C00->0x18->0x0->0x78->0x20 u32 <= 1110
+when = main+0x180A9B8->0x420->0x8->0x0->0x8->0x264 u32 >= 40
+when = main+0x180A9B8->0x420->0x8->0x0->0x8->0x264 u32 <= 85
+when = main+0x180A9D0->0x588->0x8->0x0->0x8->0x264 u32 >= 40
+when = main+0x180A9D0->0x588->0x8->0x0->0x8->0x264 u32 <= 85
+
+[sellos_55]
+name = Maestro del sello
+desc = Colecciona 55 sellos
+name.en = Stamp master
+desc.en = Collect 55 stamps
+points = 50
+hold = 15000
+when = main+0x1386C00->0x18->0x0->0x78->0x20 u32 >= 1
+when = main+0x1386C00->0x18->0x0->0x78->0x20 u32 <= 1110
+when = main+0x180A9B8->0x420->0x8->0x0->0x8->0x264 u32 >= 55
+when = main+0x180A9B8->0x420->0x8->0x0->0x8->0x264 u32 <= 85
+when = main+0x180A9D0->0x588->0x8->0x0->0x8->0x264 u32 >= 55
+when = main+0x180A9D0->0x588->0x8->0x0->0x8->0x264 u32 <= 85
 # ---------- niveles: meta, bandera, estrellas, puntos y reloj ----------
 
 [bandera_dorada]
@@ -522,6 +578,58 @@ fail = main+0x1A11EF0->0xB8->0x20->0x60->0x48->0x4 u64 to 0x700000000
 fail = main+0x1386C00->0x20->0xD8->0x204 u8 == 1
 reset = main+0x1386C00->0x20->0xD8->0x44 u32 != 1
 
+# ---------- jefes sin potenciadores ----------
+# Se anula si en cualquier momento del nivel llevas un traje (gato, fuego, tanuki, bumeran...): hay que
+# entrar sin traje y no coger ninguno. Se rearma al salir del nivel.
+
+[jefe_mundo_2_sin_trajes]
+name = A puño limpio
+desc = Termina el castillo del mundo 2 sin usar ningún traje
+name.en = Bare-handed
+desc.en = Finish the World 2 castle without using any power-up suit
+points = 25
+when = main+0x1386C00->0x20->0xD8->0x44 u32 == 1
+when = main+0x1386C00->0x20->0xD8->0x8 u32 == 20
+when = main+0x1386C00->0x20->0xD8->0xD u8 == 1
+fail = main+0x1A11EF0->0xB8->0x20->0x60->0x48->0x0 u32 >= 2
+reset = main+0x1386C00->0x20->0xD8->0x44 u32 != 1
+
+[jefe_mundo_4_sin_trajes]
+name = Sin trucos
+desc = Termina el castillo del mundo 4 sin usar ningún traje
+name.en = No tricks
+desc.en = Finish the World 4 castle without using any power-up suit
+points = 30
+when = main+0x1386C00->0x20->0xD8->0x44 u32 == 1
+when = main+0x1386C00->0x20->0xD8->0x8 u32 == 46
+when = main+0x1386C00->0x20->0xD8->0xD u8 == 1
+fail = main+0x1A11EF0->0xB8->0x20->0x60->0x48->0x0 u32 >= 2
+reset = main+0x1386C00->0x20->0xD8->0x44 u32 != 1
+
+[jefe_mundo_6_sin_trajes]
+name = A la antigua
+desc = Termina el castillo del mundo 6 sin usar ningún traje
+name.en = Old school
+desc.en = Finish the World 6 castle without using any power-up suit
+points = 35
+when = main+0x1386C00->0x20->0xD8->0x44 u32 == 1
+when = main+0x1386C00->0x20->0xD8->0x8 u32 == 80
+when = main+0x1386C00->0x20->0xD8->0xD u8 == 1
+fail = main+0x1A11EF0->0xB8->0x20->0x60->0x48->0x0 u32 >= 2
+reset = main+0x1386C00->0x20->0xD8->0x44 u32 != 1
+
+[jefe_mundo_7_sin_trajes]
+name = Solo con el bigote
+desc = Termina el castillo del mundo 7 sin usar ningún traje
+name.en = Mustache only
+desc.en = Finish the World 7 castle without using any power-up suit
+points = 45
+when = main+0x1386C00->0x20->0xD8->0x44 u32 == 1
+when = main+0x1386C00->0x20->0xD8->0x8 u32 == 96
+when = main+0x1386C00->0x20->0xD8->0xD u8 == 1
+fail = main+0x1A11EF0->0xB8->0x20->0x60->0x48->0x0 u32 >= 2
+reset = main+0x1386C00->0x20->0xD8->0x44 u32 != 1
+
 # ---------- Mega Champiñon ----------
 
 [mega_mario]
@@ -570,26 +678,26 @@ when = main+0x1386C00->0x30->0x20 u8 == 1
 when = main+0x1386C00->0x30->0xC4 u32 >= 25
 when = main+0x1386C00->0x30->0xC4 u32 <= 100
 
-[bf_soles_50]
+[bf_soles_40]
 name = Medio lago
-desc = Consigue 50 soles felinos en Bowser's Fury
+desc = Consigue 40 soles felinos en Bowser's Fury
 name.en = Half the lake
-desc.en = Get 50 Cat Shines in Bowser's Fury
+desc.en = Get 40 Cat Shines in Bowser's Fury
 points = 30
 hold = 5000
 when = main+0x1386C00->0x30->0x20 u8 == 1
-when = main+0x1386C00->0x30->0xC4 u32 >= 50
+when = main+0x1386C00->0x30->0xC4 u32 >= 40
 when = main+0x1386C00->0x30->0xC4 u32 <= 100
 
-[bf_soles_100]
+[bf_soles_60]
 name = Furia domada
-desc = Consigue 100 soles felinos en Bowser's Fury
+desc = Consigue 60 soles felinos en Bowser's Fury
 name.en = Fury tamed
-desc.en = Get 100 Cat Shines in Bowser's Fury
-points = 60
+desc.en = Get 60 Cat Shines in Bowser's Fury
+points = 50
 hold = 5000
 when = main+0x1386C00->0x30->0x20 u8 == 1
-when = main+0x1386C00->0x30->0xC4 u32 >= 100
+when = main+0x1386C00->0x30->0xC4 u32 >= 60
 when = main+0x1386C00->0x30->0xC4 u32 <= 100
 
 # ---------- traje ----------

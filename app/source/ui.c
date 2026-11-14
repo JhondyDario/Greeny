@@ -138,9 +138,11 @@ bool ui_selected_rect(int *x, int *y, int *w, int *h) {
 static bool g_chip_opens_profile; /* solo en el inicio, donde R abre el perfil */
 
 static bool g_footer_version; /* la version al pie: solo en el perfil y en Opciones */
+static bool g_hide_chip;      /* en Opciones no salen tu foto ni la campana arriba a la derecha */
 
 static void begin(gfx_canvas *c) {
     g_footer_version = false;
+    g_hide_chip = false;
     gfx_clear_transparent(c);
     g_nzones = 0;
     g_sel_set = false;
@@ -329,7 +331,7 @@ count:
 }
 
 static void user_chip(gfx_canvas *c) {
-    if (!g_profile) return;
+    if (!g_profile || g_hide_chip) return;
     const int cx = UI_W - MARGIN - 32, cy = 48;
     if (g_chip_opens_profile) zone(UI_W - 300, 0, 300, HEADER_H, UI_ZONE_BUTTON, UI_BTN_R); /* tocar tu nombre = R */
     avatar(c, cx, cy, 30, g_profile->name, g_profile->avatar);
@@ -598,10 +600,10 @@ void ui_home(gfx_canvas *c, const ui_assets *a, const gr_model *m, const gr_conf
     if (m->ngames > 0) hx = hint(c, hx, "A", T("Ver logros", "View achievements"));
     hx = hint(c, hx, "X", T("Opciones", "Options"));
     hx = hint(c, hx, "Y", T("Recargar", "Reload"));
-    if (m->ngames > 0) hx = hint(c, hx, "−", cfg->games_view == GR_VIEW_GRID ? T("Lista", "List") : T("Cuadrícula", "Grid"));
     hx = hint(c, hx, "L", T("Buscar", "Find"));
     hx = hint(c, hx, "R", T("Perfil", "Profile"));
-    hint(c, hx, "+", T("Salir", "Exit"));
+    if (m->ngames > 0) hx = hint(c, hx, "−", cfg->games_view == GR_VIEW_GRID ? T("Lista", "List") : T("Cuadrícula", "Grid"));
+    hx = hint(c, hx, "+", T("Salir", "Exit"));
 }
 
 /* ---------- detalle: logros de un juego ---------- */
@@ -905,13 +907,13 @@ void ui_detail(gfx_canvas *c, const ui_assets *a, const gr_model *m, const gr_co
     footer_bar(c);
     int hx = MARGIN;
     if (!g->broken && m->cur.nach > 0) hx = hint(c, hx, "A", T("Ver detalle", "View details"));
+    hx = hint(c, hx, "B", T("Volver", "Back"));
     if (!g->broken && m->cur.nach > 0)
         hx = hint(c, hx, "X", g_ach_filter == UI_ACH_GOT ? T("Viendo: obtenidos", "Showing: earned")
                               : g_ach_filter == UI_ACH_MISSING ? T("Viendo: por obtener", "Showing: not earned") : T("Viendo: todos", "Showing: all"));
     hx = hint(c, hx, "Y", T("Comentarios", "Comments"));
-    hx = hint(c, hx, "B", T("Volver", "Back"));
     if (!g->broken) hx = hint(c, hx, "−", cfg->ach_view == GR_VIEW_GRID ? T("Lista", "List") : T("Cuadrícula", "Grid"));
-    hint(c, hx, "+", T("Salir", "Exit"));
+    hx = hint(c, hx, "+", T("Salir", "Exit"));
 }
 
 /* ---------- buscador de juegos ---------- */
@@ -1000,15 +1002,15 @@ void ui_browse(gfx_canvas *c, const ui_assets *a, const gr_cat_game *games, cons
     footer_bar(c);
     int hx = MARGIN;
     if (state == UI_BROWSE_OK && nshown > 0) hx = hint(c, hx, "A", T("Ver logros", "View achievements"));
+    if (state == UI_BROWSE_OK && nshown > UI_BROWSE_ROWS) hx = hint(c, hx, "X", T("Siguiente letra", "Next letter"));
+    hx = hint(c, hx, "Y", T("Recargar", "Reload"));
+    hx = hint(c, hx, "R", T("Mis juegos", "My games"));
     if (state == UI_BROWSE_OK) {
         char f[64];
         snprintf(f, sizeof(f), T("Filtro: %s", "Filter: %s"), status_filter > 0 ? status_name(k_filter[status_filter]) : T("Todos", "All"));
         hx = hint(c, hx, "−", f);
     }
-    hx = hint(c, hx, "R", T("Mis juegos", "My games"));
-    if (state == UI_BROWSE_OK && nshown > UI_BROWSE_ROWS) hx = hint(c, hx, "X", T("Siguiente letra", "Next letter"));
-    hx = hint(c, hx, "Y", T("Recargar", "Reload"));
-    hint(c, hx, "+", T("Salir", "Exit"));
+    hx = hint(c, hx, "+", T("Salir", "Exit"));
 }
 
 void ui_browse_game(gfx_canvas *c, const ui_assets *a, const gr_cat_game *game, const lg_game *def, int cursor, int top) {
@@ -1031,9 +1033,10 @@ void ui_browse_game(gfx_canvas *c, const ui_assets *a, const gr_cat_game *game, 
     for (int i = 0; i < def->nach; i++) all[i] = i;
     detail_list(c, &bare, def, all, def->nach, cursor, top, 6);
     footer_bar(c);
-    int hx = hint(c, MARGIN, "Y", T("Comentarios", "Comments"));
+    int hx = MARGIN;
     hx = hint(c, hx, "B", T("Volver", "Back"));
-    hint(c, hx, "+", T("Salir", "Exit"));
+    hx = hint(c, hx, "Y", T("Comentarios", "Comments"));
+    hx = hint(c, hx, "+", T("Salir", "Exit"));
 }
 
 /* ---------- presentacion al abrir ---------- */
@@ -1132,9 +1135,9 @@ void ui_update(gfx_canvas *c, const ui_assets *a, int state, const char *version
     footer_bar(c);
     int hx = MARGIN;
     if (state == UI_UPD_AVAILABLE) hx = hint(c, hx, "A", T("Descargar e instalar", "Download and install"));
-    if (state == UI_UPD_OFFLINE || state == UI_UPD_CURRENT || state == UI_UPD_NONE) hx = hint(c, hx, "Y", T("Buscar otra vez", "Check again"));
     if (state != UI_UPD_DOWNLOADING) hx = hint(c, hx, "B", state == UI_UPD_AVAILABLE ? T("Ahora no", "Not now") : T("Volver", "Back"));
-    if (state != UI_UPD_DOWNLOADING) hint(c, hx, "+", T("Salir", "Exit"));
+    if (state == UI_UPD_OFFLINE || state == UI_UPD_CURRENT || state == UI_UPD_NONE) hx = hint(c, hx, "Y", T("Buscar otra vez", "Check again"));
+    if (state != UI_UPD_DOWNLOADING) hx = hint(c, hx, "+", T("Salir", "Exit"));
 }
 
 /* ---------- avisos ---------- */
@@ -1216,9 +1219,9 @@ void ui_notifs(gfx_canvas *c, const ui_assets *a, const gr_notif *n, int count, 
     footer_bar(c);
     int hx = MARGIN;
     if (state == 1 && count > 0) hx = hint(c, hx, "A", T("Abrir", "Open"));
-    if (state == 1 && unread > 0) hx = hint(c, hx, "X", T("Marcar todo como leído", "Mark all as read"));
     hx = hint(c, hx, "B", T("Volver", "Back"));
-    hint(c, hx, "+", T("Salir", "Exit"));
+    if (state == 1 && unread > 0) hx = hint(c, hx, "X", T("Marcar todo como leído", "Mark all as read"));
+    hx = hint(c, hx, "+", T("Salir", "Exit"));
 }
 
 /* ---------- comentarios de un juego ---------- */
@@ -1323,10 +1326,10 @@ void ui_reviews(gfx_canvas *c, const ui_assets *a, const char *game, const gr_re
     int hx = MARGIN;
     bool sel = state == 1 && n > 0 && cursor < n;
     if (sel && linked && !r[cursor].mine) hx = hint(c, hx, "A", r[cursor].liked ? T("Quitar me gusta", "Unlike") : T("Me gusta", "Like"));
+    hx = hint(c, hx, "B", T("Volver", "Back"));
     if (sel) hx = hint(c, hx, "X", T("Ver perfil", "View profile"));
     if (linked && !closed) hx = hint(c, hx, "Y", wrote ? T("Editar el tuyo", "Edit yours") : T("Escribir", "Write"));
-    hx = hint(c, hx, "B", T("Volver", "Back"));
-    hint(c, hx, "+", T("Salir", "Exit"));
+    hx = hint(c, hx, "+", T("Salir", "Exit"));
 }
 
 /* ---------- buscador de valores ---------- */
@@ -1400,10 +1403,11 @@ void ui_search(gfx_canvas *c, const ui_assets *a, unsigned value, int type_bits,
         gfx_text_fit(c, rx + 24, 172 + i * 32, 20, P->ink, lines[i], rw - 48);
 
     footer_bar(c);
-    int hx = hint(c, MARGIN, "A", T("Guardar plan", "Save plan"));
-    hx = hint(c, hx, "X", T("Borrar plan", "Delete plan"));
+    int hx = MARGIN;
+    hx = hint(c, hx, "A", T("Guardar plan", "Save plan"));
     hx = hint(c, hx, "B", T("Volver", "Back"));
-    hint(c, hx, "+", T("Salir", "Exit"));
+    hx = hint(c, hx, "X", T("Borrar plan", "Delete plan"));
+    hx = hint(c, hx, "+", T("Salir", "Exit"));
 }
 
 /* ---------- opciones ---------- */
@@ -1456,6 +1460,7 @@ static bool pill_img(gfx_canvas *c, int id, int x, int y, int w) {
 
 static int g_row_h = 88;    /* alto de las filas de Opciones */
 static int g_opt_icon = -1;
+static bool g_opt_avatar; /* la fila de la foto de perfil lleva tu foto como icono */
 static bool g_row_restart; /* la fila que se dibuja ahora necesita reiniciar la consola para aplicarse */ /* icono de la fila que se dibuja ahora (UI_IMG_opt_*), -1 = sin icono */
 
 /* valores especiales de option_row: dibujan la palanquita en vez de texto */
@@ -1467,7 +1472,8 @@ static void option_row(gfx_canvas *c, int y, bool selected, const char *label, c
     card(c, x, y, w, h, selected);
     zone(x, y, w, h, UI_ZONE_ITEM, g_row_index);
     int lx = x + 28;
-    if (g_opt_icon >= 0 && img_fit(c, g_a, g_opt_icon, x + 22, y + (h - 48) / 2, 48)) lx = x + 88;
+    if (g_opt_avatar && g_profile) { avatar(c, x + 46, y + h / 2, 24, g_profile->name, g_profile->avatar); lx = x + 88; }
+    else if (g_opt_icon >= 0 && img_fit(c, g_a, g_opt_icon, x + 22, y + (h - 48) / 2, 48)) lx = x + 88;
     gfx_text(c, lx, y + 12 + ty / 2, 27, P->ink, label);
     if (g_row_restart) { /* este cambio no se ve hasta reiniciar la consola: se dice antes de tocarlo */
         const char *r = T("Requiere reiniciar la consola", "Needs a console restart");
@@ -1558,6 +1564,7 @@ void ui_settings(gfx_canvas *c, const ui_assets *a, const gr_config *cfg, int ta
                  bool system_dark, const ui_account *acc) {
     begin(c);
     g_footer_version = true;
+    g_hide_chip = true;
     header(c, a, NULL, T("Opciones", "Options"), T("Se guardan en la tarjeta SD", "Saved to the SD card"));
 
     /* pestañas */
@@ -1604,6 +1611,7 @@ void ui_settings(gfx_canvas *c, const ui_assets *a, const gr_config *cfg, int ta
         g_row_index = i;
         g_opt_icon = opt_icon(ui_tab_option(tab, i, acc->linked), i);
         g_row_restart = ui_tab_option(tab, i, acc->linked) == UI_OPT_INGAME;
+        g_opt_avatar = ui_tab_option(tab, i, acc->linked) == UI_OPT_ACC_PHOTO;
         switch (ui_tab_option(tab, i, acc->linked)) {
             case UI_OPT_MUSIC:
                 option_row(c, y, sel, T("Música de fondo", "Background music"),
@@ -1885,9 +1893,10 @@ void ui_diag(gfx_canvas *c, const ui_assets *a, const gr_diag_item *items, int c
     for (int i = 0; i < count && i < GR_DIAG_MAX; i++) diag_row(c, 112 + i * step, step - 5, &items[i]);
 
     footer_bar(c);
-    int hx = hint(c, MARGIN, "Y", T("Revisar de nuevo", "Check again"));
+    int hx = MARGIN;
     hx = hint(c, hx, "B", T("Volver", "Back"));
-    hint(c, hx, "+", T("Salir", "Exit"));
+    hx = hint(c, hx, "Y", T("Revisar de nuevo", "Check again"));
+    hx = hint(c, hx, "+", T("Salir", "Exit"));
 }
 
 /* ---------- acerca de ---------- */
@@ -2297,11 +2306,12 @@ void ui_profile_screen(gfx_canvas *c, const ui_assets *a, const ui_profile *p) {
     else gfx_text_fit(c, fx + 76, fy + 12, 16, P->gray, T("Vincula tu cuenta para tener uno", "Link your account to get one"), cw2 - 96);
 
     footer_bar(c);
-    int hx = hint(c, MARGIN, "L", T("Mis trofeos", "My trophies"));
+    int hx = MARGIN;
     hx = hint(c, hx, "X", T("Ver medallas", "View badges"));
     if (p->linked) hx = hint(c, hx, "Y", T("Seguir con código", "Follow with code"));
-    if (p->linked) hx = hint(c, hx, "A", T("Ranking", "Ranking"));
-    hint(c, hx, "+", T("Salir", "Exit"));
+    hx = hint(c, hx, "L", T("Mis trofeos", "My trophies"));
+    if (p->linked) hx = hint(c, hx, "R", T("Ranking", "Ranking"));
+    hx = hint(c, hx, "+", T("Salir", "Exit"));
 }
 
 void ui_avatars(gfx_canvas *c, const ui_assets *a, const ui_profile *p, int cursor) {
@@ -2358,10 +2368,11 @@ void ui_countries(gfx_canvas *c, const ui_assets *a, int cursor, const char *cur
         zone(x, y, cw, ch, UI_ZONE_ITEM, i);
     }
     footer_bar(c);
-    int hx = hint(c, MARGIN, "A", T("Elegir", "Choose"));
-    hx = hint(c, hx, "X", T("Sin país", "No country"));
+    int hx = MARGIN;
+    hx = hint(c, hx, "A", T("Elegir", "Choose"));
     hx = hint(c, hx, "B", T("Volver", "Back"));
-    hint(c, hx, "+", T("Salir", "Exit"));
+    hx = hint(c, hx, "X", T("Sin país", "No country"));
+    hx = hint(c, hx, "+", T("Salir", "Exit"));
 }
 
 static void rank_line(gfx_canvas *c, const ui_assets *a, int y, const gr_rank_row *r, bool sel, bool me) {
@@ -2426,10 +2437,10 @@ void ui_ranking(gfx_canvas *c, const ui_assets *a, const gr_rank_row *rows, int 
     footer_bar(c);
     int hx = MARGIN;
     if (state == 1 && n > 0) hx = hint(c, hx, "A", T("Ver perfil", "View profile"));
+    hx = hint(c, hx, "B", T("Volver", "Back"));
     hx = hint(c, hx, "X", T("Global / País / Amigos", "Global / Country / Friends"));
     hx = hint(c, hx, "Y", T("Puntos / Juego", "Points / Game"));
-    hx = hint(c, hx, "B", T("Volver", "Back"));
-    hint(c, hx, "+", T("Salir", "Exit"));
+    hx = hint(c, hx, "+", T("Salir", "Exit"));
 }
 
 void ui_user(gfx_canvas *c, const ui_assets *a, const gr_rank_row *who, bool can_follow) {
@@ -2523,7 +2534,7 @@ void ui_badges(gfx_canvas *c, const ui_assets *a, const ui_profile *p, int top) 
 
     footer_bar(c);
     int hx = MARGIN;
-    if (no > UI_BADGE_ROWS) hx = hint(c, hx, "↕", T("Bajar y subir", "Scroll"));
     hx = hint(c, hx, "B", T("Volver al perfil", "Back to profile"));
-    hint(c, hx, "+", T("Salir", "Exit"));
+    if (no > UI_BADGE_ROWS) hx = hint(c, hx, "↕", T("Bajar y subir", "Scroll"));
+    hx = hint(c, hx, "+", T("Salir", "Exit"));
 }

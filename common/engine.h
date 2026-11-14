@@ -7,7 +7,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define LG_MAX_ACH    64
+#define LG_MAX_ACH    96
 #define LG_MAX_COND   6
 #define LG_MAX_FAIL   8       /* condiciones que anulan el logro hasta que se rearme */
 #define LG_MAX_DEREF  8

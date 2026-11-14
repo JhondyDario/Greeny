@@ -1904,7 +1904,7 @@ int main(int argc, char *argv[]) {
         } else if (screen == SCREEN_PROFILE) {
             if (down & (HidNpadButton_L | HidNpadButton_B)) { screen = SCREEN_HOME; back = true; }
             if (down & HidNpadButton_X) { screen = SCREEN_BADGES; badge_top = 0; opened = true; }
-            if ((down & HidNpadButton_A) && g_account.linked) {
+            if ((down & HidNpadButton_R) && g_account.linked) {
                 rank_state = rank_load(rank_scope, rank_mode); /* antes de cambiar de pantalla, para que no parpadee */
                 screen = SCREEN_RANKING;
                 rcursor = 0;
@@ -2117,20 +2117,6 @@ int main(int argc, char *argv[]) {
         /* La pantalla (texto, tarjetas) solo se redibuja en su capa cuando algo cambia.
          * Con el fondo animado, cada cuadro se pinta el fondo y se pone la capa encima. */
         bool redraw = dirty;
-        /* aro amarillo de la seleccion: se dibuja encima al final y, al cambiar de elemento,
-         * hace un "pop" suave (empieza un poco mas grande y se asienta) durante 180 ms */
-        static int sel_px = -1, sel_py, sel_pw, sel_ph;
-        static u64 sel_anim_start;
-        int sel_x, sel_y, sel_w, sel_h;
-        bool has_sel = screen != SCREEN_SPLASH && ui_selected_rect(&sel_x, &sel_y, &sel_w, &sel_h);
-        if (has_sel && (sel_x != sel_px || sel_y != sel_py || sel_w != sel_pw || sel_h != sel_ph)) {
-            sel_px = sel_x; sel_py = sel_y; sel_pw = sel_w; sel_ph = sel_h;
-            sel_anim_start = armGetSystemTick();
-        }
-        int sel_ms = (int)(armTicksToNs(armGetSystemTick() - sel_anim_start) / 1000000ULL);
-        bool sel_anim = has_sel && sel_ms < 180;
-        int splash_ms = screen == SCREEN_SPLASH ? (int)(armTicksToNs(armGetSystemTick() - splash_start) / 1000000ULL) : 9999;
-        if (sel_anim || sel_ms < 220) redraw = true; /* un cuadro mas para dejarlo quieto */
         if (dirty) {
             if (screen == SCREEN_DETAIL) ui_detail(&layer, &g_assets, &g_model, &g_config, cursor, dcursor, dtop);
             else if (screen == SCREEN_ACH) {
@@ -2179,6 +2165,22 @@ int main(int argc, char *argv[]) {
             else ui_home(&layer, &g_assets, &g_model, &g_config, cursor, top);
             dirty = false;
         }
+        /* (se calcula despues de dibujar la pantalla: si no, al cambiar de pantalla el aro salia un momento
+         * donde estaba la seleccion de la pantalla anterior) */
+        /* aro amarillo de la seleccion: se dibuja encima al final y, al cambiar de elemento,
+         * hace un "pop" suave (empieza un poco mas grande y se asienta) durante 180 ms */
+        static int sel_px = -1, sel_py, sel_pw, sel_ph;
+        static u64 sel_anim_start;
+        int sel_x, sel_y, sel_w, sel_h;
+        bool has_sel = screen != SCREEN_SPLASH && ui_selected_rect(&sel_x, &sel_y, &sel_w, &sel_h);
+        if (has_sel && (sel_x != sel_px || sel_y != sel_py || sel_w != sel_pw || sel_h != sel_ph)) {
+            sel_px = sel_x; sel_py = sel_y; sel_pw = sel_w; sel_ph = sel_h;
+            sel_anim_start = armGetSystemTick();
+        }
+        int sel_ms = (int)(armTicksToNs(armGetSystemTick() - sel_anim_start) / 1000000ULL);
+        bool sel_anim = has_sel && sel_ms < 180;
+        int splash_ms = screen == SCREEN_SPLASH ? (int)(armTicksToNs(armGetSystemTick() - splash_start) / 1000000ULL) : 9999;
+        if (sel_anim || sel_ms < 220) redraw = true; /* un cuadro mas para dejarlo quieto */
 
         u32 stride;
         u32 *px = (u32 *)framebufferBegin(&fb, &stride);

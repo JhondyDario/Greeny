@@ -142,10 +142,10 @@ static void test_parse(void) {
     CHECK(bad("[a]\nwhen=main+0 u8 == 1\nwhen=main+0 u8 == 1\nwhen=main+0 u8 == 1\nwhen=main+0 u8 == 1\n"
               "when=main+0 u8 == 1\nwhen=main+0 u8 == 1\nwhen=main+0 u8 == 1\n", "linea 8: demasiadas condiciones"));
 
-    /* limite de 64 logros */
+    /* limite de 96 logros */
     static char big[8192];
     size_t off = 0;
-    for (int i = 0; i < 65; i++)
+    for (int i = 0; i < LG_MAX_ACH + 1; i++)
         off += (size_t)snprintf(big + off, sizeof(big) - off, "[a%d]\nwhen=main+0 u8 == 1\n", i);
     CHECK(bad(big, "demasiados logros"));
 

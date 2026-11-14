@@ -17,8 +17,14 @@
 #   +0x44  vale 1 dentro de un nivel y -1 fuera
 #   +0x90  estrellas verdes del nivel, un bit por estrella (7 = las tres)
 #   +0xE0  puntos, sin el bono de tiempo      +0xEC  altura en la bandera (1.0 = la punta)
-# Traje del jugador = main+0x1A11EF0->0xB8->0x20->0x60->0x48->0x0: 0 pequeño, 1 con hongo, 3 gato.
-#   No se puede leer justo al tocar la meta. El Mega Champiñon no cambia este numero.
+# Jugador = main+0x1A11EF0->0xB8->0x20->0x60 (comprobado con marcas en consola):
+#   ->0x48->0x0  traje: 0 normal (con hongo), 1 pequeño, 3 gato; los demas trajes, de 2 a 7
+#   ->0x48->0x4  el mismo traje, y en ->0x48->0x8 el que tenia antes. Leidos juntos como u64 desde +0x4:
+#                1 = paso de normal a pequeño (golpe); 0x300000000 = perdio el gato (golpe)
+#   ->0x9E       vale 1 mientras dura el Mega Champiñon
+#   No se puede leer justo al tocar la meta.
+# Numeros de nivel (+0x8): castillos de los mundos 1 a 8 = 9, 20, 33, 46, 61, 80, 96, 114.
+# Bowser's Fury = main+0x1386C00->0x30: +0x20 vale 1 jugando ese modo, +0xC4 soles felinos (100 con todo).
 #
 # Para depurar pon debug = 1: anota en log.txt el valor que lee cada condicion.
 
@@ -26,27 +32,8 @@ game    = Super Mario 3D World + Bowser's Fury
 version = 1.1.0
 build   = 891687F016A18F17
 
-# ---------- SOLO PARA INVESTIGAR (ronda 5) ----------
-# w0 nivel en curso
-watch = main+0x1386C00->0x20->0xD8->0x0 0x800
-# w1 traje del jugador
-watch = main+0x1A11EF0->0xB8->0x20->0x60->0x48->0x0 0x80
-# w2 jugador
-watch = main+0x1A11EF0->0x118->0x58->0xA0->0xC8->0x0 0x200
-# w3 raiz 2: avisos de coger objeto, morir...
-watch = main+0x1A11EF0->0x0 0x800
-# w4 objeto del nivel (+0x22C contaba algo en la ronda 2)
-watch = main+0x1386C00->0x88->0x0 0x800
-# w5 partida: vidas, monedas
-watch = main+0x1386C00->0x18->0x0->0x0 0x1E0
-# w6 Bowser's Fury? (truco 1.0.0: soles felinos en +0xC4)
-watch = main+0x1386C00->0x30->0x0 0x200
-# w7 
-watch = main+0x1A11EF0->0x18->0x0 0x400
-# w8 
-watch = main+0x1A11EF0->0x118->0x58->0xA0->0x0 0x200
-# w9 
-watch = main+0x1A11EF0->0xB8->0x20->0x60->0x0 0x200
+# ---------- SOLO PARA INVESTIGAR (ronda 7): numero y reloj de cada nivel ----------
+watch = main+0x1386C00->0x20->0xD8->0x0 0x300
 
 [prueba_de_vida]
 name = Estamos vivos
@@ -61,7 +48,7 @@ when = main+0x4 u32 != 0
 # ---------- monedas ----------
 # El contador va de 0 a 99 y vuelve a 0 al llegar a 100.
 
-[monedas_5]
+[monedas_25]
 name = Bolsillo lleno
 desc = Ten 25 monedas
 name.en = Full pocket
@@ -70,7 +57,7 @@ points = 5
 when = main+0x1386C00->0x18->0x0->0x138->0x48 u32 >= 25
 when = main+0x1386C00->0x18->0x0->0x138->0x48 u32 <= 99
 
-[monedas_50]
+[monedas_75]
 name = Tres cuartos
 desc = Ten 75 monedas
 name.en = Three quarters
@@ -79,7 +66,7 @@ points = 10
 when = main+0x1386C00->0x18->0x0->0x138->0x48 u32 >= 75
 when = main+0x1386C00->0x18->0x0->0x138->0x48 u32 <= 99
 
-[monedas_90]
+[monedas_99]
 name = A una moneda
 desc = Ten 99 monedas: una más y se van en una vida
 name.en = One coin away
@@ -220,6 +207,34 @@ when = main+0x180A4A0->0x28->0x684 u32 <= 380
 when = main+0x180A9C0->0x10->0x320->0x474 u32 >= 30
 when = main+0x180A9C0->0x10->0x320->0x474 u32 <= 380
 
+[estrellas_60]
+name = Lluvia de estrellas
+desc = Junta 60 Estrellas Verdes
+name.en = Star shower
+desc.en = Collect 60 Green Stars
+points = 30
+hold = 15000
+when = main+0x1386C00->0x18->0x0->0x78->0x20 u32 >= 1
+when = main+0x1386C00->0x18->0x0->0x78->0x20 u32 <= 1110
+when = main+0x180A4A0->0x28->0x684 u32 >= 60
+when = main+0x180A4A0->0x28->0x684 u32 <= 380
+when = main+0x180A9C0->0x10->0x320->0x474 u32 >= 60
+when = main+0x180A9C0->0x10->0x320->0x474 u32 <= 380
+
+[estrellas_90]
+name = Cazador de estrellas
+desc = Junta 90 Estrellas Verdes
+name.en = Star hunter
+desc.en = Collect 90 Green Stars
+points = 40
+hold = 15000
+when = main+0x1386C00->0x18->0x0->0x78->0x20 u32 >= 1
+when = main+0x1386C00->0x18->0x0->0x78->0x20 u32 <= 1110
+when = main+0x180A4A0->0x28->0x684 u32 >= 90
+when = main+0x180A4A0->0x28->0x684 u32 <= 380
+when = main+0x180A9C0->0x10->0x320->0x474 u32 >= 90
+when = main+0x180A9C0->0x10->0x320->0x474 u32 <= 380
+
 [estrellas_127]
 name = Cielo estrellado
 desc = Junta 127 Estrellas Verdes: un tercio de todas
@@ -276,6 +291,34 @@ when = main+0x180A9B8->0x420->0x8->0x0->0x8->0x264 u32 <= 85
 when = main+0x180A9D0->0x588->0x8->0x0->0x8->0x264 u32 >= 28
 when = main+0x180A9D0->0x588->0x8->0x0->0x8->0x264 u32 <= 85
 
+
+[sellos_40]
+name = Media colección
+desc = Colecciona 40 sellos
+name.en = Half the collection
+desc.en = Collect 40 stamps
+points = 40
+hold = 15000
+when = main+0x1386C00->0x18->0x0->0x78->0x20 u32 >= 1
+when = main+0x1386C00->0x18->0x0->0x78->0x20 u32 <= 1110
+when = main+0x180A9B8->0x420->0x8->0x0->0x8->0x264 u32 >= 40
+when = main+0x180A9B8->0x420->0x8->0x0->0x8->0x264 u32 <= 85
+when = main+0x180A9D0->0x588->0x8->0x0->0x8->0x264 u32 >= 40
+when = main+0x180A9D0->0x588->0x8->0x0->0x8->0x264 u32 <= 85
+
+[sellos_55]
+name = Maestro del sello
+desc = Colecciona 55 sellos
+name.en = Stamp master
+desc.en = Collect 55 stamps
+points = 50
+hold = 15000
+when = main+0x1386C00->0x18->0x0->0x78->0x20 u32 >= 1
+when = main+0x1386C00->0x18->0x0->0x78->0x20 u32 <= 1110
+when = main+0x180A9B8->0x420->0x8->0x0->0x8->0x264 u32 >= 55
+when = main+0x180A9B8->0x420->0x8->0x0->0x8->0x264 u32 <= 85
+when = main+0x180A9D0->0x588->0x8->0x0->0x8->0x264 u32 >= 55
+when = main+0x180A9D0->0x588->0x8->0x0->0x8->0x264 u32 <= 85
 # ---------- niveles: meta, bandera, estrellas, puntos y reloj ----------
 
 [bandera_dorada]
@@ -381,6 +424,285 @@ when = main+0x1386C00->0x20->0xD8->0x44 u32 == 1
 when = main+0x1386C00->0x20->0xD8->0x8 u32 == 20
 when = main+0x1386C00->0x20->0xD8->0xD u8 == 1
 
+[jefe_mundo_3]
+name = Serpientes fuera
+desc = Termina el castillo del mundo 3
+name.en = Snakes out
+desc.en = Finish the World 3 castle
+points = 20
+when = main+0x1386C00->0x20->0xD8->0x44 u32 == 1
+when = main+0x1386C00->0x20->0xD8->0x8 u32 == 33
+when = main+0x1386C00->0x20->0xD8->0xD u8 == 1
+
+[jefe_mundo_4]
+name = Roca partida
+desc = Termina el castillo del mundo 4
+name.en = Cracked rock
+desc.en = Finish the World 4 castle
+points = 25
+when = main+0x1386C00->0x20->0xD8->0x44 u32 == 1
+when = main+0x1386C00->0x20->0xD8->0x8 u32 == 46
+when = main+0x1386C00->0x20->0xD8->0xD u8 == 1
+
+[jefe_mundo_5]
+name = Golpe al rey
+desc = Termina el castillo del mundo 5
+name.en = Strike the king
+desc.en = Finish the World 5 castle
+points = 25
+when = main+0x1386C00->0x20->0xD8->0x44 u32 == 1
+when = main+0x1386C00->0x20->0xD8->0x8 u32 == 61
+when = main+0x1386C00->0x20->0xD8->0xD u8 == 1
+
+[jefe_mundo_6]
+name = Payaso reventado
+desc = Termina el castillo del mundo 6
+name.en = Popped clown
+desc.en = Finish the World 6 castle
+points = 30
+when = main+0x1386C00->0x20->0xD8->0x44 u32 == 1
+when = main+0x1386C00->0x20->0xD8->0x8 u32 == 80
+when = main+0x1386C00->0x20->0xD8->0xD u8 == 1
+
+[jefe_mundo_7]
+name = Castillo tomado
+desc = Termina el castillo del mundo 7
+name.en = Castle taken
+desc.en = Finish the World 7 castle
+points = 35
+when = main+0x1386C00->0x20->0xD8->0x44 u32 == 1
+when = main+0x1386C00->0x20->0xD8->0x8 u32 == 96
+when = main+0x1386C00->0x20->0xD8->0xD u8 == 1
+
+[jefe_mundo_8]
+name = El fin de Bowser
+desc = Termina el castillo del mundo 8
+name.en = The end of Bowser
+desc.en = Finish the World 8 castle
+points = 50
+when = main+0x1386C00->0x20->0xD8->0x44 u32 == 1
+when = main+0x1386C00->0x20->0xD8->0x8 u32 == 114
+when = main+0x1386C00->0x20->0xD8->0xD u8 == 1
+
+# ---------- sin recibir daño ----------
+# El logro se anula si pierdes el traje, si pasas de normal a pequeño o si mueres, y se rearma al salir del nivel.
+
+[intocable]
+name = Intocable
+desc = Termina un nivel sin recibir daño
+name.en = Untouchable
+desc.en = Finish a level without taking damage
+points = 15
+when = main+0x1386C00->0x20->0xD8->0x44 u32 == 1
+when = main+0x1386C00->0x20->0xD8->0xD u8 == 1
+fail = main+0x1A11EF0->0xB8->0x20->0x60->0x48->0x4 u64 to 1
+fail = main+0x1A11EF0->0xB8->0x20->0x60->0x48->0x4 u64 to 0x200000000
+fail = main+0x1A11EF0->0xB8->0x20->0x60->0x48->0x4 u64 to 0x300000000
+fail = main+0x1A11EF0->0xB8->0x20->0x60->0x48->0x4 u64 to 0x400000000
+fail = main+0x1A11EF0->0xB8->0x20->0x60->0x48->0x4 u64 to 0x500000000
+fail = main+0x1A11EF0->0xB8->0x20->0x60->0x48->0x4 u64 to 0x600000000
+fail = main+0x1A11EF0->0xB8->0x20->0x60->0x48->0x4 u64 to 0x700000000
+fail = main+0x1386C00->0x20->0xD8->0x204 u8 == 1
+reset = main+0x1386C00->0x20->0xD8->0x44 u32 != 1
+
+[jefe_mundo_1_limpio]
+name = Ni un rasguño
+desc = Termina el castillo del mundo 1 sin recibir daño
+name.en = Not a scratch
+desc.en = Finish the World 1 castle without taking damage
+points = 25
+when = main+0x1386C00->0x20->0xD8->0x44 u32 == 1
+when = main+0x1386C00->0x20->0xD8->0x8 u32 == 9
+when = main+0x1386C00->0x20->0xD8->0xD u8 == 1
+fail = main+0x1A11EF0->0xB8->0x20->0x60->0x48->0x4 u64 to 1
+fail = main+0x1A11EF0->0xB8->0x20->0x60->0x48->0x4 u64 to 0x200000000
+fail = main+0x1A11EF0->0xB8->0x20->0x60->0x48->0x4 u64 to 0x300000000
+fail = main+0x1A11EF0->0xB8->0x20->0x60->0x48->0x4 u64 to 0x400000000
+fail = main+0x1A11EF0->0xB8->0x20->0x60->0x48->0x4 u64 to 0x500000000
+fail = main+0x1A11EF0->0xB8->0x20->0x60->0x48->0x4 u64 to 0x600000000
+fail = main+0x1A11EF0->0xB8->0x20->0x60->0x48->0x4 u64 to 0x700000000
+fail = main+0x1386C00->0x20->0xD8->0x204 u8 == 1
+reset = main+0x1386C00->0x20->0xD8->0x44 u32 != 1
+
+[jefe_mundo_3_limpio]
+name = Baile de serpientes
+desc = Termina el castillo del mundo 3 sin recibir daño
+name.en = Snake dance
+desc.en = Finish the World 3 castle without taking damage
+points = 30
+when = main+0x1386C00->0x20->0xD8->0x44 u32 == 1
+when = main+0x1386C00->0x20->0xD8->0x8 u32 == 33
+when = main+0x1386C00->0x20->0xD8->0xD u8 == 1
+fail = main+0x1A11EF0->0xB8->0x20->0x60->0x48->0x4 u64 to 1
+fail = main+0x1A11EF0->0xB8->0x20->0x60->0x48->0x4 u64 to 0x200000000
+fail = main+0x1A11EF0->0xB8->0x20->0x60->0x48->0x4 u64 to 0x300000000
+fail = main+0x1A11EF0->0xB8->0x20->0x60->0x48->0x4 u64 to 0x400000000
+fail = main+0x1A11EF0->0xB8->0x20->0x60->0x48->0x4 u64 to 0x500000000
+fail = main+0x1A11EF0->0xB8->0x20->0x60->0x48->0x4 u64 to 0x600000000
+fail = main+0x1A11EF0->0xB8->0x20->0x60->0x48->0x4 u64 to 0x700000000
+fail = main+0x1386C00->0x20->0xD8->0x204 u8 == 1
+reset = main+0x1386C00->0x20->0xD8->0x44 u32 != 1
+
+[jefe_mundo_5_limpio]
+name = Rey sin corona
+desc = Termina el castillo del mundo 5 sin recibir daño
+name.en = Crownless king
+desc.en = Finish the World 5 castle without taking damage
+points = 35
+when = main+0x1386C00->0x20->0xD8->0x44 u32 == 1
+when = main+0x1386C00->0x20->0xD8->0x8 u32 == 61
+when = main+0x1386C00->0x20->0xD8->0xD u8 == 1
+fail = main+0x1A11EF0->0xB8->0x20->0x60->0x48->0x4 u64 to 1
+fail = main+0x1A11EF0->0xB8->0x20->0x60->0x48->0x4 u64 to 0x200000000
+fail = main+0x1A11EF0->0xB8->0x20->0x60->0x48->0x4 u64 to 0x300000000
+fail = main+0x1A11EF0->0xB8->0x20->0x60->0x48->0x4 u64 to 0x400000000
+fail = main+0x1A11EF0->0xB8->0x20->0x60->0x48->0x4 u64 to 0x500000000
+fail = main+0x1A11EF0->0xB8->0x20->0x60->0x48->0x4 u64 to 0x600000000
+fail = main+0x1A11EF0->0xB8->0x20->0x60->0x48->0x4 u64 to 0x700000000
+fail = main+0x1386C00->0x20->0xD8->0x204 u8 == 1
+reset = main+0x1386C00->0x20->0xD8->0x44 u32 != 1
+
+[jefe_mundo_8_limpio]
+name = Leyenda felina
+desc = Termina el castillo del mundo 8 sin recibir daño
+name.en = Feline legend
+desc.en = Finish the World 8 castle without taking damage
+points = 60
+when = main+0x1386C00->0x20->0xD8->0x44 u32 == 1
+when = main+0x1386C00->0x20->0xD8->0x8 u32 == 114
+when = main+0x1386C00->0x20->0xD8->0xD u8 == 1
+fail = main+0x1A11EF0->0xB8->0x20->0x60->0x48->0x4 u64 to 1
+fail = main+0x1A11EF0->0xB8->0x20->0x60->0x48->0x4 u64 to 0x200000000
+fail = main+0x1A11EF0->0xB8->0x20->0x60->0x48->0x4 u64 to 0x300000000
+fail = main+0x1A11EF0->0xB8->0x20->0x60->0x48->0x4 u64 to 0x400000000
+fail = main+0x1A11EF0->0xB8->0x20->0x60->0x48->0x4 u64 to 0x500000000
+fail = main+0x1A11EF0->0xB8->0x20->0x60->0x48->0x4 u64 to 0x600000000
+fail = main+0x1A11EF0->0xB8->0x20->0x60->0x48->0x4 u64 to 0x700000000
+fail = main+0x1386C00->0x20->0xD8->0x204 u8 == 1
+reset = main+0x1386C00->0x20->0xD8->0x44 u32 != 1
+
+# ---------- jefes sin potenciadores ----------
+# Se anula si en cualquier momento del nivel llevas un traje (gato, fuego, tanuki, bumeran...): hay que
+# entrar sin traje y no coger ninguno. Se rearma al salir del nivel.
+
+[jefe_mundo_2_sin_trajes]
+name = A puño limpio
+desc = Termina el castillo del mundo 2 sin usar ningún traje
+name.en = Bare-handed
+desc.en = Finish the World 2 castle without using any power-up suit
+points = 25
+when = main+0x1386C00->0x20->0xD8->0x44 u32 == 1
+when = main+0x1386C00->0x20->0xD8->0x8 u32 == 20
+when = main+0x1386C00->0x20->0xD8->0xD u8 == 1
+fail = main+0x1A11EF0->0xB8->0x20->0x60->0x48->0x0 u32 >= 2
+reset = main+0x1386C00->0x20->0xD8->0x44 u32 != 1
+
+[jefe_mundo_4_sin_trajes]
+name = Sin trucos
+desc = Termina el castillo del mundo 4 sin usar ningún traje
+name.en = No tricks
+desc.en = Finish the World 4 castle without using any power-up suit
+points = 30
+when = main+0x1386C00->0x20->0xD8->0x44 u32 == 1
+when = main+0x1386C00->0x20->0xD8->0x8 u32 == 46
+when = main+0x1386C00->0x20->0xD8->0xD u8 == 1
+fail = main+0x1A11EF0->0xB8->0x20->0x60->0x48->0x0 u32 >= 2
+reset = main+0x1386C00->0x20->0xD8->0x44 u32 != 1
+
+[jefe_mundo_6_sin_trajes]
+name = A la antigua
+desc = Termina el castillo del mundo 6 sin usar ningún traje
+name.en = Old school
+desc.en = Finish the World 6 castle without using any power-up suit
+points = 35
+when = main+0x1386C00->0x20->0xD8->0x44 u32 == 1
+when = main+0x1386C00->0x20->0xD8->0x8 u32 == 80
+when = main+0x1386C00->0x20->0xD8->0xD u8 == 1
+fail = main+0x1A11EF0->0xB8->0x20->0x60->0x48->0x0 u32 >= 2
+reset = main+0x1386C00->0x20->0xD8->0x44 u32 != 1
+
+[jefe_mundo_7_sin_trajes]
+name = Solo con el bigote
+desc = Termina el castillo del mundo 7 sin usar ningún traje
+name.en = Mustache only
+desc.en = Finish the World 7 castle without using any power-up suit
+points = 45
+when = main+0x1386C00->0x20->0xD8->0x44 u32 == 1
+when = main+0x1386C00->0x20->0xD8->0x8 u32 == 96
+when = main+0x1386C00->0x20->0xD8->0xD u8 == 1
+fail = main+0x1A11EF0->0xB8->0x20->0x60->0x48->0x0 u32 >= 2
+reset = main+0x1386C00->0x20->0xD8->0x44 u32 != 1
+
+# ---------- Mega Champiñon ----------
+
+[mega_mario]
+name = Enorme
+desc = Hazte gigante con un Mega Champiñón
+name.en = Huge
+desc.en = Grow giant with a Mega Mushroom
+points = 10
+hold = 1000
+when = main+0x1386C00->0x20->0xD8->0x44 u32 == 1
+when = main+0x1A11EF0->0xB8->0x20->0x60->0x9E u8 == 1
+
+# ---------- Bowser's Fury ----------
+# Los soles felinos son los del archivo de ese modo; los logros salen jugando Bowser's Fury.
+
+[bf_soles_1]
+name = Primer sol felino
+desc = Consigue 1 sol felino en Bowser's Fury
+name.en = First Cat Shine
+desc.en = Get 1 Cat Shine in Bowser's Fury
+points = 5
+hold = 5000
+when = main+0x1386C00->0x30->0x20 u8 == 1
+when = main+0x1386C00->0x30->0xC4 u32 >= 1
+when = main+0x1386C00->0x30->0xC4 u32 <= 100
+
+[bf_soles_10]
+name = Diez soles
+desc = Consigue 10 soles felinos en Bowser's Fury
+name.en = Ten shines
+desc.en = Get 10 Cat Shines in Bowser's Fury
+points = 10
+hold = 5000
+when = main+0x1386C00->0x30->0x20 u8 == 1
+when = main+0x1386C00->0x30->0xC4 u32 >= 10
+when = main+0x1386C00->0x30->0xC4 u32 <= 100
+
+[bf_soles_25]
+name = Faro encendido
+desc = Consigue 25 soles felinos en Bowser's Fury
+name.en = Lighthouse lit
+desc.en = Get 25 Cat Shines in Bowser's Fury
+points = 20
+hold = 5000
+when = main+0x1386C00->0x30->0x20 u8 == 1
+when = main+0x1386C00->0x30->0xC4 u32 >= 25
+when = main+0x1386C00->0x30->0xC4 u32 <= 100
+
+[bf_soles_40]
+name = Medio lago
+desc = Consigue 40 soles felinos en Bowser's Fury
+name.en = Half the lake
+desc.en = Get 40 Cat Shines in Bowser's Fury
+points = 30
+hold = 5000
+when = main+0x1386C00->0x30->0x20 u8 == 1
+when = main+0x1386C00->0x30->0xC4 u32 >= 40
+when = main+0x1386C00->0x30->0xC4 u32 <= 100
+
+[bf_soles_60]
+name = Furia domada
+desc = Consigue 60 soles felinos en Bowser's Fury
+name.en = Fury tamed
+desc.en = Get 60 Cat Shines in Bowser's Fury
+points = 50
+hold = 5000
+when = main+0x1386C00->0x30->0x20 u8 == 1
+when = main+0x1386C00->0x30->0xC4 u32 >= 60
+when = main+0x1386C00->0x30->0xC4 u32 <= 100
+
 # ---------- traje ----------
 
 [disfrazado]
@@ -394,15 +716,3 @@ when = main+0x1386C00->0x20->0xD8->0x44 u32 == 1
 when = main+0x1A11EF0->0xB8->0x20->0x60->0x48->0x0 u32 >= 2
 when = main+0x1A11EF0->0xB8->0x20->0x60->0x48->0x0 u32 <= 9
 
-
-# ---------- A PRUEBA: memoria del motor ----------
-[prueba_sin_golpe]
-name = PRUEBA: nivel sin perder el traje ni morir
-desc = Termina un nivel sin que te quiten el traje y sin morir
-points = 5
-when = main+0x1386C00->0x20->0xD8->0x44 u32 == 1
-when = main+0x1386C00->0x20->0xD8->0xD u8 == 1
-fail = main+0x1A11EF0->0xB8->0x20->0x60->0x48->0x0 u32 dec
-fail = main+0x1386C00->0x20->0xD8->0x204 u8 == 1
-fail = main+0x1386C00->0x20->0xD8->0x13 u8 == 1
-reset = main+0x1386C00->0x20->0xD8->0x44 u32 != 1

@@ -70,7 +70,7 @@ when = <dirección> <tipo> <operador> <valor>
 
 Un puntero nulo o una lectura fallida hace la condición falsa; nunca desbloquea.
 
-Límites: 64 logros por juego, 6 condiciones por logro, archivo de 64 KB.
+Límites: 96 logros por juego, 6 condiciones por logro, archivo de 64 KB.
 
 ### Logros con memoria: `fail` y `reset`
 

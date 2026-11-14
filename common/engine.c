@@ -268,7 +268,7 @@ int lg_parse(lg_game *g, char *text, char *err, size_t errlen) {
             if (!valid_id(id)) FAIL("id invalido (letras, numeros, _ y -, max 31)");
             if (lg_find(g, id)) FAIL("id repetido");
             if (cur && cur->ncond == 0) FAIL("el logro anterior no tiene ninguna condicion when=");
-            if (g->nach >= LG_MAX_ACH) FAIL("demasiados logros (max 64)");
+            if (g->nach >= LG_MAX_ACH) FAIL("demasiados logros (max 96)");
             cur = &g->ach[g->nach++];
             copy_str(cur->id, sizeof(cur->id), id);
             copy_str(cur->name, sizeof(cur->name), id);
