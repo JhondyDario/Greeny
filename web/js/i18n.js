@@ -44,7 +44,7 @@
     "Logros para tu Switch": "Achievements for your Switch",
     "Greeny corre en segundo plano mientras juegas, te avisa cuando desbloqueas un logro y guarda tu progreso. Aquí lo ves, lo compartes y lo comparas.":
       "Greeny runs in the background while you play, tells you when you unlock an achievement and saves your progress. See it, share it and compare it here.",
-    "Vincular mi consola": "Link my console", "Ver juegos": "Browse games", "Descargar en GitHub": "Download on GitHub",
+    "Vincular mi consola": "Link my console", "Ver juegos": "Browse games", "Descargar en GitHub": "Download on GitHub", "Únete a Discord": "Join our Discord", "Sin versión": "No version",
     "Greeny, la mascota: una plantita verde saludando": "Greeny, the mascot: a little green sprout waving",
     "Números de Greeny": "Greeny in numbers", "Greeny en números": "Greeny in numbers",
     "jugadores": "players", "logros desbloqueados": "achievements unlocked", "juegos con logros": "games with achievements",

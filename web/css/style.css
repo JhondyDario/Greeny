@@ -818,3 +818,9 @@ input.switch:focus-visible { outline: 2px solid var(--yellow); outline-offset: 2
 .feed { display: grid; gap: 8px; }
 .feed-row { display: flex; align-items: center; gap: 12px; }
 .feed-row .avatar { width: 40px; height: 40px; }
+
+/* boton de Discord en la portada, con su icono */
+.btn.discord { display: inline-flex; align-items: center; gap: 8px; color: #fff; }
+.btn.discord svg { width: 20px; height: 20px; fill: currentColor; flex: none; }
+/* catalogo: version y logros en una sola fila */
+.game-meta { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-top: 6px; flex-wrap: wrap; }

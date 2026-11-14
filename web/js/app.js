@@ -487,7 +487,9 @@
           session ? h("a", { class: "btn", href: "#/cuenta" }, "Vincular mi consola")
                   : h("a", { class: "btn", href: "#/registro" }, "Crear cuenta"),
           h("a", { class: "btn alt", href: "#/juegos" }, "Ver juegos"),
-          h("a", { class: "btn alt", href: cfg.repoUrl, rel: "noopener" }, "Descargar en GitHub"))),
+          h("a", { class: "btn alt", href: cfg.repoUrl, rel: "noopener" }, "Descargar en GitHub"),
+          discordUrl ? h("a", { class: "btn discord", href: discordUrl, target: "_blank", rel: "noopener" },
+            svgEl(SOCIAL.discord), "Únete a Discord") : null)),
       h("img", { class: "hero-mascot", src: "img/m_saludando.png", alt: "Greeny, la mascota: una plantita verde saludando", width: 260, height: 260 }));
 
     const stats = h("section", { class: "stats three", "aria-label": "Números de Greeny" },
@@ -583,8 +585,9 @@
           cover(g),
           h("strong", { class: "clip", style: "display:block" }, g.name),
           h("div", { style: "margin:4px 0" }, statusPill(g.status)),
-          h("div", { class: "muted small" }, g.version ? "Versión " + g.version : "Versión sin indicar", g.published ? "" : " · sin publicar"),
-          h("div", { class: "small", style: "margin-top:6px" }, t.n + " logros · " + t.pts + " pts"));
+          h("div", { class: "small game-meta" },
+            h("span", { class: "muted" }, g.version ? "v" + g.version : "Sin versión", g.published ? "" : " · sin publicar"),
+            h("span", {}, t.n + " logros · " + t.pts + " pts")));
       }));
     apply("");
     return [
@@ -1660,7 +1663,7 @@
     if (!/^https:\/\/(discord\.gg|discord\.com\/invite)\//.test(u)) return;
     discordUrl = u;
     renderFooter();
-    if (/^#\/contribuir/.test(location.hash)) render();
+    if (!location.hash || /^#\/(contribuir|inicio)?$/.test(location.hash)) render();
   }).catch(() => {});
   const top = document.querySelector(".top"), menuBtn = document.getElementById("menu-toggle");
   const closeMenu = () => { top.classList.remove("open"); menuBtn.setAttribute("aria-expanded", "false"); };
