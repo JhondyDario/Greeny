@@ -9,6 +9,7 @@
 
 #define LG_MAX_ACH    64
 #define LG_MAX_COND   6
+#define LG_MAX_FAIL   3       /* condiciones que anulan el logro hasta que se rearme */
 #define LG_MAX_DEREF  8
 #define LG_ID_LEN     32
 #define LG_NAME_LEN   48
@@ -34,6 +35,8 @@ typedef enum {
     LG_EQ, LG_NE, LG_GT, LG_GE, LG_LT, LG_LE,
     LG_BITS_SET,   /* (v & x) == x */
     LG_BITS_CLEAR, /* (v & x) == 0 */
+    /* comparan con la lectura anterior, sin valor: solo en fail= y reset= */
+    LG_DEC, LG_INC, LG_CHG,
 } lg_op;
 
 typedef struct {
@@ -46,6 +49,8 @@ typedef struct {
     uint64_t u;   /* valor para tipos sin signo y mascaras */
     int64_t  s;   /* valor para tipos con signo */
     double   f;   /* valor para f32/f64 */
+    uint64_t prev;       /* lectura anterior, para dec / inc / chg */
+    bool     prev_ok;
     /* ultimo valor leido, para el modo debug */
     uint64_t dbg_raw;
     bool     dbg_ok;     /* la ultima lectura funciono */
@@ -70,6 +75,14 @@ typedef struct {
     bool     holding;
     uint64_t true_since;
     lg_cond  cond[LG_MAX_COND];
+    /* Memoria: si alguna condicion fail= se cumple en cualquier momento, el logro queda anulado
+     * hasta que se cumpla reset= (por ejemplo, al salir del nivel). Asi se hacen "sin recibir daño"
+     * o "sin derrotar enemigos". */
+    lg_cond  fail[LG_MAX_FAIL];
+    uint8_t  nfail;
+    lg_cond  reset;
+    bool     has_reset;
+    bool     spoiled;
     /* Progreso de un logro bloqueado (ej. 40 de 99 monedas). prog_cond es la condicion que
      * marca la meta (-1 = sin progreso); por defecto, la primera "x >= N" con N de 2 o mas.
      * prog_value solo se acepta si el valor se mantiene igual 10 segundos y cumple los

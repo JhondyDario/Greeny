@@ -329,6 +329,47 @@ static void test_debug(void) {
     CHECK(g.ach[0].cond[0].dbg_seen && !g.ach[0].cond[1].dbg_seen);
 }
 
+static void test_memory(void) {
+    static lg_game g;
+    char err[128];
+    int out[4];
+    memset(g_main, 0, sizeof(g_main));
+    memset(g_heap, 0, sizeof(g_heap));
+
+    CHECK(bad("[a]\nwhen=main+0x10 u8 dec\n", "solo valen en fail"));
+    CHECK(bad("[a]\nwhen=main+0x10 u8 == 1\nfail=main+0x11 f32 dec\n", "no aplican"));
+    CHECK(bad("[a]\nwhen=main+0x10 u8 == 1\nfail=main+0x11 u8 dec 3\n", "no llevan valor"));
+    CHECK(bad("[a]\nwhen=main+0x10 u8 == 1\nreset=main+0x12 u8 == 0\nreset=main+0x12 u8 == 0\n", "un reset"));
+
+    /* "sin daño": meta (0x10 == 1) sin que el traje (0x11) baje; se rearma fuera del nivel (0x12 == 0) */
+    CHECK(parse(&g, "[a]\nhold=0\nwhen=main+0x10 u8 == 1\nfail=main+0x11 u8 dec\nreset=main+0x12 u8 == 0\n", err, sizeof(err)) == 0);
+    CHECK(g.ach[0].nfail == 1 && g.ach[0].has_reset);
+    PUT(g_main, 0x12, uint8_t, 1); PUT(g_main, 0x11, uint8_t, 3);
+    CHECK(lg_tick(&g, &g_bases, fake_read, NULL, 0, out, 4) == 0 && !g.ach[0].spoiled);
+    PUT(g_main, 0x11, uint8_t, 0);                                   /* golpe: el traje baja */
+    CHECK(lg_tick(&g, &g_bases, fake_read, NULL, 100, out, 4) == 0 && g.ach[0].spoiled);
+    PUT(g_main, 0x11, uint8_t, 3);                                   /* coger otro traje no lo arregla */
+    PUT(g_main, 0x10, uint8_t, 1);
+    CHECK(lg_tick(&g, &g_bases, fake_read, NULL, 200, out, 4) == 0 && g.ach[0].spoiled);
+    PUT(g_main, 0x10, uint8_t, 0); PUT(g_main, 0x12, uint8_t, 0);    /* fuera del nivel: se rearma */
+    CHECK(lg_tick(&g, &g_bases, fake_read, NULL, 300, out, 4) == 0 && !g.ach[0].spoiled);
+    PUT(g_main, 0x12, uint8_t, 1);
+    CHECK(lg_tick(&g, &g_bases, fake_read, NULL, 400, out, 4) == 0);
+    PUT(g_main, 0x10, uint8_t, 1);                                   /* meta sin golpes */
+    CHECK(lg_tick(&g, &g_bases, fake_read, NULL, 500, out, 4) == 1 && g.ach[0].unlocked);
+
+    /* inc y chg; una fail con valor fijo tambien vale */
+    CHECK(parse(&g, "[b]\nhold=0\nwhen=main+0x10 u8 == 1\nfail=main+0x14 u32 inc\nfail=main+0x18 u8 == 9\n", err, sizeof(err)) == 0);
+    PUT(g_main, 0x10, uint8_t, 0); PUT(g_main, 0x14, uint32_t, 5);
+    CHECK(lg_tick(&g, &g_bases, fake_read, NULL, 0, out, 4) == 0 && !g.ach[0].spoiled);
+    PUT(g_main, 0x14, uint32_t, 4);                                  /* bajar no es inc */
+    CHECK(lg_tick(&g, &g_bases, fake_read, NULL, 100, out, 4) == 0 && !g.ach[0].spoiled);
+    PUT(g_main, 0x14, uint32_t, 6);
+    CHECK(lg_tick(&g, &g_bases, fake_read, NULL, 200, out, 4) == 0 && g.ach[0].spoiled);
+    PUT(g_main, 0x10, uint8_t, 1);                                   /* sin reset no hay vuelta atras */
+    CHECK(lg_tick(&g, &g_bases, fake_read, NULL, 300, out, 4) == 0);
+}
+
 static void test_watch(void) {
     static lg_game g;
     char err[128];
@@ -581,6 +622,7 @@ int main(void) {
     test_debug();
     test_scan();
     test_watch();
+    test_memory();
     test_i18n_config();
     test_progress();
     test_store();

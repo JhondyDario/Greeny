@@ -66,6 +66,7 @@ static const struct { const char *name; uint8_t type; } k_types[] = {
 static const struct { const char *name; uint8_t op; } k_ops[] = {
     {"==", LG_EQ}, {"!=", LG_NE}, {">", LG_GT}, {">=", LG_GE},
     {"<", LG_LT}, {"<=", LG_LE}, {"&", LG_BITS_SET}, {"!&", LG_BITS_CLEAR},
+    {"dec", LG_DEC}, {"inc", LG_INC}, {"chg", LG_CHG},
 };
 
 static bool type_is_float(uint8_t t)  { return t == LG_F32 || t == LG_F64; }
@@ -134,7 +135,8 @@ static const char *parse_cond(char *s, lg_cond *c) {
         if (*p) *p++ = 0;
     }
     while (*p && isspace((unsigned char)*p)) p++;
-    if (n != 4 || *p) return "formato: <direccion> <tipo> <operador> <valor>";
+    bool delta = n == 3 && (!strcmp(tok[2], "dec") || !strcmp(tok[2], "inc") || !strcmp(tok[2], "chg"));
+    if ((n != 4 && !delta) || *p) return "formato: <direccion> <tipo> <operador> <valor>";
 
     memset(c, 0, sizeof(*c));
     const char *e = parse_addr(tok[0], c);
@@ -149,6 +151,11 @@ static const char *parse_cond(char *s, lg_cond *c) {
         if (!strcmp(tok[2], k_ops[i].name)) { c->op = k_ops[i].op; break; }
     if (i == sizeof(k_ops) / sizeof(k_ops[0])) return "operador desconocido (== != > >= < <= & !&)";
 
+    if (c->op >= LG_DEC) { /* bajo, subio o cambio respecto a la lectura anterior: no lleva valor */
+        if (!delta) return "dec, inc y chg no llevan valor";
+        if (type_is_float(c->type)) return "dec, inc y chg no aplican a f32/f64";
+        return NULL;
+    }
     bool mask = c->op == LG_BITS_SET || c->op == LG_BITS_CLEAR;
     if (type_is_float(c->type)) {
         if (mask) return "& y !& no aplican a f32/f64";
@@ -335,8 +342,19 @@ int lg_parse(lg_game *g, char *text, char *err, size_t errlen) {
             if (cur->ncond >= LG_MAX_COND) FAIL("demasiadas condiciones en un logro (max 6)");
             const char *e = parse_cond(val, &cur->cond[cur->ncond]);
             if (e) FAIL(e);
+            if (cur->cond[cur->ncond].op >= LG_DEC) FAIL("dec, inc y chg solo valen en fail= y reset=");
             cur->ncond++;
-        } else FAIL("clave desconocida (name, desc, name.en, desc.en, points, tier, progress, hold, when)");
+        } else if (!strcmp(key, "fail")) {
+            if (cur->nfail >= LG_MAX_FAIL) FAIL("demasiadas condiciones fail en un logro (max 3)");
+            const char *e = parse_cond(val, &cur->fail[cur->nfail]);
+            if (e) FAIL(e);
+            cur->nfail++;
+        } else if (!strcmp(key, "reset")) {
+            if (cur->has_reset) FAIL("un logro solo puede tener un reset");
+            const char *e = parse_cond(val, &cur->reset);
+            if (e) FAIL(e);
+            cur->has_reset = true;
+        } else FAIL("clave desconocida (name, desc, name.en, desc.en, points, tier, progress, hold, when, fail, reset)");
     }
 
     lineno++;
@@ -402,7 +420,7 @@ bool lg_eval_cond(lg_cond *c, const lg_bases *b, lg_read_fn rd, void *ctx) {
     uint64_t rawval = 0;
     if (ok) memcpy(&rawval, raw, sz);
     dbg_record(c, ok, rawval);
-    if (!ok) return false;
+    if (!ok) { c->prev_ok = false; return false; }
 
     if (type_is_float(c->type)) {
         double v;
@@ -422,6 +440,15 @@ bool lg_eval_cond(lg_cond *c, const lg_bases *b, lg_read_fn rd, void *ctx) {
 
     uint64_t u = 0;
     memcpy(&u, raw, sz); /* little-endian, igual que la Switch */
+
+    if (c->op >= LG_DEC) { /* contra la lectura anterior; la primera lectura (o la primera tras no poder leer) no cuenta */
+        bool had = c->prev_ok;
+        uint64_t before = c->prev;
+        c->prev = u;
+        c->prev_ok = true;
+        if (!had) return false;
+        return c->op == LG_DEC ? u < before : c->op == LG_INC ? u > before : u != before;
+    }
 
     if (c->op == LG_BITS_SET)   return (u & c->u) == c->u;
     if (c->op == LG_BITS_CLEAR) return (u & c->u) == 0;
@@ -508,6 +535,11 @@ int lg_tick(lg_game *g, const lg_bases *b, lg_read_fn rd, void *ctx,
         lg_ach *a = &g->ach[i];
         if (a->unlocked) continue;
 
+        /* memoria: las fail se miran siempre (aunque el logro aun no este cerca), y el reset manda */
+        for (int k = 0; k < a->nfail; k++)
+            if (lg_eval_cond(&a->fail[k], b, rd, ctx)) a->spoiled = true;
+        if (a->has_reset && lg_eval_cond(&a->reset, b, rd, ctx)) a->spoiled = false;
+
         bool all = a->ncond > 0;
         int evaluated = 0;
         for (int k = 0; k < a->ncond && (all || g->debug); k++, evaluated++)
@@ -525,7 +557,7 @@ int lg_tick(lg_game *g, const lg_bases *b, lg_read_fn rd, void *ctx,
             track_progress(g, a, pk, now_ms);
         }
 
-        if (!all) { a->holding = false; continue; }
+        if (!all || a->spoiled) { a->holding = false; continue; }
         if (!a->holding) { a->holding = true; a->true_since = now_ms; }
         if (now_ms - a->true_since < a->hold_ms) continue;
         /* si no cabe en `out`, se queda pendiente para el proximo tick */

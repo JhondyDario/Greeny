@@ -7,6 +7,7 @@ def load(path):
         if l.startswith('=== sesion'): cur={}; sessions.append(cur); continue
         if not l.startswith('t=') or cur is None: continue
         p=l.split(' '); t=int(p[0][2:]); 
+        if len(p)>1 and p[1]=='MARCA': cur.setdefault('marks',[]).append((t if t<1<<60 else 0,int(p[2]))); continue
         if t>1<<60: t=0
         w=int(p[1][1:]); ev=cur.setdefault(w,[])
         if p[2]=='NULL': ev.append((t,None,None,None)); continue

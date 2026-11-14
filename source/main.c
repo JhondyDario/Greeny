@@ -147,8 +147,10 @@ static u64 g_main_size, g_space_end; /* para el buscador de valores */
 static bool g_pad_ready, g_combo_held;
 static PadState g_pad;
 
+static void watch_mark(u64 now);
+
 static void combo_init(void) {
-    if (g_pad_ready || !search_has_plan()) return;
+    if (g_pad_ready || (!search_has_plan() && !g_game.nwatch)) return;
     if (R_FAILED(smInitialize())) return;
     Result rc = hidInitialize();
     smExit();
@@ -156,7 +158,7 @@ static void combo_init(void) {
     padConfigureInput(8, HidNpadStyleSet_NpadStandard | HidNpadStyleTag_NpadSystemExt);
     padInitializeAny(&g_pad);
     g_pad_ready = true;
-    log_line("buscador: plan encontrado; L+R+ZL+ZR con la cruceta (arriba, derecha, abajo) lo maneja");
+    if (search_has_plan()) log_line("buscador: plan encontrado; L+R+ZL+ZR con la cruceta (arriba, derecha, abajo) lo maneja");
 }
 
 /* L+R+ZL+ZR mantenidos y una direccion de la cruceta: arriba = paso siguiente (o "cambio"),
@@ -165,6 +167,16 @@ static void combo_poll(u64 now) {
     if (!g_pad_ready) return;
     padUpdate(&g_pad);
     u64 b = padGetButtons(&g_pad);
+    /* vigilante: pulsar las dos palancas a la vez deja una marca numerada en watch.txt */
+    const u64 sticks = HidNpadButton_StickL | HidNpadButton_StickR;
+    static bool mark_held;
+    if (g_game.nwatch && (b & sticks) == sticks) {
+        if (!mark_held) {
+            mark_held = true;
+            watch_mark(now);
+        }
+    } else mark_held = false;
+
     const u64 hold = HidNpadButton_L | HidNpadButton_R | HidNpadButton_ZL | HidNpadButton_ZR;
     int action = -1;
     if ((b & hold) == hold) {
@@ -233,11 +245,13 @@ static u8 g_watch_state[LG_MAX_WATCH]; /* 0 = sin leer aun, 1 = leido, 2 = no se
 #define WATCH_MAX_FULL 40                /* un trozo que se reescribe entero tantas veces es ruido: llenaria el archivo */
 static u8 g_watch_fulls[LG_MAX_WATCH];
 static u64 g_watch_t0;
+static int g_watch_marks;
 static bool g_watch_full;
 
 static void watch_reset(u64 tid, u64 now) {
     memset(g_watch_state, 0, sizeof(g_watch_state));
     memset(g_watch_fulls, 0, sizeof(g_watch_fulls));
+    g_watch_marks = 0;
     g_watch_t0 = now;
     g_watch_full = false;
     if (!g_game.nwatch) return;
@@ -294,6 +308,16 @@ static void watch_report(u64 now) {
         g_watch_state[i] = 1;
     }
     if (f) fclose(f);
+}
+
+static void watch_mark(u64 now) {
+    FILE *f = fopen(WATCH_PATH, "a");
+    if (!f) return;
+    fprintf(f, "t=%lu MARCA %d\n", now - g_watch_t0, ++g_watch_marks);
+    fclose(f);
+    char l1[32];
+    snprintf(l1, sizeof(l1), "Marca %d", g_watch_marks);
+    toast_push(TOAST_INFO, 0, -1, g_cfg_dark, "GREENY", l1, "Anotada en watch.txt");
 }
 
 #define SCAN_PERIOD_MS 10000

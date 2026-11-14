@@ -49,6 +49,8 @@ when = main+0x2F00A8->0x18->0x3C u8 & 0x04
 | `tier` | Dificultad: `bronce`, `plata` u `oro`. Si no lo pones sale de los puntos: hasta 10 bronce, hasta 25 plata, más de 25 oro. También se cambia desde la web, en Desarrollador. |
 | `hold` | Milisegundos seguidos que deben cumplirse las condiciones (500 por defecto). |
 | `when` | Condición. Si hay varias, se tienen que cumplir todas a la vez. |
+| `fail` | Condición que **anula** el logro si se cumple en cualquier momento (hasta 3). Sirve para "sin recibir daño" o "sin derrotar enemigos". |
+| `reset` | Condición que lo vuelve a armar después de un `fail` (por ejemplo, estar fuera del nivel). Sin `reset`, el logro queda anulado hasta cerrar el juego. |
 
 ### Condiciones
 
@@ -69,6 +71,23 @@ when = <dirección> <tipo> <operador> <valor>
 Un puntero nulo o una lectura fallida hace la condición falsa; nunca desbloquea.
 
 Límites: 64 logros por juego, 6 condiciones por logro, archivo de 64 KB.
+
+### Logros con memoria: `fail` y `reset`
+
+`when` solo mira el momento actual. Para un logro que depende de lo que pasó antes, `fail` marca
+el logro como anulado y `reset` lo rearma:
+
+```ini
+[sin_golpe]
+name = Intocable
+when  = main+0x…->0xD u8 == 1        # tocaste la meta
+fail  = main+0x…->0x0 u32 dec        # el traje bajó: te golpearon
+reset = main+0x…->0x44 u32 != 1      # fuera del nivel se rearma
+```
+
+En `fail` y `reset` hay tres operadores más, sin valor: `dec` (bajó respecto a la lectura
+anterior), `inc` (subió) y `chg` (cambió). La primera lectura, o la primera después de no poder
+leer la dirección, no cuenta. Las `fail` se revisan siempre, aunque el logro esté lejos de salir.
 
 ## Validar antes de copiar a la SD
 

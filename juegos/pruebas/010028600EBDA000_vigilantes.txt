@@ -9,26 +9,44 @@
 #   objeto en reserva (...->0x228->0x90)  1 hongo, 2 gato, 3 flor de fuego,
 #                     4 tanuki, 5 bumeran, 6 hoja dorada, 7 campana de la suerte
 #
+# Nivel en curso = main+0x1386C00->0x20->0xD8 (sacado con watch y visto saltar en consola):
+#   +0x8   numero del nivel: 1 = 1-1, 2 = 1-2, 9 = castillo del mundo 1, 20 = castillo del mundo 2
+#   +0xD   vale 1 desde que termina el conteo de la meta hasta que se carga otro nivel
+#   +0x13  vale 1 si en este intento ya moriste (visto una sola vez)
+#   +0x38  reloj en cuadros: 44 por unidad (500 en pantalla = 22000)
+#   +0x44  vale 1 dentro de un nivel y -1 fuera
+#   +0x90  estrellas verdes del nivel, un bit por estrella (7 = las tres)
+#   +0xE0  puntos, sin el bono de tiempo      +0xEC  altura en la bandera (1.0 = la punta)
+# Traje del jugador = main+0x1A11EF0->0xB8->0x20->0x60->0x48->0x0: 0 pequeño, 1 con hongo, 3 gato.
+#   No se puede leer justo al tocar la meta. El Mega Champiñon no cambia este numero.
+#
 # Para depurar pon debug = 1: anota en log.txt el valor que lee cada condicion.
 
 game    = Super Mario 3D World + Bowser's Fury
 version = 1.1.0
 build   = 891687F016A18F17
 
-# ---------- SOLO PARA INVESTIGAR (ronda 3) ----------
-# Lista de niveles: busca estos nombres internos en la memoria y deja lo que hay alrededor en find.txt
-find = DownRiverStage
-find = RouteDokanTourStage
-find = EnterCatMarioStage
-find = KoopaChaseLv1Stage
-# w0 nivel en curso (comprobado)
-watch = main+0x1386C00->0x20->0xD8->0x0 0x300
-# w1 traje del jugador: +0x0 actual, +0x8 anterior (visto en la ronda 2)
+# ---------- SOLO PARA INVESTIGAR (ronda 5) ----------
+# w0 nivel en curso
+watch = main+0x1386C00->0x20->0xD8->0x0 0x800
+# w1 traje del jugador
 watch = main+0x1A11EF0->0xB8->0x20->0x60->0x48->0x0 0x80
-# w2 jugador: +0x18 y +0x1C traje, +0x78 contador al morir
-watch = main+0x1A11EF0->0x118->0x58->0xA0->0xC8->0x0 0x100
-# w3 avisos: +0x380 coger potenciador, +0x386 muerte
-watch = main+0x1A11EF0->0x0 0x400
+# w2 jugador
+watch = main+0x1A11EF0->0x118->0x58->0xA0->0xC8->0x0 0x200
+# w3 raiz 2: avisos de coger objeto, morir...
+watch = main+0x1A11EF0->0x0 0x800
+# w4 objeto del nivel (+0x22C contaba algo en la ronda 2)
+watch = main+0x1386C00->0x88->0x0 0x800
+# w5 partida: vidas, monedas
+watch = main+0x1386C00->0x18->0x0->0x0 0x1E0
+# w6 Bowser's Fury? (truco 1.0.0: soles felinos en +0xC4)
+watch = main+0x1386C00->0x30->0x0 0x200
+# w7 
+watch = main+0x1A11EF0->0x18->0x0 0x400
+# w8 
+watch = main+0x1A11EF0->0x118->0x58->0xA0->0x0 0x200
+# w9 
+watch = main+0x1A11EF0->0xB8->0x20->0x60->0x0 0x200
 
 [prueba_de_vida]
 name = Estamos vivos
@@ -44,30 +62,30 @@ when = main+0x4 u32 != 0
 # El contador va de 0 a 99 y vuelve a 0 al llegar a 100.
 
 [monedas_5]
-name = Cinco cheles
-desc = Ten 5 monedas
-name.en = Pocket change
-desc.en = Have 5 coins
+name = Bolsillo lleno
+desc = Ten 25 monedas
+name.en = Full pocket
+desc.en = Have 25 coins
 points = 5
-when = main+0x1386C00->0x18->0x0->0x138->0x48 u32 >= 5
+when = main+0x1386C00->0x18->0x0->0x138->0x48 u32 >= 25
 when = main+0x1386C00->0x18->0x0->0x138->0x48 u32 <= 99
 
 [monedas_50]
-name = Medio camino
-desc = Ten 50 monedas
-name.en = Halfway there
-desc.en = Have 50 coins
+name = Tres cuartos
+desc = Ten 75 monedas
+name.en = Three quarters
+desc.en = Have 75 coins
 points = 10
-when = main+0x1386C00->0x18->0x0->0x138->0x48 u32 >= 50
+when = main+0x1386C00->0x18->0x0->0x138->0x48 u32 >= 75
 when = main+0x1386C00->0x18->0x0->0x138->0x48 u32 <= 99
 
 [monedas_90]
-name = Casi una vida
-desc = Ten 90 monedas sin gastarlas en una vida
-name.en = Almost a life
-desc.en = Have 90 coins without cashing them in for a life
+name = A una moneda
+desc = Ten 99 monedas: una más y se van en una vida
+name.en = One coin away
+desc.en = Have 99 coins: one more and they turn into a life
 points = 20
-when = main+0x1386C00->0x18->0x0->0x138->0x48 u32 >= 90
+when = main+0x1386C00->0x18->0x0->0x138->0x48 u32 >= 99
 when = main+0x1386C00->0x18->0x0->0x138->0x48 u32 <= 99
 
 # ---------- vidas ----------
@@ -104,48 +122,58 @@ when = main+0x1386C00->0x18->0x0->0x78->0x20 u32 <= 1110
 
 [reserva_gato]
 name = Miau
-desc = Guarda una Supercampana en la reserva
+desc = Guarda una Supercampana en la reserva mientras llevas un traje puesto
 name.en = Meow
-desc.en = Keep a Super Bell in reserve
+desc.en = Keep a Super Bell in reserve while you are wearing a power-up suit
 points = 10
 hold = 1000
 when = main+0x1386C00->0x18->0x0->0x228->0x90 u32 == 2
+when = main+0x1A11EF0->0xB8->0x20->0x60->0x48->0x0 u32 >= 2
+when = main+0x1A11EF0->0xB8->0x20->0x60->0x48->0x0 u32 <= 9
 
 [reserva_fuego]
 name = Candela
-desc = Guarda una Flor de Fuego en la reserva
+desc = Guarda una Flor de Fuego en la reserva mientras llevas un traje puesto
 name.en = Fired up
-desc.en = Keep a Fire Flower in reserve
+desc.en = Keep a Fire Flower in reserve while you are wearing a power-up suit
 points = 10
 hold = 1000
 when = main+0x1386C00->0x18->0x0->0x228->0x90 u32 == 3
+when = main+0x1A11EF0->0xB8->0x20->0x60->0x48->0x0 u32 >= 2
+when = main+0x1A11EF0->0xB8->0x20->0x60->0x48->0x0 u32 <= 9
 
 [reserva_tanuki]
 name = Rabo de mapache
-desc = Guarda una Superhoja en la reserva
+desc = Guarda una Superhoja en la reserva mientras llevas un traje puesto
 name.en = Raccoon tail
-desc.en = Keep a Super Leaf in reserve
+desc.en = Keep a Super Leaf in reserve while you are wearing a power-up suit
 points = 10
 hold = 1000
 when = main+0x1386C00->0x18->0x0->0x228->0x90 u32 == 4
+when = main+0x1A11EF0->0xB8->0x20->0x60->0x48->0x0 u32 >= 2
+when = main+0x1A11EF0->0xB8->0x20->0x60->0x48->0x0 u32 <= 9
 
 [reserva_bumeran]
 name = Va y viene
-desc = Guarda una Flor Bumerán en la reserva
+desc = Guarda una Flor Bumerán en la reserva mientras llevas un traje puesto
 name.en = Comes right back
-desc.en = Keep a Boomerang Flower in reserve
+desc.en = Keep a Boomerang Flower in reserve while you are wearing a power-up suit
 points = 10
 hold = 1000
 when = main+0x1386C00->0x18->0x0->0x228->0x90 u32 == 5
+when = main+0x1A11EF0->0xB8->0x20->0x60->0x48->0x0 u32 >= 2
+when = main+0x1A11EF0->0xB8->0x20->0x60->0x48->0x0 u32 <= 9
 
 [reserva_suerte]
 name = Con suerte
-desc = Guarda una Campana de la Suerte en la reserva
+desc = Guarda una Campana de la Suerte en la reserva mientras llevas un traje puesto
 name.en = Feeling lucky
-desc.en = Keep a Lucky Bell in reserve
+desc.en = Keep a Lucky Bell in reserve while you are wearing a power-up suit
 points = 25
 hold = 1000
 when = main+0x1386C00->0x18->0x0->0x228->0x90 u32 == 7
+when = main+0x1A11EF0->0xB8->0x20->0x60->0x48->0x0 u32 >= 2
+when = main+0x1A11EF0->0xB8->0x20->0x60->0x48->0x0 u32 <= 9
 
 # ---------- estrellas verdes y sellos ----------
 # Son los totales de la partida (los numeros del mapa del mundo). Suben al terminar el nivel,
@@ -248,36 +276,133 @@ when = main+0x180A9B8->0x420->0x8->0x0->0x8->0x264 u32 <= 85
 when = main+0x180A9D0->0x588->0x8->0x0->0x8->0x264 u32 >= 28
 when = main+0x180A9D0->0x588->0x8->0x0->0x8->0x264 u32 <= 85
 
-# ---------- A PRUEBA (ronda 2): salen de watch.txt, falta verlos saltar en consola ----------
-# Nivel en curso = main+0x1386C00->0x20->0xD8: +0x8 id del nivel (1 = 1-1, 2 = 1-2), +0xD vale 1 al tocar la meta,
-# +0x38 tiempo que queda en cuadros (44 por unidad del reloj: 500 = 22000), +0x44 vale 1 dentro del nivel,
-# +0xE0 puntos antes del bono de tiempo, +0xEC altura en la bandera (1.0 = la punta).
+# ---------- niveles: meta, bandera, estrellas, puntos y reloj ----------
 
-[prueba_bandera_dorada]
-name = PRUEBA: bandera dorada
-desc = Toca la punta de la bandera en cualquier nivel
-points = 5
+[bandera_dorada]
+name = Hasta la punta
+desc = Toca la punta de la bandera al terminar un nivel
+name.en = All the way up
+desc.en = Grab the very top of the flagpole at the end of a level
+points = 10
 when = main+0x1386C00->0x20->0xD8->0x44 u32 == 1
 when = main+0x1386C00->0x20->0xD8->0xD u8 == 1
 when = main+0x1386C00->0x20->0xD8->0xEC f32 >= 0.999
 
-[prueba_1_1_rapido]
-name = PRUEBA: 1-1 con 420 o más en el reloj
-desc = Termina el 1-1 con 420 o más en el reloj
-points = 5
+[tres_estrellas]
+name = Tres de tres
+desc = Termina un nivel con sus 3 estrellas verdes
+name.en = Three for three
+desc.en = Finish a level with its 3 green stars
+points = 10
 when = main+0x1386C00->0x20->0xD8->0x44 u32 == 1
-when = main+0x1386C00->0x20->0xD8->0x8 u32 == 1
 when = main+0x1386C00->0x20->0xD8->0xD u8 == 1
-when = main+0x1386C00->0x20->0xD8->0x38 u32 >= 18480
-when = main+0x1386C00->0x20->0xD8->0x38 u32 <= 22000
+when = main+0x1386C00->0x20->0xD8->0x90 u8 == 7
 
-[prueba_1_1_puntos]
-name = PRUEBA: 13000 puntos en el 1-1
-desc = Llega a la meta del 1-1 con 13000 puntos o más (sin contar el bono de tiempo)
-points = 5
+[nivel_perfecto]
+name = Nivel redondo
+desc = Termina un nivel con sus 3 estrellas verdes, en la punta de la bandera y sin morir
+name.en = Flawless level
+desc.en = Finish a level with its 3 green stars, at the top of the flagpole and without dying
+points = 25
+when = main+0x1386C00->0x20->0xD8->0x44 u32 == 1
+when = main+0x1386C00->0x20->0xD8->0xD u8 == 1
+when = main+0x1386C00->0x20->0xD8->0x90 u8 == 7
+when = main+0x1386C00->0x20->0xD8->0xEC f32 >= 0.999
+when = main+0x1386C00->0x20->0xD8->0x13 u8 == 0
+
+[puntos_20000]
+name = Buen puntaje
+desc = Llega a la meta de un nivel con 20000 puntos o más (antes del bono de tiempo)
+name.en = Nice score
+desc.en = Reach the goal of a level with 20000 points or more (before the time bonus)
+points = 10
+progress = 0
+when = main+0x1386C00->0x20->0xD8->0x44 u32 == 1
+when = main+0x1386C00->0x20->0xD8->0xD u8 == 1
+when = main+0x1386C00->0x20->0xD8->0xE0 u32 >= 20000
+when = main+0x1386C00->0x20->0xD8->0xE0 u32 <= 9999999
+
+[puntos_30000]
+name = Puntaje serio
+desc = Llega a la meta de un nivel con 30000 puntos o más (antes del bono de tiempo)
+name.en = Serious score
+desc.en = Reach the goal of a level with 30000 points or more (before the time bonus)
+points = 20
+progress = 0
+when = main+0x1386C00->0x20->0xD8->0x44 u32 == 1
+when = main+0x1386C00->0x20->0xD8->0xD u8 == 1
+when = main+0x1386C00->0x20->0xD8->0xE0 u32 >= 30000
+when = main+0x1386C00->0x20->0xD8->0xE0 u32 <= 9999999
+
+[puntos_45000]
+name = Rompemarcas
+desc = Llega a la meta de un nivel con 45000 puntos o más (antes del bono de tiempo)
+name.en = Record breaker
+desc.en = Reach the goal of a level with 45000 points or more (before the time bonus)
+points = 30
+progress = 0
+when = main+0x1386C00->0x20->0xD8->0x44 u32 == 1
+when = main+0x1386C00->0x20->0xD8->0xD u8 == 1
+when = main+0x1386C00->0x20->0xD8->0xE0 u32 >= 45000
+when = main+0x1386C00->0x20->0xD8->0xE0 u32 <= 9999999
+
+[contrarreloj_1_1]
+name = Con prisa
+desc = Termina el 1-1 con 400 o más en el reloj
+name.en = In a hurry
+desc.en = Finish 1-1 with 400 or more on the clock
+points = 20
 progress = 0
 when = main+0x1386C00->0x20->0xD8->0x44 u32 == 1
 when = main+0x1386C00->0x20->0xD8->0x8 u32 == 1
 when = main+0x1386C00->0x20->0xD8->0xD u8 == 1
-when = main+0x1386C00->0x20->0xD8->0xE0 u32 >= 13000
-when = main+0x1386C00->0x20->0xD8->0xE0 u32 <= 9999999
+when = main+0x1386C00->0x20->0xD8->0x38 u32 >= 17600
+when = main+0x1386C00->0x20->0xD8->0x38 u32 <= 22000
+
+# ---------- jefes ----------
+
+[jefe_mundo_1]
+name = Bowser en la autopista
+desc = Termina el castillo del mundo 1
+name.en = Bowser on the highway
+desc.en = Finish the World 1 castle
+points = 15
+when = main+0x1386C00->0x20->0xD8->0x44 u32 == 1
+when = main+0x1386C00->0x20->0xD8->0x8 u32 == 9
+when = main+0x1386C00->0x20->0xD8->0xD u8 == 1
+
+[jefe_mundo_2]
+name = Brigada blindada
+desc = Termina el castillo del mundo 2
+name.en = Armored brigade
+desc.en = Finish the World 2 castle
+points = 20
+when = main+0x1386C00->0x20->0xD8->0x44 u32 == 1
+when = main+0x1386C00->0x20->0xD8->0x8 u32 == 20
+when = main+0x1386C00->0x20->0xD8->0xD u8 == 1
+
+# ---------- traje ----------
+
+[disfrazado]
+name = Disfrazado
+desc = Ponte un traje: gato, fuego, tanuki o bumerán
+name.en = Dressed up
+desc.en = Put on a suit: cat, fire, tanooki or boomerang
+points = 5
+hold = 1000
+when = main+0x1386C00->0x20->0xD8->0x44 u32 == 1
+when = main+0x1A11EF0->0xB8->0x20->0x60->0x48->0x0 u32 >= 2
+when = main+0x1A11EF0->0xB8->0x20->0x60->0x48->0x0 u32 <= 9
+
+
+# ---------- A PRUEBA: memoria del motor ----------
+[prueba_sin_golpe]
+name = PRUEBA: nivel sin perder el traje ni morir
+desc = Termina un nivel sin que te quiten el traje y sin morir
+points = 5
+when = main+0x1386C00->0x20->0xD8->0x44 u32 == 1
+when = main+0x1386C00->0x20->0xD8->0xD u8 == 1
+fail = main+0x1A11EF0->0xB8->0x20->0x60->0x48->0x0 u32 dec
+fail = main+0x1386C00->0x20->0xD8->0x204 u8 == 1
+fail = main+0x1386C00->0x20->0xD8->0x13 u8 == 1
+reset = main+0x1386C00->0x20->0xD8->0x44 u32 != 1
