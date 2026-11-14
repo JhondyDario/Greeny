@@ -8,8 +8,10 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <ctime>
 
 extern "C" {
+void __libnx_init_time(void);   // de libnx: carga la zona horaria de la consola
 #include "config.h"
 #include "engine.h"
 }
@@ -23,7 +25,8 @@ static u64 g_tid;
 enum class State { Ok, NoGame, NoDefs, Bad };
 static State g_state = State::NoGame;
 static int g_got, g_pts, g_total_pts;
-static bool g_refresh;    // al volver a mostrar el overlay: releer progreso y desbloqueos
+static bool g_refresh;
+static bool g_time;       // servicio de hora abierto: localtime da la hora de la consola    // al volver a mostrar el overlay: releer progreso y desbloqueos
 
 static const char *T(const char *es, const char *en) { return g_en ? en : es; }
 
@@ -144,7 +147,15 @@ public:
             r->drawString(buf, false, x + 22, y + h - 72, 20, r->a(tsl::Color(0xF, 0xC, 0x1, 0xF)));
             u64 have, goal;
             if (a->unlocked) {
-                r->drawString(T("Desbloqueado", "Unlocked"), false, x + 22, y + h - 34, 22, r->a(green));
+                s32 dw = r->drawString(T("Desbloqueado", "Unlocked"), false, x + 22, y + h - 34, 22, r->a(green)).first;
+                // fecha y hora del desbloqueo, en la hora de la consola (0 = no se sabe)
+                time_t t = static_cast<time_t>(a->unlocked_at);
+                struct tm tm;
+                if (a->unlocked_at && localtime_r(&t, &tm)) {
+                    char when[40];
+                    strftime(when, sizeof(when), g_en ? "%m/%d/%Y  %H:%M" : "%d/%m/%Y  %H:%M", &tm);
+                    r->drawString(when, false, x + 22 + dw + 14, y + h - 34, 19, r->a(gray));
+                }
             } else if (progress_of(a, &have, &goal)) {
                 snprintf(buf, sizeof(buf), "%s: %llu / %llu", T("Tu progreso", "Your progress"), (unsigned long long)have, (unsigned long long)goal);
                 r->drawString(buf, false, x + 22, y + h - 40, 19, r->a(ink));
@@ -239,8 +250,13 @@ class GreenyOverlay : public tsl::Overlay {
 public:
     // libtesla no monta la SD por su cuenta (cambia el arranque de libnx): sin esto,
     // fopen("sdmc:/...") falla y parece que el juego no tiene logros.
-    void initServices() override { pminfoInitialize(); fsdevMountSdmc(); }
-    void exitServices() override { fsdevUnmountAll(); pminfoExit(); }
+    // el servicio de hora tampoco viene: sin el, la fecha del logro saldria en UTC
+    void initServices() override {
+        pminfoInitialize();
+        fsdevMountSdmc();
+        if (R_SUCCEEDED(timeInitialize())) { __libnx_init_time(); g_time = true; }
+    }
+    void exitServices() override { if (g_time) timeExit(); fsdevUnmountAll(); pminfoExit(); }
     void onShow() override { g_refresh = true; }
     std::unique_ptr<tsl::Gui> loadInitialGui() override {
         load();
