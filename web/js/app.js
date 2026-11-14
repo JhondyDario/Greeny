@@ -44,6 +44,11 @@
     return st ? h("span", { class: "pill st-" + status + " with-icon", title: st.help }, h("img", { src: "img/st_" + status + ".png", alt: "", width: 18, height: 18 }), st.label) : null;
   }
 
+  function statusDot(status) {
+    const st = STATUS[status];
+    return st ? h("img", { src: "img/st_" + status + ".png", alt: st.label, title: st.label, width: 16, height: 16 }) : null;
+  }
+
   const uiLang = () => (window.GreenyI18n && window.GreenyI18n.lang) || "es";
   const fmtDate = (iso) => new Date(iso).toLocaleDateString(uiLang(), { day: "numeric", month: "short", year: "numeric" });
   const fmtNum = (n) => Number(n || 0).toLocaleString(uiLang());
@@ -469,12 +474,14 @@
   async function viewHome() {
     const count = (table) => sb.from(table).select("*", { count: "exact", head: true });
     const friendsRes = session ? sb.rpc("my_friend_activity") : Promise.resolve({ data: [] });
-    const [players, unlocks, games, recent, live] = await Promise.all([
+    const [players, unlocks, games, recent, latestGames, achRows] = await Promise.all([
       count("profiles"), count("unlocks"), count("games"),
       sb.from("unlocks")
         .select("unlocked_at,title_id,ach_id,profiles(username,display_name,avatar),achievements(*,games(name))")
-        .order("unlocked_at", { ascending: false }).limit(10),
-      sb.rpc("activity_now"),
+        .order("unlocked_at", { ascending: false }).limit(5),
+      sb.from("games").select("title_id,name,cover_path,status").eq("published", true)
+        .order("updated_at", { ascending: false }).limit(6),
+      sb.from("achievements").select("title_id"),
     ]);
 
     const hero = h("section", { class: "hero" },
@@ -483,13 +490,7 @@
         h("img", { class: "hero-logo-mobile", src: "img/logo_mascota.png", alt: "Greeny", width: 380, height: 141 }),
         h("h1", {}, "Logros para tu Switch"),
         h("p", { class: "lead" }, "Greeny corre en segundo plano mientras juegas, te avisa cuando desbloqueas un logro y guarda tu progreso. Aquí lo ves, lo compartes y lo comparas."),
-        h("div", { class: "actions" },
-          session ? h("a", { class: "btn", href: "#/cuenta" }, "Vincular mi consola")
-                  : h("a", { class: "btn", href: "#/registro" }, "Crear cuenta"),
-          h("a", { class: "btn alt", href: "#/juegos" }, "Ver juegos"),
-          h("a", { class: "btn alt", href: cfg.repoUrl, rel: "noopener" }, "Descargar en GitHub"),
-          discordUrl ? h("a", { class: "btn discord", href: discordUrl, target: "_blank", rel: "noopener" },
-            svgEl(SOCIAL.discord), "Únete a Discord") : null)),
+        ),
       h("img", { class: "hero-mascot", src: "img/m_saludando.png", alt: "Greeny, la mascota: una plantita verde saludando", width: 260, height: 260 }));
 
     const stats = h("section", { class: "stats three", "aria-label": "Números de Greeny" },
@@ -497,11 +498,25 @@
       h("div", { class: "card stat" }, h("b", { "data-count": unlocks.count || 0 }, "0"), h("span", {}, "logros desbloqueados")),
       h("div", { class: "card stat" }, h("b", { "data-count": games.count || 0 }, "0"), h("span", {}, "juegos con logros")));
 
-    // en vivo: el bombillito verde que late. "Hoy" = abrieron la app o subieron logros en 24 horas.
-    const act = (live && !live.error && live.data) || null;
-    const liveCard = act ? h("div", { class: "card live", "aria-live": "polite" }, h("span", { class: "live-dot", "aria-hidden": "true" }),
-      h("div", {}, h("b", { "data-count": act.today || 0 }, "0"), h("span", {}, "jugadores activos hoy"),
-        act.online ? h("span", { class: "live-sub" }, fmtNum(act.online) + " con Greeny abierto ahora") : null)) : null;
+    // "¿Nuevo por aqui?" a lo ancho, con las descargas y el Discord a la derecha
+    const welcome = h("section", { class: "card home-welcome" },
+      h("img", { src: "img/m_celebrando.png", alt: "", width: 64, height: 64 }),
+      h("div", { class: "grow" }, h("strong", {}, "¿Nuevo por aquí?"), h("div", { class: "muted small" }, "Mira en un minuto qué es Greeny y cómo empezar."),
+        h("a", { href: "#/como-funciona", style: "font-weight:700" }, "Cómo funciona →")),
+      h("div", { class: "actions" },
+        h("a", { class: "btn alt", href: cfg.repoUrl, rel: "noopener" }, "Descargar en GitHub"),
+        discordUrl ? h("a", { class: "btn discord", href: discordUrl, target: "_blank", rel: "noopener" },
+          svgEl(SOCIAL.discord), "Únete a Discord") : null));
+
+    // juegos disponibles: los ultimos que se han puesto al dia, con "Ver más" al catalogo
+    const nAch = {};
+    for (const a of achRows.data || []) nAch[a.title_id] = (nAch[a.title_id] || 0) + 1;
+    const shelf = (latestGames.data || []).length ? h("section", { class: "card shelf" },
+      h("div", { class: "shelf-head" }, h("h2", {}, "Juegos disponibles"), h("a", { class: "btn alt small", href: "#/juegos" }, "Ver más")),
+      h("div", { class: "shelf-row" }, latestGames.data.map((g) =>
+        h("a", { class: "card shelf-item", href: "#/juego/" + g.title_id, title: g.name }, cover(g),
+          h("strong", { class: "shelf-name" }, g.name),
+          h("span", { class: "shelf-sub" }, statusDot(g.status), (nAch[g.title_id] || 0) + " logros"))))) : null;
 
     const rows = (recent.data || []).filter((u) => u.profiles && u.achievements).map((u) =>
       h("div", { class: "card row" },
@@ -515,10 +530,8 @@
 
     return [
       hero,
-      liveCard ? h("div", { class: "home-top" }, liveCard, h("div", { class: "card", style: "display:flex;align-items:center;gap:14px" },
-        h("img", { src: "img/m_celebrando.png", alt: "", width: 64, height: 64 }),
-        h("div", {}, h("strong", {}, "¿Nuevo por aquí?"), h("div", { class: "muted small" }, "Mira en un minuto qué es Greeny y cómo empezar."),
-          h("a", { href: "#/como-funciona", style: "font-weight:700" }, "Cómo funciona →")))) : null,
+      welcome,
+      shelf,
       await friendFeed(friendsRes),
       h("h2", {}, "Greeny en números"), stats,
       h("h2", {}, "Últimos logros"),
