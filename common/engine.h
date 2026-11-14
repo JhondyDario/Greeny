@@ -9,7 +9,7 @@
 
 #define LG_MAX_ACH    64
 #define LG_MAX_COND   6
-#define LG_MAX_FAIL   3       /* condiciones que anulan el logro hasta que se rearme */
+#define LG_MAX_FAIL   8       /* condiciones que anulan el logro hasta que se rearme */
 #define LG_MAX_DEREF  8
 #define LG_ID_LEN     32
 #define LG_NAME_LEN   48
@@ -37,6 +37,7 @@ typedef enum {
     LG_BITS_CLEAR, /* (v & x) == 0 */
     /* comparan con la lectura anterior, sin valor: solo en fail= y reset= */
     LG_DEC, LG_INC, LG_CHG,
+    LG_TO,         /* "to N": acaba de cambiar y ahora vale N */
 } lg_op;
 
 typedef struct {

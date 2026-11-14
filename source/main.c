@@ -35,7 +35,7 @@
 #define ATTACH_RETRY_MS  3000
 #define ATTACH_RETRIES   10
 
-#define INNER_HEAP_SIZE 0xC0000
+#define INNER_HEAP_SIZE 0x130000 /* el sonido del logro (210 KB) y el aviso a la vez no cabian en 0xC0000: audren daba "sin memoria" */
 
 u32 __nx_applet_type = AppletType_None;
 u32 __nx_fs_num_sessions = 1;

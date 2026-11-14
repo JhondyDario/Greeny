@@ -358,6 +358,19 @@ static void test_memory(void) {
     PUT(g_main, 0x10, uint8_t, 1);                                   /* meta sin golpes */
     CHECK(lg_tick(&g, &g_bases, fake_read, NULL, 500, out, 4) == 1 && g.ach[0].unlocked);
 
+    /* "to": solo cuenta el momento en que cambia a ese valor, no si ya lo tenia al empezar */
+    CHECK(parse(&g, "[c]\nhold=0\nwhen=main+0x10 u8 == 1\nfail=main+0x20 u64 to 0x300000000\nfail=main+0x20 u64 to 1\n", err, sizeof(err)) == 0);
+    PUT(g_main, 0x10, uint8_t, 0); PUT(g_main, 0x20, uint64_t, 1);   /* entra pequeño: no es daño */
+    CHECK(lg_tick(&g, &g_bases, fake_read, NULL, 0, out, 4) == 0 && !g.ach[0].spoiled);
+    CHECK(lg_tick(&g, &g_bases, fake_read, NULL, 100, out, 4) == 0 && !g.ach[0].spoiled);
+    PUT(g_main, 0x20, uint64_t, 0x100000000ull);                     /* coge un hongo: tampoco */
+    CHECK(lg_tick(&g, &g_bases, fake_read, NULL, 200, out, 4) == 0 && !g.ach[0].spoiled);
+    PUT(g_main, 0x20, uint64_t, 3);                                  /* traje de gato */
+    CHECK(lg_tick(&g, &g_bases, fake_read, NULL, 300, out, 4) == 0 && !g.ach[0].spoiled);
+    PUT(g_main, 0x20, uint64_t, 0x300000000ull);                     /* golpe: pierde el gato */
+    CHECK(lg_tick(&g, &g_bases, fake_read, NULL, 400, out, 4) == 0 && g.ach[0].spoiled);
+    CHECK(bad("[a]\nwhen=main+0x10 u8 == 1\nfail=main+0x11 u8 to\n", "formato"));
+
     /* inc y chg; una fail con valor fijo tambien vale */
     CHECK(parse(&g, "[b]\nhold=0\nwhen=main+0x10 u8 == 1\nfail=main+0x14 u32 inc\nfail=main+0x18 u8 == 9\n", err, sizeof(err)) == 0);
     PUT(g_main, 0x10, uint8_t, 0); PUT(g_main, 0x14, uint32_t, 5);

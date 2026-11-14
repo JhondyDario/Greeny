@@ -1921,17 +1921,23 @@ void ui_about(gfx_canvas *c, const ui_assets *a, const char *discord) {
     gfx_text(c, tx, y + 118, 19, P->gray, T("CREADO POR", "CREATED BY"));
     gfx_text(c, tx, y + 142, 30, P->ink, "Jhondy");
 
-    gfx_text(c, tx, y + 204, 19, P->gray, T("CÓDIGO, AYUDA Y CONTACTO", "SOURCE, HELP AND CONTACT"));
-    gfx_text(c, tx, y + 228, 26, P->accent, "github.com/JhondyDario/Greeny");
-    gfx_text(c, tx, y + 264, 18, P->gray,
-             T("Reporta errores o propone logros abriendo un \"issue\" ahí.", "Report bugs or suggest achievements by opening an issue there."));
+    gfx_text(c, tx, y + 196, 19, P->gray, T("SÍGUEME Y CONTACTO", "FOLLOW AND CONTACT"));
+    static const struct { int img; const char *url; } k_social[] = {
+        { UI_IMG_soc_github, "github.com/JhondyDario/Greeny" }, { UI_IMG_soc_youtube, "youtube.com/@Jhondy" } };
+    for (int i = 0; i < 2; i++) {
+        int ry = y + 222 + i * 42, rx = tx;
+        if (img(c, a, k_social[i].img, tx, ry)) rx = tx + 48;
+        gfx_text(c, rx, ry + 3, 24, P->accent, k_social[i].url);
+    }
+    gfx_text(c, tx, y + 308, 18, P->gray,
+             T("Reporta errores o propone logros abriendo un \"issue\" en GitHub.", "Report bugs or suggest achievements by opening an issue on GitHub."));
 
-    gfx_text(c, tx, y + 322, 19, P->gray, T("LICENCIA Y CRÉDITOS", "LICENSE AND CREDITS"));
-    gfx_text_fit(c, tx, y + 346, 19, P->ink, T("Software libre, licencia GPLv2.", "Free software, GPLv2 license."), w - 72);
-    gfx_text_fit(c, tx, y + 372, 19, P->ink,
+    gfx_text(c, tx, y + 350, 19, P->gray, T("LICENCIA Y CRÉDITOS", "LICENSE AND CREDITS"));
+    gfx_text_fit(c, tx, y + 374, 19, P->ink, T("Software libre, licencia GPLv2.", "Free software, GPLv2 license."), w - 72);
+    gfx_text_fit(c, tx, y + 400, 19, P->ink,
                  T("Usa código de Atmosphère, libtesla, FreeType, stb y QR Code generator (Nayuki).",
                    "Uses code from Atmosphère, libtesla, FreeType, stb and QR Code generator (Nayuki)."), w - 72);
-    gfx_text_fit(c, tx, y + 418, 18, P->gray,
+    gfx_text_fit(c, tx, y + 440, 18, P->gray,
                  T("Proyecto de fans. No está afiliado ni avalado por Nintendo.",
                    "Fan project. Not affiliated with or endorsed by Nintendo."), w - 72);
 
@@ -1941,7 +1947,10 @@ void ui_about(gfx_canvas *c, const ui_assets *a, const char *discord) {
         /* la comunidad: un QR para abrir la invitacion en el celular */
         const char *shown = strstr(discord, "://") ? strstr(discord, "://") + 3 : discord;
         qr_draw(c, side - 105, 300, 210, discord);
-        text_center(c, side, 522, 22, P->ink, T("Únete al Discord", "Join the Discord"), 320);
+        const char *join = T("Únete al Discord", "Join the Discord");
+        int jw = gfx_text_width(22, join);
+        if (img(c, a, UI_IMG_soc_discord, side - (jw + 44) / 2, 516)) gfx_text(c, side - (jw + 44) / 2 + 44, 522, 22, P->ink, join);
+        else text_center(c, side, 522, 22, P->ink, join, 320);
         text_center(c, side, 554, 19, P->accent, shown, 320);
         text_center(c, side, 584, 16, P->gray, T("Escanéalo con el celular", "Scan it with your phone"), 320);
     } else if (a->mascot_big) gfx_image(c, side - a->big_w / 2, 320, a->mascot_big, a->big_w, a->big_h);

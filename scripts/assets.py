@@ -88,6 +88,7 @@ OPCIONES = ["idioma", "tema", "inicio", "fondo_animado", "sonido_app", "vista_ju
             "diagnostico", "acerca", "ver_logros_juego", "toast_pos", "toast_time", "disco", "disco_sonando", "descargar"]
 AVATARS = sorted(f[:-4] for f in os.listdir(os.path.join(A, "avatars")) if f.endswith(".png"))
 app_images = [  # (nombre, archivo en assets/, ancho, alto, espejo)
+    ("soc_github", "redes/github.png", 36, 36, False), ("soc_youtube", "redes/youtube.png", 36, 36, False), ("soc_discord", "redes/discord.png", 36, 36, False),
     ("medal_bronce", "medals/bronce.png", 64, 64, False), ("medal_plata", "medals/plata.png", 64, 64, False),
     ("medal_oro", "medals/oro.png", 64, 64, False),
     ("ach_fill", "relleno_logro.png", 120, 120, False),

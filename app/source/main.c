@@ -1283,11 +1283,11 @@ int main(int argc, char *argv[]) {
             touch_x = (int)touch.touches[0].x;
             touch_y = (int)touch.touches[0].y;
             if (!touching) { touching = true; touch_dragged = false; touch_x0 = touch_x; touch_y0 = touch_y; touch_anchor = touch_y; }
-            /* cada 56 puntos de arrastre es un paso de la lista (uno por cuadro, para que no salte) */
-            const int drag_step = 56;
+            /* cada 38 puntos de arrastre es un paso de la lista (uno por cuadro, para que no salte) */
+            const int drag_step = 38;
             if (abs(touch_y - touch_anchor) >= drag_step && abs(touch_y - touch_y0) > abs(touch_x - touch_x0)) {
-                bool up = touch_y < touch_anchor; /* arrastrar hacia arriba baja en la lista */
-                nav |= up ? HidNpadButton_AnyDown : HidNpadButton_AnyUp;
+                bool up = touch_y < touch_anchor; /* el dedo hacia arriba sube en la lista, y hacia abajo baja */
+                nav |= up ? HidNpadButton_AnyUp : HidNpadButton_AnyDown;
                 touch_anchor += up ? -drag_step : drag_step;
                 touch_dragged = true;
             }

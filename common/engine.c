@@ -66,7 +66,7 @@ static const struct { const char *name; uint8_t type; } k_types[] = {
 static const struct { const char *name; uint8_t op; } k_ops[] = {
     {"==", LG_EQ}, {"!=", LG_NE}, {">", LG_GT}, {">=", LG_GE},
     {"<", LG_LT}, {"<=", LG_LE}, {"&", LG_BITS_SET}, {"!&", LG_BITS_CLEAR},
-    {"dec", LG_DEC}, {"inc", LG_INC}, {"chg", LG_CHG},
+    {"dec", LG_DEC}, {"inc", LG_INC}, {"chg", LG_CHG}, {"to", LG_TO},
 };
 
 static bool type_is_float(uint8_t t)  { return t == LG_F32 || t == LG_F64; }
@@ -151,6 +151,11 @@ static const char *parse_cond(char *s, lg_cond *c) {
         if (!strcmp(tok[2], k_ops[i].name)) { c->op = k_ops[i].op; break; }
     if (i == sizeof(k_ops) / sizeof(k_ops[0])) return "operador desconocido (== != > >= < <= & !&)";
 
+    if (c->op == LG_TO) { /* acaba de cambiar a este valor */
+        if (delta || type_is_float(c->type)) return "to lleva un valor entero";
+        if (!parse_u64(tok[3], &c->u)) return "valor entero sin signo invalido";
+        return NULL;
+    }
     if (c->op >= LG_DEC) { /* bajo, subio o cambio respecto a la lectura anterior: no lleva valor */
         if (!delta) return "dec, inc y chg no llevan valor";
         if (type_is_float(c->type)) return "dec, inc y chg no aplican a f32/f64";
@@ -345,7 +350,7 @@ int lg_parse(lg_game *g, char *text, char *err, size_t errlen) {
             if (cur->cond[cur->ncond].op >= LG_DEC) FAIL("dec, inc y chg solo valen en fail= y reset=");
             cur->ncond++;
         } else if (!strcmp(key, "fail")) {
-            if (cur->nfail >= LG_MAX_FAIL) FAIL("demasiadas condiciones fail en un logro (max 3)");
+            if (cur->nfail >= LG_MAX_FAIL) FAIL("demasiadas condiciones fail en un logro (max 8)");
             const char *e = parse_cond(val, &cur->fail[cur->nfail]);
             if (e) FAIL(e);
             cur->nfail++;
@@ -447,6 +452,7 @@ bool lg_eval_cond(lg_cond *c, const lg_bases *b, lg_read_fn rd, void *ctx) {
         c->prev = u;
         c->prev_ok = true;
         if (!had) return false;
+        if (c->op == LG_TO) return u != before && u == c->u;
         return c->op == LG_DEC ? u < before : c->op == LG_INC ? u > before : u != before;
     }
 

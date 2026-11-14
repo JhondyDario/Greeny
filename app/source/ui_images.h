@@ -1,5 +1,8 @@
 /* Generado por scripts/assets.py. No editar a mano.
  * UI_IMG(nombre, ancho, alto): imagenes PNG que la app lleva dentro. */
+UI_IMG(soc_github, 36, 36)
+UI_IMG(soc_youtube, 36, 36)
+UI_IMG(soc_discord, 36, 36)
 UI_IMG(medal_bronce, 64, 64)
 UI_IMG(medal_plata, 64, 64)
 UI_IMG(medal_oro, 64, 64)
