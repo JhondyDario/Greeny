@@ -20,6 +20,11 @@ void search_poll(uint64_t main_base, uint64_t main_size, uint64_t heap_base, uin
 
 /* Manejo sin salir del juego: la app deja un plan (plan.txt: "u32 10 1" = tipo, numero con el que
  * se empieza y cuanto cambia cada vez; con 0 al final es "no se el numero": cambio / no cambio) y dentro del juego se avanza con una combinacion de botones. */
+/* Busca hasta 4 textos en los datos del juego y anota en sdmc:/config/greeny/find.txt lo que hay
+ * alrededor de cada sitio donde salen. Sirve para dar con tablas del juego (lista de niveles...).
+ * Devuelve cuantas veces los encontro. Puede tardar un par de minutos. */
+int search_find_text(const char (*texts)[32], int ntexts, uint64_t main_base, uint64_t main_size, uint64_t heap_base, uint64_t space_end);
+
 typedef enum { SEARCH_NEXT, SEARCH_PTR, SEARCH_CHECK, SEARCH_SAME } search_action;
 bool search_has_plan(void);
 /* Ejecuta el paso (puede tardar minutos) y deja en line1 y line2 un resumen para mostrar en el aviso. */

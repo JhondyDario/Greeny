@@ -1245,9 +1245,9 @@ int main(int argc, char *argv[]) {
     ui_set_unread(g_account.token[0] && g_account.linked ? 0 : -1); /* la campana sale si hay cuenta */
     sync_start(); /* en segundo plano y solo si hay cuenta e internet; la app no espera por esto */
 
-    /* tactil: un toque corto es una pulsacion; un arrastre vertical mueve la lista */
-    bool touching = false;
-    int touch_x0 = 0, touch_y0 = 0, touch_x = 0, touch_y = 0;
+    /* tactil: un toque corto es una pulsacion; arrastrar con el dedo mueve la lista mientras se arrastra */
+    bool touching = false, touch_dragged = false;
+    int touch_x0 = 0, touch_y0 = 0, touch_x = 0, touch_y = 0, touch_anchor = 0;
 
     char link_code[8] = "";
     u64 link_started = 0, link_last_poll = 0;
@@ -1282,19 +1282,27 @@ int main(int argc, char *argv[]) {
         if (hidGetTouchScreenStates(&touch, 1) && touch.count > 0) {
             touch_x = (int)touch.touches[0].x;
             touch_y = (int)touch.touches[0].y;
-            if (!touching) { touching = true; touch_x0 = touch_x; touch_y0 = touch_y; }
+            if (!touching) { touching = true; touch_dragged = false; touch_x0 = touch_x; touch_y0 = touch_y; touch_anchor = touch_y; }
+            /* cada 56 puntos de arrastre es un paso de la lista (uno por cuadro, para que no salte) */
+            const int drag_step = 56;
+            if (abs(touch_y - touch_anchor) >= drag_step && abs(touch_y - touch_y0) > abs(touch_x - touch_x0)) {
+                bool up = touch_y < touch_anchor; /* arrastrar hacia arriba baja en la lista */
+                nav |= up ? HidNpadButton_AnyDown : HidNpadButton_AnyUp;
+                touch_anchor += up ? -drag_step : drag_step;
+                touch_dragged = true;
+            }
         } else if (touching) {
             touching = false;
             int dx = touch_x - touch_x0, dy = touch_y - touch_y0;
-            if (abs(dx) < 24 && abs(dy) < 24) {
+            if (touch_dragged) {
+                /* ya se movio la lista mientras arrastraba: soltar no pulsa nada */
+            } else if (abs(dx) < 24 && abs(dy) < 24) {
                 static const u64 button_of[UI_BTN_COUNT] = { HidNpadButton_A, HidNpadButton_B, HidNpadButton_X, HidNpadButton_Y,
                                                              HidNpadButton_Plus, HidNpadButton_Minus, HidNpadButton_L, HidNpadButton_R };
                 const ui_zone *z = ui_zone_at(touch_x, touch_y);
                 if (z && z->kind == UI_ZONE_BUTTON && z->value >= 0 && z->value < UI_BTN_COUNT) down |= button_of[z->value];
                 else if (z && z->kind == UI_ZONE_ITEM) tap_item = z->value;
                 else if (z && z->kind == UI_ZONE_TAB) tap_tab = z->value;
-            } else if (abs(dy) > 60 && abs(dy) > abs(dx)) {
-                nav |= dy < 0 ? HidNpadButton_AnyDown : HidNpadButton_AnyUp; /* arrastrar hacia arriba baja en la lista */
             }
         }
         /* tocar un elemento lo selecciona; tocarlo otra vez (o si ya estaba seleccionado) lo abre */
@@ -1756,6 +1764,7 @@ int main(int argc, char *argv[]) {
                     case UI_OPT_STARTPOP:   g_config.start_popup = !g_config.start_popup; break;
                     case UI_OPT_TOAST_POS:  g_config.toast_pos = (g_config.toast_pos + 1) % GR_TOAST_POS_COUNT; break;
                     case UI_OPT_SPLASH:     g_config.splash = !g_config.splash; break;
+                    case UI_OPT_GRID_VERSION: g_config.grid_version = !g_config.grid_version; break;
                     case UI_OPT_ACTIVITY:
                         g_config.activity = !g_config.activity;
                         ui_set_activity(g_activity, g_config.activity ? g_nact : 0, g_act_index, (long long)time(NULL));
@@ -1850,7 +1859,7 @@ int main(int argc, char *argv[]) {
                     accepted = true;
                     if (g_sfx_next < 0) {
                         bool is_toggle = opt == UI_OPT_ANIM || opt == UI_OPT_APPSOUND || opt == UI_OPT_INGAME || opt == UI_OPT_SOUND ||
-                                         opt == UI_OPT_POPUP || opt == UI_OPT_STARTPOP || opt == UI_OPT_OVERLAY || opt == UI_OPT_MUSIC || opt == UI_OPT_SPLASH || opt == UI_OPT_ACTIVITY;
+                                         opt == UI_OPT_POPUP || opt == UI_OPT_STARTPOP || opt == UI_OPT_OVERLAY || opt == UI_OPT_MUSIC || opt == UI_OPT_SPLASH || opt == UI_OPT_ACTIVITY || opt == UI_OPT_GRID_VERSION;
                         if (opt != UI_OPT_SONG) sfx_next(is_toggle ? SFX_TOGGLE : SFX_OPTION);
                     }
                     save_config();

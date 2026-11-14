@@ -18,6 +18,8 @@
 #define LG_MAX_SCAN   4
 #define LG_MAX_WATCH  16      /* trozos de memoria vigilados (para investigar un juego) */
 #define LG_WATCH_MAX  0x800   /* bytes por trozo */
+#define LG_MAX_FIND   4       /* textos que se buscan una vez en la memoria (para investigar) */
+#define LG_FIND_LEN   32
 #define LG_SCAN_MAX_LEN 0x100000
 
 typedef enum { LG_REGION_MAIN, LG_REGION_HEAP } lg_region;
@@ -109,6 +111,8 @@ typedef struct {
     bool   debug;      /* evalua todas las condiciones y marca los cambios de valor */
     int    nscan;
     lg_scan scan[LG_MAX_SCAN];
+    int    nfind;
+    char   find[LG_MAX_FIND][LG_FIND_LEN];
     int    nwatch;
     lg_watch watch[LG_MAX_WATCH];
     int    nach;

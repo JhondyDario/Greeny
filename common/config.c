@@ -25,6 +25,7 @@ void gr_config_defaults(gr_config *c) {
     c->overlay = false;
     c->splash = true;
     c->activity = true;
+    c->grid_version = false;
     c->toast_pos = GR_TOAST_RIGHT;
     c->toast_time = GR_TOAST_MEDIUM;
     c->animated_bg = true;
@@ -73,6 +74,7 @@ void gr_config_load(gr_config *c, const char *path) {
         else if (!strcmp(key, "overlay")) pick_bool(val, &c->overlay);
         else if (!strcmp(key, "splash")) pick_bool(val, &c->splash);
         else if (!strcmp(key, "activity")) pick_bool(val, &c->activity);
+        else if (!strcmp(key, "grid_version")) pick_bool(val, &c->grid_version);
         else if (!strcmp(key, "toast_pos")) pick(val, k_tpos, GR_TOAST_POS_COUNT, &c->toast_pos);
         else if (!strcmp(key, "toast_time")) pick(val, k_ttime, GR_TOAST_TIME_COUNT, &c->toast_time);
         else if (!strcmp(key, "music_track")) {
@@ -99,7 +101,7 @@ int gr_config_save(const gr_config *c, const char *path) {
                      name_of(k_view, GR_VIEW_COUNT, c->games_view), name_of(k_view, GR_VIEW_COUNT, c->ach_view),
                      c->sound ? 1 : 0, c->popup ? 1 : 0, c->animated_bg ? 1 : 0, c->intro_done ? 1 : 0, name_of(k_start, GR_START_COUNT, c->start_page),
                      name_of(k_scope, GR_SCOPE_COUNT, c->games_scope), name_of(k_show, GR_SHOW_COUNT, c->games_show), c->music ? 1 : 0, c->app_sound ? 1 : 0) > 0;
-    if (ok) ok = fprintf(f, "activity = %d\n", c->activity ? 1 : 0) > 0;
+    if (ok) ok = fprintf(f, "activity = %d\ngrid_version = %d\n", c->activity ? 1 : 0, c->grid_version ? 1 : 0) > 0;
     if (ok) ok = fprintf(f, "splash = %d\nstart_popup = %d\noverlay = %d\ntoast_pos = %s\ntoast_time = %s\n", c->splash ? 1 : 0, c->start_popup ? 1 : 0, c->overlay ? 1 : 0,
                          name_of(k_tpos, GR_TOAST_POS_COUNT, c->toast_pos), name_of(k_ttime, GR_TOAST_TIME_COUNT, c->toast_time)) > 0;
     if (ok && c->music_track[0]) ok = fprintf(f, "music_track = %s\n", c->music_track) > 0;

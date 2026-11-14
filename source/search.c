@@ -663,3 +663,57 @@ void search_button(search_action action, uint64_t main_base, uint64_t main_size,
     free(g_w);
     g_w = NULL;
 }
+
+/* ---------- buscar texto ---------- */
+
+#define FIND_PATH "sdmc:/config/greeny/find.txt"
+#define FIND_MAX_HITS 80
+#define FIND_BEFORE 0x400
+#define FIND_AFTER 0xC00
+
+typedef struct { const char (*texts)[32]; int ntexts; u64 hits[FIND_MAX_HITS]; u8 which[FIND_MAX_HITS]; int nhits; } find_ctx;
+
+static bool find_chunk(u64 addr, const u8 *data, size_t size, void *vctx) {
+    find_ctx *c = vctx;
+    for (int t = 0; t < c->ntexts; t++) {
+        size_t len = strlen(c->texts[t]);
+        if (len == 0 || len > size) continue;
+        for (size_t i = 0; i + len <= size; i++) { /* lo que caiga justo entre dos trozos se pierde: no importa */
+            if (data[i] != (u8)c->texts[t][0] || memcmp(data + i, c->texts[t], len)) continue;
+            if (c->nhits >= FIND_MAX_HITS) return false;
+            c->which[c->nhits] = (u8)t;
+            c->hits[c->nhits++] = addr + i;
+        }
+    }
+    return true;
+}
+
+int search_find_text(const char (*texts)[32], int ntexts, uint64_t main_base, uint64_t main_size, uint64_t heap_base, uint64_t space_end) {
+    g_main = main_base; g_main_size = main_size; g_heap = heap_base; g_end = space_end;
+    g_w = malloc(sizeof(*g_w));
+    find_ctx *c = calloc(1, sizeof(*c));
+    FILE *f = fopen(FIND_PATH, "w");
+    if (!g_w || !c || !f) { free(g_w); g_w = NULL; free(c); if (f) fclose(f); return -1; }
+    c->texts = texts; c->ntexts = ntexts;
+    g_only_game_data = true;
+    g_walk_total = 0;
+    walk_memory(find_chunk, c);
+    g_only_game_data = false;
+    fprintf(f, "main=0x%lX heap=0x%lX recorrido=%lu MB encontrados=%d\n", (unsigned long)main_base, (unsigned long)heap_base,
+            (unsigned long)(g_walk_total >> 20), c->nhits);
+    for (int i = 0; i < c->nhits; i++) {
+        u64 start = (c->hits[i] - FIND_BEFORE) & ~0xFull;
+        fprintf(f, "\"%s\" en 0x%lX; desde 0x%lX:\n", texts[c->which[i]], (unsigned long)c->hits[i], (unsigned long)start);
+        for (u64 a = start; a < start + FIND_BEFORE + FIND_AFTER; a += 0x100) { /* por partes: si un trozo no se puede leer, el resto si */
+            if (R_FAILED(dmntchtReadCheatProcessMemory(a, g_buf, 0x100))) { fprintf(f, "??\n"); continue; }
+            for (int k = 0; k < 0x100; k++) fprintf(f, "%02X", g_buf[k]);
+            fputc('\n', f);
+        }
+    }
+    fclose(f);
+    int n = c->nhits;
+    free(c);
+    free(g_w);
+    g_w = NULL;
+    return n;
+}

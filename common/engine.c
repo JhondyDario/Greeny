@@ -287,6 +287,10 @@ int lg_parse(lg_game *g, char *text, char *err, size_t errlen) {
                 const char *e = parse_scan(val, &g->scan[g->nscan]);
                 if (e) FAIL(e);
                 g->nscan++;
+            } else if (!strcmp(key, "find")) { /* texto que se busca una vez en la memoria del juego */
+                if (g->nfind >= LG_MAX_FIND) FAIL("demasiados find (max 4)");
+                if (strlen(val) < 4 || strlen(val) >= LG_FIND_LEN) FAIL("find: el texto debe tener de 4 a 31 letras");
+                copy_str(g->find[g->nfind++], LG_FIND_LEN, val);
             } else if (!strcmp(key, "watch")) { /* "<direccion> <bytes>" */
                 if (g->nwatch >= LG_MAX_WATCH) FAIL("demasiados watch (max 16)");
                 char *sp = strrchr(val, ' ');
@@ -302,7 +306,7 @@ int lg_parse(lg_game *g, char *text, char *err, size_t errlen) {
             } else if (!strcmp(key, "debug")) {
                 if (strcmp(val, "0") && strcmp(val, "1")) FAIL("debug debe ser 0 o 1");
                 g->debug = val[0] == '1';
-            } else FAIL("clave desconocida antes del primer logro (game, version, build, debug, scan, watch)");
+            } else FAIL("clave desconocida antes del primer logro (game, version, build, debug, scan, watch, find)");
             continue;
         }
 
@@ -337,7 +341,7 @@ int lg_parse(lg_game *g, char *text, char *err, size_t errlen) {
 
     lineno++;
     if (cur && cur->ncond == 0) FAIL("el ultimo logro no tiene ninguna condicion when=");
-    if (g->nach == 0 && g->nscan == 0 && g->nwatch == 0) FAIL("el archivo no define ningun logro");
+    if (g->nach == 0 && g->nscan == 0 && g->nwatch == 0 && g->nfind == 0) FAIL("el archivo no define ningun logro");
 
     /* la meta de cada logro, para mostrar su progreso */
     for (int i = 0; i < g->nach; i++) {

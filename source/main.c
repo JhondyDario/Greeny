@@ -483,7 +483,7 @@ int main(int argc, char *argv[]) {
     log_line("Greeny iniciado");
     if (migrated) log_line("progreso migrado desde config/logros");
 
-    u64 cur_pid = 0, cur_tid = 0, attach_at = 0, scan_at = 0, watch_at = 0, search_at = 0, progress_at = 0;
+    u64 cur_pid = 0, cur_tid = 0, attach_at = 0, scan_at = 0, watch_at = 0, find_at = 0, search_at = 0, progress_at = 0;
     int retries = 0;
     bool pending = false, bad_defs = false, toast_fail_logged = false, sound_fail_logged = false;
 
@@ -537,6 +537,7 @@ int main(int argc, char *argv[]) {
                     g_debug_lines = 0;
                     watch_reset(cur_tid, now);
                     watch_at = now;
+                    find_at = g_game.nfind ? now + 75000 : 0; /* da tiempo a cargar la partida */
                     g_scan_lines = 0;
                     scan_at = now + SCAN_PERIOD_MS;
                     memset(g_scan_prev, 0, sizeof(g_scan_prev));
@@ -591,6 +592,16 @@ int main(int argc, char *argv[]) {
                 search_poll(g_bases.main_base, g_main_size, g_bases.heap_base, g_space_end);
             }
             if (g_game.debug) debug_report(cur_tid);
+            if (g_game.nfind && find_at && now >= find_at) { /* una sola vez por sesion */
+                find_at = 0;
+                toast_push(TOAST_INFO, 0, -1, g_cfg_dark, "GREENY", "Buscando texto en la memoria...", "Puede tardar un par de minutos. Sigue en el mapa.");
+                toast_update(now);
+                int n = search_find_text(g_game.find, g_game.nfind, g_bases.main_base, g_main_size, g_bases.heap_base, g_space_end);
+                char l2[64];
+                snprintf(l2, sizeof(l2), "Encontrado %d veces. Mira find.txt.", n);
+                log_line("%016lX: find: %d", cur_tid, n);
+                toast_push(TOAST_INFO, 0, -1, g_cfg_dark, "GREENY", "Busqueda de texto terminada", l2);
+            }
             if (g_game.nwatch && now >= watch_at) {
                 watch_report(now);
                 watch_at = now + WATCH_PERIOD_MS;

@@ -522,6 +522,8 @@ static void home_list(gfx_canvas *c, const ui_assets *a, const gr_model *m, int 
     scrollbar(c, 124, rows * (h + 13) - 13, top, rows, m->ngames);
 }
 
+static bool g_grid_version; /* la etiqueta de version sobre la caratula: opcion de Vista, apagada de fabrica */
+
 static void home_grid(gfx_canvas *c, const ui_assets *a, const gr_model *m, int cursor, int top, ui_layout l) {
     const int w = 220, h = 250, gx = 18, gy = 16;
     for (int i = top * l.cols; i < m->ngames && i < (top + l.rows) * l.cols; i++) {
@@ -539,7 +541,7 @@ static void home_grid(gfx_canvas *c, const ui_assets *a, const gr_model *m, int 
             text_center(c, cx, y + 202, 18, C_RED, T("Archivo con error", "File has an error"), w - 20);
             continue;
         }
-        if (g->version[0]) {
+        if (g->version[0] && g_grid_version) {
             snprintf(buf, sizeof(buf), "v%s", g->version);
             int pw = gfx_text_width(17, buf) + 26;   /* abajo a la izquierda de la portada */
             pill(c, cx - UI_COVER_BIG / 2 + 6 + pw, y + 12 + UI_COVER_BIG - 34, C_ON_YELLOW, C_WHITE, buf);
@@ -578,6 +580,7 @@ void ui_home(gfx_canvas *c, const ui_assets *a, const gr_model *m, const gr_conf
         gfx_text(c, MARGIN + 320, 406, 20, P->gray, T("Luego pulsa Y para recargar.", "Then press Y to reload."));
     } else {
         ui_layout l = ui_home_layout(cfg);
+        g_grid_version = cfg->grid_version;
         if (l.cols > 1) home_grid(c, a, m, cursor, top, l);
         else home_list(c, a, m, cursor, top, l.rows);
         if (cfg->activity) activity_strip(c, a);
@@ -1400,7 +1403,7 @@ void ui_search(gfx_canvas *c, const ui_assets *a, unsigned value, int type_bits,
 
 static const struct { const char *es, *en; int n; int opt[8]; } k_tabs[UI_TABS] = {
     { "General",     "General",  6, { UI_OPT_ANIM, UI_OPT_APPSOUND, UI_OPT_SPLASH, UI_OPT_LANG, UI_OPT_THEME, UI_OPT_START } }, /* los de encender/apagar arriba, como en Música */
-    { "Vista",       "View",     5, { UI_OPT_ACTIVITY, UI_OPT_SCOPE, UI_OPT_SHOW, UI_OPT_GAMES_VIEW, UI_OPT_ACH_VIEW } },
+    { "Vista",       "View",     6, { UI_OPT_ACTIVITY, UI_OPT_GRID_VERSION, UI_OPT_SCOPE, UI_OPT_SHOW, UI_OPT_GAMES_VIEW, UI_OPT_ACH_VIEW } },
     { "En el juego", "In-game",  7, { UI_OPT_INGAME, UI_OPT_SOUND, UI_OPT_POPUP, UI_OPT_STARTPOP, UI_OPT_OVERLAY, UI_OPT_TOAST_POS, UI_OPT_TOAST_TIME } },
     { "Música",      "Music",    0, { 0 } },  /* una fila para encender y una por cancion */
     { "Cuenta",      "Account",  0, { 0 } },  /* sus filas dependen de si la consola esta vinculada */
@@ -1518,6 +1521,7 @@ static int opt_icon(int opt, int row) {
         case UI_OPT_TOAST_TIME: return UI_IMG_opt_toast_time;
         case UI_OPT_SPLASH: return UI_IMG_opt_inicio;
         case UI_OPT_ACTIVITY: return UI_IMG_stat_siguiendo;
+        case UI_OPT_GRID_VERSION: return UI_IMG_opt_vista_juegos;
         case UI_OPT_OVERLAY: return UI_IMG_opt_ver_logros_juego;
         case UI_OPT_MUSIC: return UI_IMG_opt_musica;
         case UI_OPT_SONG: return -1;
@@ -1696,6 +1700,11 @@ void ui_settings(gfx_canvas *c, const ui_assets *a, const gr_config *cfg, int ta
                 option_row(c, y, sel, T("Actividad de amigos", "Friends' activity"),
                            T("Abajo en el inicio: los últimos logros de la gente que sigues.", "At the bottom of the home screen: the latest achievements of people you follow."),
                            cfg->activity ? on : off, C_GREEN);
+                break;
+            case UI_OPT_GRID_VERSION:
+                option_row(c, y, sel, T("Versión en la cuadrícula", "Version on the grid"),
+                           T("Etiqueta con la versión del juego sobre cada carátula, en Mis juegos.", "A tag with the game's version on each cover, in My games."),
+                           cfg->grid_version ? on : off, cfg->grid_version ? C_GREEN : C_NEUTRAL);
                 break;
             case UI_OPT_SPLASH:
                 option_row(c, y, sel, T("Presentación al abrir", "Intro when opening"),
