@@ -1,0 +1,24 @@
+Greeny
+Copyright (c) 2026 Jhondy Dario. All rights reserved.
+
+Greeny (the Switch app, the background service, the website, the achievement definitions,
+the artwork, the mascot, the sounds and the documentation) is proprietary software.
+
+You may download and use the official releases of Greeny for free, for personal and
+non-commercial use, on a console you own.
+
+Without written permission from the author you may not:
+  - copy, modify, translate or redistribute Greeny or any part of it;
+  - publish modified builds, forks or derivative projects based on it;
+  - reuse its achievement definitions, artwork, mascot, sounds or name;
+  - sell it or include it in paid products or bundles.
+
+The Tesla overlay (folder "overlay") includes libtesla and is distributed under the
+GNU General Public License v2; see overlay/LICENSE. Third-party components keep their own
+licenses; see THIRD_PARTY_NOTICES.md.
+
+Greeny is a fan project. It is not affiliated with, endorsed or sponsored by Nintendo.
+All trademarks belong to their respective owners.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND. IN NO EVENT SHALL THE AUTHOR
+BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY ARISING FROM THE USE OF THE SOFTWARE.

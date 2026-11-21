@@ -1,0 +1,1 @@
+window.GREENY_CONFIG={supabaseUrl:"https://mlwzlirkjgpyyldbtoci.supabase.co",supabaseKey:"sb_publishable_r4Y8LjTEzu7A2Z9ecr2hEw_Jr-OT8RC",repoUrl:"https://github.com/JhondyDario/Greeny",youtubeUrl:"https://www.youtube.com/@Jhondy",donateUrl:"https://www.paypal.com/donate/?hosted_button_id=B82PT4TEHBG3G",turnstileSiteKey:"0x4AAAAAAF-38a9egevH7JCS"};
