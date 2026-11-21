@@ -885,3 +885,15 @@ input.switch:checked { background: url("../img/toggle_on.png") center / contain 
 a.card:hover .marquee, a.card:focus-visible .marquee { text-overflow: clip; }
 a.card:hover .marquee > span, a.card:focus-visible .marquee > span { animation: marquee 6s ease-in-out infinite alternate; }
 @keyframes marquee { 0%, 15% { transform: translateX(0); } 85%, 100% { transform: translateX(min(0px, calc(var(--mw, 180px) - 100%))); } }
+
+/* Como funciona: cada parte se abre y se cierra */
+.how-section { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); margin-top: 14px; overflow: hidden; }
+.how-section > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 14px; padding: 16px 20px; }
+.how-section > summary::-webkit-details-marker { display: none; }
+.how-section > summary:hover { background: rgba(255, 255, 255, .04); }
+.how-section > summary img { flex: none; }
+.how-section > summary strong { font-size: 1.1rem; }
+.how-section[open] .faq-plus { transform: rotate(45deg); }
+.how-section-body { padding: 0 20px 18px; }
+.how-section-body .card { box-shadow: none; }
+.how-section > summary .grow { flex: 1; min-width: 0; }
