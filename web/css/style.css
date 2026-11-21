@@ -514,6 +514,8 @@ h1 .flag { vertical-align: -3px; }
   .stats.three .stat { padding: 12px 8px; text-align: center; }
   .stats.three .stat b { font-size: 1.35rem; }
   .stats.three .stat span { font-size: .75rem; }
+  .stats.three .stat.with-icon { flex-direction: column; gap: 6px; }
+  .stats.three .stat.with-icon img { width: 34px; height: 34px; }
   /* cabecera de un juego: caratula y titulo juntos */
   .game-head { flex-wrap: nowrap; align-items: flex-start; gap: 14px; }
   .game-head .cover.small { width: 72px; }
