@@ -178,6 +178,19 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fo
 /* nivel y medallas del perfil */
 .pill.lvl { font-size: 1rem; padding: 5px 16px; }
 .level .bar { height: 14px; }
+/* medallas del perfil: una fila, como en la app */
+.badge-strip { display: flex; gap: 6px; overflow: hidden; padding: 4px 2px; }
+.badge-mini { flex: 0 0 88px; display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; }
+.badge-mini img { width: 64px; height: 64px; transition: transform .16s ease; }
+.badge-mini.earned:hover img { transform: scale(1.08) rotate(-3deg); }
+.badge-mini:not(.earned) { opacity: .45; }
+.badge-mini-name { font-size: .74rem; line-height: 1.2; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.badge-mini.earned .badge-mini-name { color: var(--ink); font-weight: 600; }
+.badge-strip[hidden], .badge-box .badges[hidden] { display: none !important; }
+.badge-strip { -webkit-mask-image: linear-gradient(90deg, #000 88%, transparent); mask-image: linear-gradient(90deg, #000 88%, transparent); }
+.badge-box-foot { display: flex; justify-content: flex-end; margin-top: 10px; }
+.badge-box .badges { margin-top: 4px; }
+@media (max-width: 720px) { .badge-mini { flex-basis: 72px; } .badge-mini img { width: 52px; height: 52px; } }
 .badges { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); }
 .badge { display: flex; gap: 14px; align-items: center; }
 .badge:not(.earned) strong { color: var(--muted); }
