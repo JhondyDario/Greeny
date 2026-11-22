@@ -35,8 +35,11 @@ Play your games as usual and Greeny lets you know **the moment you earn an achie
 - 💬 **Comments** on every supported game.
 - 🎮 **In-game view** through Tesla (optional): check your achievements and progress without leaving the game.
 - 🌗 Spanish and English, light and dark themes, music and sounds.
+- 🌐 **Coming soon: online achievements**, earned by playing online and compatible with [Nextendo Network](https://github.com/NextendoNetwork).
 
 ## Screenshots
+
+<p align="center"><img src="docs/img/tesla_demo.webp" alt="Browsing Greeny achievements and progress in Tesla during Super Mario 3D World" width="80%"><br><sub><b>Greeny in Tesla</b> – browse your achievements and your progress on each one in the middle of a game.</sub></p>
 
 <table>
   <tr>
@@ -99,6 +102,8 @@ Not to play. An account is only needed for your online profile, the rankings, co
 <summary><b>Can I play online with Greeny?</b></summary>
 
 Greeny itself works offline and online. Keep in mind that using Nintendo's online services on a console with custom firmware always carries a risk of a ban, with or without Greeny. Many players use a separate setup for homebrew (emuMMC).
+
+Achievements for playing online are coming, and they will be compatible with [Nextendo Network](https://github.com/NextendoNetwork), a fan-made online service that does not use Nintendo's servers.
 </details>
 
 <details>
@@ -118,7 +123,10 @@ Greeny is free and made by one person in their spare time. If you enjoy it, you 
 
 <a href="https://www.paypal.com/donate/?hosted_button_id=B82PT4TEHBG3G"><img src="https://img.shields.io/badge/Donate-PayPal-00457C?logo=paypal&logoColor=white&style=for-the-badge" alt="Donate with PayPal"></a>
 
-Donations are optional and do not unlock achievements or give any advantage.
+<img src="docs/img/donador.png" alt="Donor badge" width="72" align="left">
+
+Every donor gets the **Donor badge** on their Greeny profile, on the website and in the app, as a thank-you. Write your Greeny username in the donation note so we know who to give it to (it is added by hand, so it can take a little while). It is only a badge: it does not unlock achievements or give any advantage in the rankings.
+<br clear="left">
 
 ## License
 
