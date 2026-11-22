@@ -119,14 +119,26 @@ Yes! Join the <a href="https://discord.gg/4KU8C9bEHy">Discord</a> to become a te
 
 ## Support the project
 
-Greeny is free and made by one person in their spare time. If you enjoy it, you can help keep it going:
+<div align="center">
+
+Greeny is free and made by one person in their spare time.<br>
+If you enjoy it, you can help keep it going.
+
+<br>
 
 <a href="https://www.paypal.com/donate/?hosted_button_id=B82PT4TEHBG3G"><img src="https://img.shields.io/badge/Donate-PayPal-00457C?logo=paypal&logoColor=white&style=for-the-badge" alt="Donate with PayPal"></a>
 
-<img src="docs/img/donador.png" alt="Donor badge" width="72" align="left">
+<br>
 
-Every donor gets the **Donor badge** on their Greeny profile, on the website and in the app, as a thank-you. Write your Greeny username in the donation note so we know who to give it to (it is added by hand, so it can take a little while). It is only a badge: it does not unlock achievements or give any advantage in the rankings.
-<br clear="left">
+<img src="docs/img/donador.png" alt="Donor badge" width="96">
+
+**Donor badge**
+
+Every donor gets it on their Greeny profile, on the website and in the app.<br>
+Write your Greeny username in the donation note so we know who to give it to.<br>
+<sub>It is added by hand, so it can take a little while. It is only a badge: no achievements or ranking advantage.</sub>
+
+</div>
 
 ## License
 
