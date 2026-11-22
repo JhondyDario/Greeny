@@ -206,9 +206,18 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fo
 .preset-row { display: grid; grid-template-columns: 1fr 1fr auto auto; gap: 8px; align-items: center; }
 @media (max-width: 620px) { .preset-row { grid-template-columns: 1fr; } }
 .btn.small { padding: 4px 12px; font-size: .85rem; }
-.pill.tier-bronce { background: #b56a2c; color: #fff; }
-.pill.tier-plata { background: #b4bcc6; color: #1e2a1f; }
-.pill.tier-oro { background: var(--yellow); color: var(--on-yellow); }
+/* medalla del logro: chip suave con un punto metalico; los puntos, en texto dorado sin relleno */
+.pill.tier-bronce, .pill.tier-plata, .pill.tier-oro {
+  display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px 2px 7px; vertical-align: 1px;
+  font-size: .7rem; font-weight: 800; letter-spacing: .07em; text-transform: uppercase;
+  background: var(--tier-bg); border: 1px solid var(--tier-line); color: var(--tier-ink); }
+.pill.tier-bronce::before, .pill.tier-plata::before, .pill.tier-oro::before {
+  content: ""; width: 9px; height: 9px; border-radius: 50%; flex: none;
+  background: var(--tier-dot); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .18), 0 0 6px var(--tier-line); }
+.pill.tier-bronce { --tier-bg: rgba(205, 127, 50, .14); --tier-line: rgba(224, 146, 80, .5); --tier-ink: #f2b483; --tier-dot: radial-gradient(circle at 35% 30%, #f6c08f, #b56a2c 70%); }
+.pill.tier-plata  { --tier-bg: rgba(210, 220, 230, .1); --tier-line: rgba(210, 220, 230, .42); --tier-ink: #dde5ec; --tier-dot: radial-gradient(circle at 35% 30%, #ffffff, #9aa5b1 70%); }
+.pill.tier-oro    { --tier-bg: rgba(247, 201, 30, .12); --tier-line: rgba(247, 201, 30, .5); --tier-ink: #ffd84d; --tier-dot: radial-gradient(circle at 35% 30%, #fff3a8, #d9a400 70%); }
+.pill.points { background: none; padding: 2px; color: #f7c91e; font-weight: 800; font-size: .8rem; letter-spacing: 0; vertical-align: 1px; }
 .tier-select { padding: 4px 8px; border-radius: 999px; font-weight: 700; border: 0; }
 .tier-select.tier-bronce { background: #b56a2c; color: #fff; }
 .tier-select.tier-plata { background: #b4bcc6; color: #1e2a1f; }
