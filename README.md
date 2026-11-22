@@ -15,7 +15,9 @@
 **[Discord](https://discord.gg/4KU8C9bEHy)** ·
 **[Support the project](https://jhondydario.github.io/Greeny/#/contribuir)**
 
-<!-- SCREENSHOTS: pop-up in game + the app (to be added) -->
+<br>
+
+<img src="docs/img/logro_en_juego.webp" alt="An achievement pop-up appearing in Mario Kart 8 Deluxe" width="49%"> <img src="docs/img/app.webp" alt="Browsing the Greeny app on the Switch" width="49%">
 
 </div>
 
@@ -31,8 +33,37 @@ Play your games as usual and Greeny lets you know **the moment you earn an achie
 - 📱 **The Greeny app** on your Switch: your games, achievements, progress, profile, badges and play time.
 - 🌍 **Online profile and rankings**: link your console, follow your friends and climb the worldwide, country and friends leaderboards.
 - 💬 **Comments** on every supported game.
-- 🎮 **In-game view** through Tesla (optional).
+- 🎮 **In-game view** through Tesla (optional): check your achievements and progress without leaving the game.
 - 🌗 Spanish and English, light and dark themes, music and sounds.
+
+## Screenshots
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/img/mk8d_pocket_change_en.jpg" alt="Achievement unlocked pop-up in Mario Kart 8 Deluxe"><br><sub><b>Achievement unlocked</b> – a pop-up and a sound the moment you earn it.</sub></td>
+    <td width="50%"><img src="docs/img/ssbu_cant_touch_this_en.jpg" alt="Gold achievement pop-up in Super Smash Bros. Ultimate"><br><sub><b>Bronze, silver and gold</b> – harder achievements give more points.</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/img/sm3dw_meow_en.jpg" alt="Achievement pop-up in Super Mario 3D World"><br><sub><b>Made for each game</b> – achievements built around what you actually do in the game.</sub></td>
+    <td width="50%"><img src="docs/img/mk8d_logros_activos.jpg" alt="Achievements on pop-up when Mario Kart 8 Deluxe starts"><br><sub><b>Achievements on</b> – Greeny tells you it is ready when the game starts.</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/img/tesla_mk8d_list.jpg" alt="Greeny achievement list in Tesla over Mario Kart 8 Deluxe"><br><sub><b>Check them mid-game</b> – open Tesla, pick Greeny and see what is left without leaving the game.</sub></td>
+    <td width="50%"><img src="docs/img/tesla_mk8d_detail.jpg" alt="Achievement details in Tesla over Mario Kart 8 Deluxe"><br><sub><b>Every detail</b> – how to earn it, its points and whether you have it.</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/img/tesla_in_game.jpg" alt="Greeny achievement progress in Tesla over Super Mario 3D World"><br><sub><b>Live progress</b> – see how far you are, like 10 of 28 stamps.</sub></td>
+    <td width="50%"><img src="docs/img/app_achievements.jpg" alt="Achievement grid for a game in the Greeny app"><br><sub><b>Every achievement</b> – medals, points and your progress on each one.</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/img/app_my_games.jpg" alt="My games list with progress bars"><br><sub><b>My games</b> – your progress in every game you have played.</sub></td>
+    <td width="50%"><img src="docs/img/app_game.jpg" alt="Game page with rankings and comments"><br><sub><b>Game page</b> – how you rank worldwide, in your country and among friends.</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/img/app_profile.jpg" alt="Player profile with level, points and badges"><br><sub><b>Your profile</b> – level, points, badges and friend code.</sub></td>
+    <td width="50%"><img src="docs/img/app_find.jpg" alt="Find games screen listing supported games on the console"><br><sub><b>Find games</b> – see which of your games already have achievements.</sub></td>
+  </tr>
+</table>
 
 ## Supported games
 

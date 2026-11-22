@@ -857,6 +857,22 @@ input.switch:focus-visible { outline: 2px solid var(--yellow); outline-offset: 2
   .shelf-item { flex: 0 0 42%; scroll-snap-align: start; }
 }
 
+/* Greeny en accion: videos y tira de capturas */
+.showcase h2 { margin-top: 0; }
+.showcase-videos { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.showcase-video { margin: 0; }
+.showcase-video video { width: 100%; aspect-ratio: 16 / 9; border-radius: 12px; display: block; background: #000; }
+.showcase-video figcaption { margin-top: 6px; text-align: center; }
+.showcase-row { display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory; padding: 14px 0 6px; }
+.showcase-shot { flex: 0 0 calc((100% - 36px) / 4); scroll-snap-align: start; border-radius: 10px; overflow: hidden; transition: transform .18s ease; }
+.showcase-shot:hover { transform: translateY(-3px); }
+.showcase-shot img { width: 100%; height: auto; display: block; }
+.how-shot { width: 100%; max-width: 640px; height: auto; border-radius: 10px; margin: 8px 0 4px; display: block; }
+@media (max-width: 720px) {
+  .showcase-videos { grid-template-columns: 1fr; }
+  .showcase-shot { flex-basis: 78%; }
+}
+
 /* barras de progreso sin animacion: se apaga en Ajustes */
 .no-bar-anim .bar > i { animation: none !important; }
 
