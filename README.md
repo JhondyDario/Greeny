@@ -35,7 +35,6 @@ Play your games as usual and Greeny lets you know **the moment you earn an achie
 - 💬 **Comments** on every supported game.
 - 🎮 **In-game view** through Tesla (optional): check your achievements and progress without leaving the game.
 - 🌗 Spanish and English, light and dark themes, music and sounds.
-- 🌐 **Coming soon: online achievements**, earned by playing online and compatible with [Nextendo Network](https://github.com/NextendoNetwork).
 
 ## Screenshots
 
@@ -73,6 +72,17 @@ Play your games as usual and Greeny lets you know **the moment you earn an achie
 <p align="center"><img src="docs/img/juegos_iniciales.png" alt="Super Mario 3D World + Bowser's Fury: 73 achievements · Super Smash Bros. Ultimate: 44 achievements · Mario Kart 8 Deluxe: 51 achievements" width="100%"></p>
 
 New games are added regularly. See the **[Games](https://jhondydario.github.io/Greeny/#/juegos)** page for the full list and the status of each one.
+
+## Roadmap
+
+- 🤝 Group achievements to earn together with your friends.
+- 🎮 Many more achievements in many more games.
+- 🔥 Hardcore achievements.
+- 🌐 Achievements for playing online, compatible with [Nextendo Network](https://github.com/NextendoNetwork).
+- 🆕 Achievements for Switch 2 games.
+- 📱 Android and iOS apps.
+- 🏠 A dedicated domain for the website.
+- ✨ And much more.
 
 ## Installation
 

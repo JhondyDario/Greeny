@@ -178,6 +178,16 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fo
 /* nivel y medallas del perfil */
 .pill.lvl { font-size: 1rem; padding: 5px 16px; }
 .level .bar { height: 14px; }
+/* ultimos logros del perfil, en casillas */
+.ach-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); }
+.ach-tile { display: flex; flex-direction: column; gap: 6px; padding: 14px; text-decoration: none; color: inherit; min-width: 0; transition: transform .18s ease; }
+.ach-tile:hover { transform: translateY(-3px); }
+.ach-tile-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+.ach-tile-top .icon { width: 64px; height: 64px; }
+.ach-tile-name { line-height: 1.25; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.ach-tile-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: auto; padding-top: 4px; }
+@media (max-width: 720px) { .ach-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .ach-tile-top .icon { width: 52px; height: 52px; } }
+
 /* medallas del perfil: una fila, como en la app */
 .badge-strip { display: flex; gap: 6px; overflow: hidden; padding: 4px 2px; }
 .badge-mini { flex: 0 0 88px; display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; }
