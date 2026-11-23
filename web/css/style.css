@@ -178,6 +178,15 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fo
 /* nivel y medallas del perfil */
 .pill.lvl { font-size: 1rem; padding: 5px 16px; }
 .level .bar { height: 14px; }
+/* seguidores / siguiendo */
+.stat-btn { font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.stat-btn:hover, .stat-btn[aria-expanded="true"] { border-color: var(--green); }
+.follow-box { margin-top: 12px; }
+.follow-box[hidden] { display: none; }
+.follow-list { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+.follow-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 12px; text-decoration: none; color: inherit; background: rgba(255, 255, 255, .04); }
+.follow-item:hover { background: rgba(255, 255, 255, .09); }
+
 /* ultimos logros del perfil, en casillas */
 .ach-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); }
 .ach-tile { display: flex; flex-direction: column; gap: 6px; padding: 14px; text-decoration: none; color: inherit; min-width: 0; transition: transform .18s ease; }
