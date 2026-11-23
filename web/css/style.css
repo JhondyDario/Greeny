@@ -906,18 +906,18 @@ input.switch:focus-visible { outline: 2px solid var(--yellow); outline-offset: 2
 }
 
 /* cintas que se mueven solas (juegos disponibles y capturas); se paran al pasar el raton */
-.marquee { overflow: hidden; padding: 4px 0 6px;
+.belt { overflow: hidden; padding: 4px 0 6px;
   -webkit-mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
           mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent); }
-.marquee-track { display: flex; gap: 12px; width: max-content; animation: marquee-left linear infinite; }
-.marquee-track > * { margin-right: 0; }
-.marquee-track.right { animation-name: marquee-right; }
-.marquee:hover .marquee-track, .marquee:focus-within .marquee-track { animation-play-state: paused; }
-@keyframes marquee-left { from { transform: translateX(0); } to { transform: translateX(calc(-50% - 6px)); } }
-@keyframes marquee-right { from { transform: translateX(calc(-50% - 6px)); } to { transform: translateX(0); } }
+.belt-track { display: flex; gap: 12px; width: max-content; animation: belt-left linear infinite; }
+.belt-track > * { margin-right: 0; }
+.belt-track.right { animation-name: belt-right; }
+.belt:hover .belt-track, .belt:focus-within .belt-track { animation-play-state: paused; }
+@keyframes belt-left { from { transform: translateX(0); } to { transform: translateX(calc(-50% - 6px)); } }
+@keyframes belt-right { from { transform: translateX(calc(-50% - 6px)); } to { transform: translateX(0); } }
 @media (prefers-reduced-motion: reduce) {
-  .marquee { overflow-x: auto; -webkit-mask-image: none; mask-image: none; }
-  .marquee-track { animation: none; }
+  .belt { overflow-x: auto; -webkit-mask-image: none; mask-image: none; }
+  .belt-track { animation: none; }
 }
 
 /* barras de progreso sin animacion: se apaga en Ajustes */
