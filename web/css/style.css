@@ -184,6 +184,7 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fo
 .follow-box { margin-top: 12px; }
 a.stat-btn { text-decoration: none; }
 .player-search { width: 100%; }
+@media (max-width: 720px) { .follow-list.latest .follow-item:nth-child(n+4) { display: none; } }
 .feed-row .avatar { width: 36px; height: 36px; }
 .feed-who { color: var(--ink); font-weight: 600; }
 .follow-box[hidden] { display: none; }
