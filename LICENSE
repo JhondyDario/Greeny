@@ -13,6 +13,10 @@ Without written permission from the author you may not:
   - reuse its achievement definitions, artwork, mascot, sounds or name;
   - sell it or include it in paid products or bundles.
 
+Integrations are the exception: other projects may read the files Greeny writes on the SD card,
+launch the Greeny app and use its name to credit it, under the terms in INTEGRATIONS.md. That
+permission does not cover the achievement definitions, the binaries or the source code.
+
 The Tesla overlay (folder "overlay") includes libtesla and is distributed under the
 GNU General Public License v2; see overlay/LICENSE. Third-party components keep their own
 licenses; see THIRD_PARTY_NOTICES.md.

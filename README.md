@@ -150,6 +150,13 @@ Write your Greeny username in the donation note so we know who to give it to.<br
 
 </div>
 
+## Integrations
+
+Greeny is built to be extended. HOME menus, launchers, overlays and other homebrew can show Greeny achievements
+— much like RetroAchievements lives inside many emulators while staying one project — as long as Greeny stays
+the source and is credited as **"Achievements by Greeny"**. See [INTEGRATIONS.md](INTEGRATIONS.md) for what is
+allowed and the files you can read.
+
 ## License
 
 Greeny is free for personal use. © Jhondy Dario. All rights reserved. See [LICENSE](LICENSE).
