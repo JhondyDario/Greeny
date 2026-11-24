@@ -178,6 +178,13 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fo
 /* nivel y medallas del perfil */
 .pill.lvl { font-size: 1rem; padding: 5px 16px; }
 .level .bar { height: 14px; }
+/* copiar el enlace del perfil, junto al @usuario */
+.link-copy { display: inline-grid; place-items: center; width: 24px; height: 24px; padding: 0; margin-left: 2px; vertical-align: -6px;
+  border: 0; border-radius: 6px; background: none; color: var(--muted); cursor: pointer; transition: color .15s ease, background .15s ease; }
+.link-copy:hover, .link-copy:focus-visible { color: var(--ink); background: rgba(255, 255, 255, .08); }
+.link-copy.done { color: #4ade80; }
+.link-copy.done::after { content: "✓"; position: absolute; margin: -22px 0 0 18px; font-size: .75rem; font-weight: 800; }
+
 /* seguidores / siguiendo */
 .stat-btn { font: inherit; color: inherit; text-align: left; cursor: pointer; }
 .stat-btn:hover, .stat-btn[aria-expanded="true"] { border-color: var(--green); }
