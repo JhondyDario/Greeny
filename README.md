@@ -71,12 +71,15 @@ Play your games as usual and Greeny lets you know **the moment you earn an achie
 
 <p align="center"><img src="docs/img/juegos_iniciales.png" alt="Greeny mascots celebrating with gold, silver and bronze trophies" width="100%"></p>
 
-| Game | Achievements |
-|---|---|
-| Super Mario 3D World + Bowser's Fury | 73 |
-| Mario Kart 8 Deluxe | 51 |
-| Super Smash Bros. Ultimate | 44 |
-| Super Mario Bros. Wonder | 33 |
+<div align="center">
+<table>
+  <tr><th>Game</th><th>Achievements</th></tr>
+  <tr><td>Super Mario 3D World + Bowser's Fury</td><td align="center">76</td></tr>
+  <tr><td>Mario Kart 8 Deluxe</td><td align="center">54</td></tr>
+  <tr><td>Super Smash Bros. Ultimate</td><td align="center">47</td></tr>
+  <tr><td>Super Mario Bros. Wonder</td><td align="center">36</td></tr>
+</table>
+</div>
 
 New games are added regularly. See the **[Games](https://jhondydario.github.io/Greeny/#/juegos)** page for the full list and the status of each one.
 
