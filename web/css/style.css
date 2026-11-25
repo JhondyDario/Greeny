@@ -1008,3 +1008,11 @@ a.card:hover .marquee > span, a.card:focus-visible .marquee > span { animation: 
 
 /* version del juego junto al nombre: los logros son para esa version */
 .ver-pill { font-size: .45em; vertical-align: middle; margin-left: 10px; background: var(--green); color: #fff; padding: 4px 10px; }
+
+/* etiqueta sutil de rol en el perfil: administrador o beta tester */
+.role-tag { display: inline-block; margin-left: 8px; padding: 1px 8px; border-radius: 999px; font-size: .72rem; font-weight: 600;
+  letter-spacing: .02em; vertical-align: middle; border: 1px solid currentColor; opacity: .85; }
+.role-tag.role-admin { color: var(--green-dk); }
+.role-tag.role-tester { color: #8a5cd1; }
+.staff-row { flex-wrap: wrap; gap: 10px; }
+@media (prefers-color-scheme: dark) { .role-tag.role-tester { color: #c3a3ff; } .role-tag.role-admin { color: #7fe08a; } }
