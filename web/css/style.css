@@ -1007,7 +1007,10 @@ a.card:hover .marquee > span, a.card:focus-visible .marquee > span { animation: 
 .friends-faces .avatar.tiny + .avatar.tiny { margin-left: -8px; }
 
 /* version del juego junto al nombre: los logros son para esa version */
-.ver-pill { font-size: .45em; vertical-align: middle; margin-left: 10px; background: var(--green); color: #fff; padding: 4px 10px; }
+.game-title { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 14px; }
+.ver-pill { display: inline-flex; align-items: center; font-size: .42em; font-weight: 700; line-height: 1; letter-spacing: .03em;
+  padding: 7px 12px; border-radius: 999px; color: #8ee89a; background: rgba(127, 224, 138, .12);
+  border: 1px solid rgba(127, 224, 138, .4); font-variant-numeric: tabular-nums; white-space: nowrap; }
 
 /* etiqueta sutil de rol en el perfil: administrador o beta tester */
 .role-tag { display: inline-block; margin-left: 8px; padding: 1px 8px; border-radius: 999px; font-size: .72rem; font-weight: 600;
