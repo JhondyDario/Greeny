@@ -12,6 +12,7 @@ Greeny uses these components. Each one keeps its own license.
 | zlib, libpng, bzip2 | app | zlib / libpng / bzip2 licenses |
 | stb_image (Sean Barrett) | app | MIT / Public Domain |
 | QR Code generator (Project Nayuki) | app | MIT |
+| Twemoji (Mozilla twemoji-colr font) | app, emoji in text | Graphics CC-BY 4.0 (Twitter, Inc. and contributors); font build MIT |
 | supabase-js | website | MIT |
 
 Nintendo Switch is a trademark of Nintendo. Greeny is not affiliated with Nintendo.

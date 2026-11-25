@@ -993,3 +993,18 @@ a.card:hover .marquee > span, a.card:focus-visible .marquee > span { animation: 
 .how-section-body { padding: 0 20px 18px; }
 .how-section-body .card { box-shadow: none; }
 .how-section > summary .grow { flex: 1; min-width: 0; }
+
+/* arrastrar y soltar archivos en el panel */
+.drop-zone { transition: outline-color .15s, background-color .15s; outline: 2px dashed transparent; outline-offset: 4px; border-radius: 10px; }
+.drop-zone.drop-over { outline-color: var(--green); background-color: rgba(46, 158, 68, .08); }
+.drop-hint { display: block; font-size: .8em; opacity: .7; margin-top: 4px; }
+@media (hover: none) { .drop-hint { display: none; } }
+
+/* "Ikki y 2 más lo tienen" en la lista de logros de un juego */
+.friends-have { display: flex; align-items: center; gap: 6px; margin-top: 4px; flex-wrap: wrap; }
+.friends-faces { display: inline-flex; }
+.friends-faces .avatar.tiny { width: 22px; height: 22px; font-size: .65rem; border: 2px solid var(--card-solid); }
+.friends-faces .avatar.tiny + .avatar.tiny { margin-left: -8px; }
+
+/* version del juego junto al nombre: los logros son para esa version */
+.ver-pill { font-size: .45em; vertical-align: middle; margin-left: 10px; background: var(--green); color: #fff; padding: 4px 10px; }
