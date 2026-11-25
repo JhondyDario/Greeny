@@ -69,7 +69,14 @@ Play your games as usual and Greeny lets you know **the moment you earn an achie
 
 ## Supported games
 
-<p align="center"><img src="docs/img/juegos_iniciales.png" alt="Super Mario 3D World + Bowser's Fury: 73 achievements · Super Smash Bros. Ultimate: 44 achievements · Mario Kart 8 Deluxe: 51 achievements" width="100%"></p>
+<p align="center"><img src="docs/img/juegos_iniciales.png" alt="Greeny mascots celebrating with gold, silver and bronze trophies" width="100%"></p>
+
+| Game | Achievements |
+|---|---|
+| Super Mario 3D World + Bowser's Fury | 73 |
+| Mario Kart 8 Deluxe | 51 |
+| Super Smash Bros. Ultimate | 44 |
+| Super Mario Bros. Wonder | 33 |
 
 New games are added regularly. See the **[Games](https://jhondydario.github.io/Greeny/#/juegos)** page for the full list and the status of each one.
 
