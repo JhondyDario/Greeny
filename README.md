@@ -139,29 +139,52 @@ Yes! Join the <a href="https://discord.gg/4KU8C9bEHy">Discord</a> to become a te
 
 ## Community
 
-- 💬 **[Discord](https://discord.gg/4KU8C9bEHy)** – news, help and game testing.
-- 🌐 **[Website](https://jhondydario.github.io/Greeny/)** – profiles, rankings and comments.
+<div align="center">
+
+<table>
+  <tr>
+    <td align="center" width="33%">
+      <a href="https://discord.gg/4KU8C9bEHy"><img src="https://img.shields.io/badge/Discord-join-5865F2?logo=discord&logoColor=white&style=for-the-badge" alt="Join the Discord"></a><br>
+      <sub>News, help, game requests and testing.</sub>
+    </td>
+    <td align="center" width="33%">
+      <a href="https://jhondydario.github.io/Greeny/"><img src="https://img.shields.io/badge/Website-visit-0EA5E9?style=for-the-badge" alt="Visit the website"></a><br>
+      <sub>Profiles, rankings, comments and every supported game.</sub>
+    </td>
+    <td align="center" width="33%">
+      <a href="https://github.com/JhondyDario/Greeny/issues"><img src="https://img.shields.io/badge/Issues-report-E5484D?logo=github&logoColor=white&style=for-the-badge" alt="Report a problem"></a><br>
+      <sub>Found a bug or an achievement that does not unlock? Tell us.</sub>
+    </td>
+  </tr>
+</table>
+
+</div>
 
 ## Support the project
 
 <div align="center">
 
 Greeny is free and made by one person in their spare time.<br>
-If you enjoy it, you can help keep it going.
+There are many ways to help, and most of them cost nothing.
+
+<table>
+  <tr>
+    <td align="center" width="25%">⭐<br><b>Star the repo</b><br><sub>It helps more people find Greeny.</sub></td>
+    <td align="center" width="25%">📣<br><b>Share it</b><br><sub>Forums, Discord servers, friends.</sub></td>
+    <td align="center" width="25%">🎮<br><b>Test games</b><br><sub>Help us bring new games to Greeny. Ask on Discord.</sub></td>
+    <td align="center" width="25%">🐞<br><b>Report achievements</b><br><sub>From the app or the website, in one tap.</sub></td>
+  </tr>
+</table>
 
 <br>
+
+<img src="docs/img/donador.png" alt="Donor badge" width="96"><br>
+<b>Donate and get the donor badge</b>
 
 <a href="https://www.paypal.com/donate/?hosted_button_id=B82PT4TEHBG3G"><img src="https://img.shields.io/badge/Donate-PayPal-00457C?logo=paypal&logoColor=white&style=for-the-badge" alt="Donate with PayPal"></a>
 
-<br>
-
-<img src="docs/img/donador.png" alt="Donor badge" width="96">
-
-**Donor badge**
-
-Every donor gets it on their Greeny profile, on the website and in the app.<br>
-Write your Greeny username in the donation note so we know who to give it to.<br>
-<sub>It is added by hand, so it can take a little while. It is only a badge: no achievements or ranking advantage.</sub>
+<sub>Write your Greeny username in the donation note. The badge shows on your profile, on the website and in the app.<br>
+It is added by hand, so it can take a little while. It is only a badge: no achievements or ranking advantage.</sub>
 
 </div>
 
