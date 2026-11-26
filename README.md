@@ -1,6 +1,8 @@
 <div align="center">
 
-<img src="web/img/logo.png" alt="Greeny" width="440">
+<img src="web/img/logo.png" alt="Greeny Achievements" width="440">
+
+# Greeny Achievements
 
 ### The first unofficial achievement system for the Nintendo Switch
 
@@ -131,6 +133,9 @@ Achievements for playing online are coming, and they will be compatible with [Ne
 
 Yes! Join the <a href="https://discord.gg/4KU8C9bEHy">Discord</a> to become a tester for new games.
 </details>
+
+**More technical questions** (RAM usage, homebrew games, emulators, Switch 2, save files): see the
+**[Technical FAQ](FAQ.md)**.
 
 ## Community
 
