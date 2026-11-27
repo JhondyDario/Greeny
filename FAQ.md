@@ -24,6 +24,27 @@ the achievement definitions and the code were public, faking achievements would 
 
 Soon an **open-source SDK** will let homebrew and ports add their own achievements.
 
+### Why isn't it fully open yet?
+
+- **Fair rankings come first.** Greeny has public rankings and profiles. While the project is this young, the
+  checks that stop fake achievements are still being built. Publishing all the code now would make cheating
+  much easier before those checks are ready, and the rankings would stop meaning anything.
+- **It is a new, one-person project.** Opening a project well (clear license, contribution rules, review of every
+  file) takes time. We would rather do it right than rush it.
+- **The achievement definitions are the community's work.** Each game takes hours of research. They stay
+  protected so nobody can copy the whole catalog and publish it as their own.
+
+### Will it be opened in the future?
+
+That is the plan, step by step: first the **SDK** (open source), then more of Greeny as the anti-cheat checks
+and the community grow. The achievement definitions, the name and the artwork will stay protected.
+
+### Can I contribute now?
+
+Yes, and you don't need the source code for most of it: test new games, find the values for new achievements,
+report achievements that don't work, suggest ideas, translate, or build an integration
+([INTEGRATIONS.md](INTEGRATIONS.md)). Join us on [Discord](https://discord.gg/4KU8C9bEHy).
+
 ## Does it track achievements in homebrew (.nro) games?
 
 Not yet. Greeny is built around retail Switch games.

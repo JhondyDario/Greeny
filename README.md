@@ -118,6 +118,8 @@ No. Greeny only watches what happens while you play. It never changes your games
 <summary><b>Is Greeny open source?</b></summary>
 
 Not fully. **Greeny is free, with open integration formats.** The core is closed to protect fair rankings, but any homebrew can read Greeny's data ([INTEGRATIONS.md](INTEGRATIONS.md)), the Tesla overlay is open source (GPL-2.0), and soon an **open-source SDK** will let homebrew and ports add their own achievements.
+
+The plan is to open more of Greeny step by step, as the anti-cheat checks and the community grow. Why it is not fully open yet, and how you can contribute today: see the [Technical FAQ](FAQ.md#is-greeny-open-source).
 </details>
 
 <details>
