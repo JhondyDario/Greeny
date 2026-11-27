@@ -206,7 +206,7 @@ allowed and the files you can read.
 ## License
 
 Greeny is free for personal use, with open integration formats ([INTEGRATIONS.md](INTEGRATIONS.md)). The core is closed
-to protect fair rankings. © Jhondy Dario. All rights reserved. See [LICENSE](LICENSE).
+to protect fair rankings. © Jhondy. All rights reserved. See [LICENSE](LICENSE).
 
 The Tesla overlay source code is published with each release under GPL-2.0. Third-party components: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
