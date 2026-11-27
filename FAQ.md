@@ -13,6 +13,17 @@ total (code plus memory). It takes nothing from the game's own memory.
 There is no noticeable effect on performance or battery. Greeny only reads a few values a few times per
 second.
 
+## Is Greeny open source?
+
+Not fully. **Greeny is free, with open integration formats.** The core is closed to protect fair rankings: if
+the achievement definitions and the code were public, faking achievements would be trivial. What is open:
+
+- the **file formats** any homebrew can read to show Greeny achievements ([INTEGRATIONS.md](INTEGRATIONS.md));
+- the **Tesla overlay**, open source under GPL-2.0 (its source ships with every release);
+- the list of **third-party components** we use ([THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)).
+
+Soon an **open-source SDK** will let homebrew and ports add their own achievements.
+
 ## Does it track achievements in homebrew (.nro) games?
 
 Not yet. Greeny is built around retail Switch games.

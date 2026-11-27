@@ -115,6 +115,12 @@ No. Greeny only watches what happens while you play. It never changes your games
 </details>
 
 <details>
+<summary><b>Is Greeny open source?</b></summary>
+
+Not fully. **Greeny is free, with open integration formats.** The core is closed to protect fair rankings, but any homebrew can read Greeny's data ([INTEGRATIONS.md](INTEGRATIONS.md)), the Tesla overlay is open source (GPL-2.0), and soon an **open-source SDK** will let homebrew and ports add their own achievements.
+</details>
+
+<details>
 <summary><b>Do I need an account?</b></summary>
 
 Not to play. An account is only needed for your online profile, the rankings, comments and following friends.
@@ -197,7 +203,8 @@ allowed and the files you can read.
 
 ## License
 
-Greeny is free for personal use. © Jhondy Dario. All rights reserved. See [LICENSE](LICENSE).
+Greeny is free for personal use, with open integration formats ([INTEGRATIONS.md](INTEGRATIONS.md)). The core is closed
+to protect fair rankings. © Jhondy Dario. All rights reserved. See [LICENSE](LICENSE).
 
 The Tesla overlay source code is published with each release under GPL-2.0. Third-party components: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
