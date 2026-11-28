@@ -39,7 +39,8 @@ docker run --rm -v "${PWD}:/src" -w /src devkitpro/devkita64:latest make TARGET_
 ```
 
 Copy `build/us_nx/sm64.us.f3dex2e.nro` to `sdmc:/switch/`. Open it **as an application**: hold **R** while
-starting any game, then pick it in the homebrew menu. Opened from the Album it gets less memory and Greeny
+starting any game, then pick it in the homebrew menu, or install it as a **forwarder** (its own icon on the
+HOME menu), which also runs it as an application. Opened from the Album it gets less memory and Greeny
 does not see it. You need Greeny 1.0.2 or newer.
 
 ## Fair play

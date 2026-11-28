@@ -100,7 +100,10 @@ p { margin: 0 0 12px; }
 .pill.ok { background: var(--green); color: #fff; }
 .pill.no { background: var(--line); color: var(--ink); }
 .pill.pts { background: var(--yellow); color: var(--on-yellow); }
-.pill.port-pill { background: #6a4fd1; color: #fff; }
+.pill.kind-port, .pill.kind-switch { border: 1px solid; font-weight: 700; padding-left: 4px; }
+.pill.kind-port { background: rgba(139, 92, 246, .2); border-color: rgba(167, 139, 250, .6); color: #cdb8ff; }
+.pill.kind-switch { background: rgba(230, 0, 18, .16); border-color: rgba(255, 90, 100, .55); color: #ffb3b8; }
+.pill-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
 .bar { height: 12px; border-radius: 6px; background: var(--line); overflow: hidden; }
 .bar > i { display: block; height: 100%; background: var(--green); border-radius: 6px; }

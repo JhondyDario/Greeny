@@ -58,8 +58,8 @@ changed later without rebuilding your game.
 - **Fair play.** Any homebrew can talk to Greeny, so achievements from homebrew and ports **don't add
   points to the global ranking**. They show on profiles with a **Port** tag and have their own ranking.
 - Requires Greeny **1.0.2** or newer on the console.
-- Your game must run **as an application** (title takeover: hold R while starting a game), not from the
-  Album. That's also where homebrew games get the most memory.
+- Your game must run **as an application** (hold R while starting a game, or a forwarder on the HOME menu),
+  not from the Album. That's also where homebrew games get the most memory.
 
 ## Example: sm64ex
 
