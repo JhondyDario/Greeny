@@ -1032,3 +1032,5 @@ a.card:hover .marquee > span, a.card:focus-visible .marquee > span { animation: 
 .games-section { display: flex; align-items: center; gap: 10px; margin-top: 28px; }
 .games-section .tab-count { font-size: .9rem; }
 .status-select { width: 100%; max-width: 640px; }
+.port-links { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 6px 0; }
+.btn.with-icon { display: inline-flex; align-items: center; gap: 6px; }
