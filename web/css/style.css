@@ -1032,5 +1032,7 @@ a.card:hover .marquee > span, a.card:focus-visible .marquee > span { animation: 
 .games-section { display: flex; align-items: center; gap: 10px; margin-top: 28px; }
 .games-section .tab-count { font-size: .9rem; }
 .status-select { width: 100%; max-width: 640px; }
-.port-links { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 6px 0; }
+.pill.gh-pill { border: 1px solid rgba(255, 255, 255, .22); background: rgba(0, 0, 0, .35); color: var(--ink); font-weight: 700; padding-left: 6px; text-decoration: none; }
+.pill.gh-pill:hover { background: rgba(0, 0, 0, .55); }
+.pill.gh-pill svg { width: 15px; height: 15px; fill: currentColor; }
 .btn.with-icon { display: inline-flex; align-items: center; gap: 6px; }

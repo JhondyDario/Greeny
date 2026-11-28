@@ -1,5 +1,7 @@
 # Greeny SDK
 
+<p align="center"><img src="../docs/img/sm64_port_achievement.gif" alt="An achievement unlocking in the Super Mario 64 port" width="70%"></p>
+
 Add Greeny achievements to your homebrew game or port in about 5 minutes. Players get the same pop-ups,
 app, profile and website as with retail games.
 
@@ -61,10 +63,17 @@ changed later without rebuilding your game.
 - Your game must run **as an application** (hold R while starting a game, or a forwarder on the HOME menu),
   not from the Album. That's also where homebrew games get the most memory.
 
+## Want achievements in your port?
+
+If you make or maintain a homebrew game or a port on GitHub, we'd love to help: open an
+[issue](https://github.com/JhondyDario/Greeny/issues) or write on [Discord](https://discord.gg/4KU8C9bEHy).
+We set up the achievements with you; your code only needs the calls above.
+
 ## Example: sm64ex
 
 [`ejemplos/sm64ex`](ejemplos/sm64ex) adds 46 achievements to the Switch port of sm64ex. The game itself
-only changes in 3 lines; everything else is one extra file.
+only changes in 3 lines; everything else is one extra file. Ready to play:
+[JhondyDario/greeny-sm64](https://github.com/JhondyDario/greeny-sm64) (source and one-click builder).
 
 ## License
 

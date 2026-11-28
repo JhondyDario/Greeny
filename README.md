@@ -36,7 +36,16 @@ Play your games as usual and Greeny lets you know **the moment you earn an achie
 - 🌍 **Online profile and rankings**: link your console, follow your friends and climb the worldwide, country and friends leaderboards.
 - 💬 **Comments** on every supported game.
 - 🎮 **In-game view** through Tesla (optional): check your achievements and progress without leaving the game.
+- 🧩 **Ports & homebrew**: with the open-source [Greeny SDK](sdk/), homebrew games and ports get achievements too.
 - 🌗 Spanish and English, light and dark themes, music and sounds.
+
+## In action
+
+<p align="center">
+<img src="docs/img/wonder_achievement.gif" alt="An achievement unlocking in Super Mario Bros. Wonder" width="32%">
+<img src="docs/img/sm64_port_achievement.gif" alt="An achievement unlocking in the Super Mario 64 port" width="32%">
+<img src="docs/img/jamboree_achievement.gif" alt="An achievement unlocking in Super Mario Party Jamboree" width="32%">
+</p>
 
 ## Screenshots
 
@@ -203,11 +212,30 @@ Greeny is built to be extended. HOME menus, launchers, overlays and other homebr
 the source and is credited as **"Achievements by Greeny"**. See [INTEGRATIONS.md](INTEGRATIONS.md) for what is
 allowed and the files you can read.
 
-### Achievements in your homebrew or port
+## <img src="docs/img/ports.png" alt="" width="36" align="top"> Ports & homebrew: add Greeny to your game
 
-With the **[Greeny SDK](sdk/)** (one C file, MIT) your homebrew game or port gets Greeny achievements: same
-pop-ups, app and profile. The first one is the Switch port of sm64ex, with 46 achievements
-([example](sdk/ejemplos/sm64ex)).
+**Do you make a homebrew game or a port for the Switch? Add Greeny achievements to it.** Your players get the
+same pop-ups, app, profile and Tesla overlay as with retail games, and it takes about 5 minutes:
+
+1. Add **one C file**, [`greeny.h`](sdk/greeny.h) (MIT license, works in open and closed projects).
+2. Report what happens: `greeny_stat("stars", 70)`, `greeny_event("boss_beaten")`.
+3. Tell us on [Discord](https://discord.gg/4KU8C9bEHy) or in an [issue](https://github.com/JhondyDario/Greeny/issues)
+   which achievements you want. We add them to the catalog (names, points, pictures) and they can change
+   without rebuilding your game.
+
+Full guide: **[Greeny SDK](sdk/)**. Port and homebrew developers are very welcome: if you maintain a port on
+GitHub and want achievements in it, open an issue and we'll help you set it up.
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/img/sm64_achievements_on.jpg" alt="Achievements on when the Super Mario 64 port starts"><br><sub><b>Super Mario 64 (sm64ex)</b> – the first port with Greeny: 46 achievements.</sub></td>
+    <td width="50%"><img src="docs/img/app_my_games_sm64.jpg" alt="The Super Mario 64 port next to Switch games in the Greeny app"><br><sub><b>Right next to your games</b> – ports show in the app with their own tab.</sub></td>
+  </tr>
+</table>
+
+Play it: **[JhondyDario/greeny-sm64](https://github.com/JhondyDario/greeny-sm64)** has the source and a
+[one-click builder for Windows](https://github.com/JhondyDario/greeny-sm64/releases/latest) that uses your own
+copy of the game. Ports show with a **Port** tag and don't add points to the global ranking.
 
 ## License
 
