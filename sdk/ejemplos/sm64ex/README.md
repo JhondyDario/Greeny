@@ -21,6 +21,12 @@ change without rebuilding the game. Without Greeny installed, the port works exa
 
 ## Build it
 
+**Easiest (Windows):** download **Greeny-SM64-Builder.zip** from the
+[releases](https://github.com/JhondyDario/greeny-sm64/releases/latest), double-click `Crear port.bat` and pick
+your ROM. It converts and checks the ROM, builds the port with Docker Desktop and leaves the `.nro` ready.
+
+**By hand:**
+
 You need Docker and **your own** dump of the game (US version). The ROM is only used on your machine to
 extract the assets; nothing from it is in this repository, and please don't ask for one.
 
