@@ -100,6 +100,7 @@ p { margin: 0 0 12px; }
 .pill.ok { background: var(--green); color: #fff; }
 .pill.no { background: var(--line); color: var(--ink); }
 .pill.pts { background: var(--yellow); color: var(--on-yellow); }
+.pill.port-pill { background: #6a4fd1; color: #fff; }
 
 .bar { height: 12px; border-radius: 6px; background: var(--line); overflow: hidden; }
 .bar > i { display: block; height: 100%; background: var(--green); border-radius: 6px; }
@@ -1019,3 +1020,12 @@ a.card:hover .marquee > span, a.card:focus-visible .marquee > span { animation: 
 .role-tag.role-tester { color: #8a5cd1; }
 .staff-row { flex-wrap: wrap; gap: 10px; }
 @media (prefers-color-scheme: dark) { .role-tag.role-tester { color: #c3a3ff; } .role-tag.role-admin { color: #7fe08a; } }
+
+/* respuestas a un comentario */
+.review .replies { margin: 8px 0 0; padding-left: 14px; border-left: 3px solid var(--line); display: grid; gap: 10px; }
+.review .reply { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: start; }
+.review .reply .avatar { width: 32px; height: 32px; }
+.review .reply .body { margin: 4px 0; }
+.games-section { display: flex; align-items: center; gap: 10px; margin-top: 28px; }
+.games-section .tab-count { font-size: .9rem; }
+.status-select { width: 100%; max-width: 640px; }

@@ -117,7 +117,7 @@ No. Greeny only watches what happens while you play. It never changes your games
 <details>
 <summary><b>Is Greeny open source?</b></summary>
 
-Not fully. **Greeny is free, with open integration formats.** The core is closed to protect fair rankings, but any homebrew can read Greeny's data ([INTEGRATIONS.md](INTEGRATIONS.md)), the Tesla overlay is open source (GPL-2.0), and soon an **open-source SDK** will let homebrew and ports add their own achievements.
+Not fully. **Greeny is free, with open integration formats.** The core is closed to protect fair rankings, but any homebrew can read Greeny's data ([INTEGRATIONS.md](INTEGRATIONS.md)), the Tesla overlay is open source (GPL-2.0), and the **[Greeny SDK](sdk/)** (MIT) lets homebrew and ports add their own achievements.
 
 The plan is to open more of Greeny step by step, as the anti-cheat checks and the community grow. Why it is not fully open yet, and how you can contribute today: see the [Technical FAQ](FAQ.md#is-greeny-open-source).
 </details>
@@ -203,11 +203,17 @@ Greeny is built to be extended. HOME menus, launchers, overlays and other homebr
 the source and is credited as **"Achievements by Greeny"**. See [INTEGRATIONS.md](INTEGRATIONS.md) for what is
 allowed and the files you can read.
 
+### Achievements in your homebrew or port
+
+With the **[Greeny SDK](sdk/)** (one C file, MIT) your homebrew game or port gets Greeny achievements: same
+pop-ups, app and profile. The first one is the Switch port of sm64ex, with 46 achievements
+([example](sdk/ejemplos/sm64ex)).
+
 ## License
 
 Greeny is free for personal use, with open integration formats ([INTEGRATIONS.md](INTEGRATIONS.md)). The core is closed
 to protect fair rankings. © Jhondy. All rights reserved. See [LICENSE](LICENSE).
 
-The Tesla overlay source code is published with each release under GPL-2.0. Third-party components: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+The Tesla overlay source code is published with each release under GPL-2.0. The [Greeny SDK](sdk/) is under the MIT license. Third-party components: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 <sub>Greeny is a fan project. It is not affiliated with, endorsed or sponsored by Nintendo. All trademarks belong to their respective owners.</sub>

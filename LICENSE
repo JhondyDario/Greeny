@@ -20,6 +20,8 @@ What you CAN do
     Greeny app and use the Greeny name and logo to credit it, following INTEGRATIONS.md.
   - Use, study and modify the Tesla overlay source code (folder "overlay"), under the
     GNU General Public License v2. See overlay/LICENSE.
+  - Use the Greeny SDK (folder "sdk") in any project, open or closed, under the MIT
+    license. See sdk/LICENSE.
   - Help the project: test games, research new achievements, report problems, translate,
     suggest ideas and share Greeny. Thank you!
 

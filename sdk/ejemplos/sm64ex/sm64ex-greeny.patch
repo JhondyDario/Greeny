@@ -1,0 +1,332 @@
+diff --git a/Makefile b/Makefile
+index d0e38c2..6fb7c00 100644
+--- a/Makefile
++++ b/Makefile
+@@ -447,8 +447,9 @@ ifeq ($(TARGET_SWITCH),1)
+   ifeq ($(strip $(DEVKITPRO)),)
+     $(error "Please set DEVKITPRO in your environment. export DEVKITPRO=<path to>/devkitpro")
+   endif
+-  export PATH := $(DEVKITPRO)/devkitA64/bin:$(PATH)
+   PORTLIBS ?= $(DEVKITPRO)/portlibs/switch
++  # sdl2-config lives in portlibs/switch/bin; current devkitPro images don't put it on PATH
++  export PATH := $(PORTLIBS)/bin:$(DEVKITPRO)/devkitA64/bin:$(PATH)
+   LIBNX ?= $(DEVKITPRO)/libnx
+   CROSS ?= aarch64-none-elf-
+   SDLCROSS :=
+@@ -678,7 +679,7 @@ else ifeq ($(OSX_BUILD),1)
+   LDFLAGS := -lm $(BACKEND_LDFLAGS) -no-pie -lpthread
+ 
+ else ifeq ($(TARGET_SWITCH),1)
+-  LDFLAGS := -specs=$(LIBNX)/switch.specs $(NXARCH) $(OPT_FLAGS) -no-pie -L$(LIBNX)/lib $(BACKEND_LDFLAGS) -lstdc++ -lnx -lm
++  LDFLAGS := -specs=$(LIBNX)/switch.specs $(NXARCH) $(OPT_FLAGS) -no-pie -L$(PORTLIBS)/lib -L$(LIBNX)/lib $(BACKEND_LDFLAGS) -lstdc++ -lnx -lm
+ 
+ else
+   LDFLAGS := $(BITS) -march=$(TARGET_ARCH) -lm $(BACKEND_LDFLAGS) -no-pie -lpthread
+diff --git a/src/pc/greeny.h b/src/pc/greeny.h
+new file mode 100644
+index 0000000..0ad009f
+--- /dev/null
++++ b/src/pc/greeny.h
+@@ -0,0 +1,115 @@
++/*
++ * Greeny SDK: achievements for homebrew games and ports on Nintendo Switch.
++ * https://github.com/JhondyDario/Greeny
++ *
++ * MIT License. Copyright (c) 2026 Jhondy. See LICENSE next to this file.
++ *
++ * One file, no dependencies besides the C standard library.
++ *
++ * Your game does not decide the achievements: it only reports what happens (stats and events).
++ * Which achievements exist, their names, points and pictures live in Greeny's catalog, like the ones
++ * for retail games. That way they can be tuned without rebuilding your game.
++ *
++ * Usage:
++ *     #define GREENY_IMPLEMENTATION      // in ONE .c file of your project
++ *     #include "greeny.h"
++ *
++ *     greeny_begin("0500000000000001");  // the id Greeny gives your game
++ *     greeny_stat("stars", 70);          // current value of a stat
++ *     greeny_event("bowser_1");          // something happened (adds 1)
++ *     greeny_add("coins_total", 5);      // adds N (coins, enemies...)
++ *     greeny_end();                      // when the game closes
++ *
++ * Without Greeny installed, all of this does nothing and never fails.
++ */
++#ifndef GREENY_SDK_H
++#define GREENY_SDK_H
++
++#include <stdbool.h>
++#include <stdint.h>
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++#define GREENY_SDK_VERSION 1
++
++/* Starts the session. `port_id`: 16 hex digits assigned by Greeny (they start with 05).
++ * Returns false if Greeny is not installed (then the other calls do nothing). */
++bool greeny_begin(const char *port_id);
++
++/* CURRENT value of a stat: stars, coins, lives... Call it when it changes and, when a save file is
++ * loaded, with every value from the save (so what the player already had counts as "already had",
++ * without points). Use this one, not greeny_event, for everything that lives in the save file.
++ * `name`: lowercase letters, digits and _ (1 to 31 characters). */
++void greeny_stat(const char *name, uint32_t value);
++
++/* Something that happens in the session and is not in the save file: adds 1 to that stat. */
++void greeny_event(const char *name);
++
++/* Like greeny_event, but adds `amount` (for example 5 coins at once). 0 does nothing. */
++void greeny_add(const char *name, uint32_t amount);
++
++/* Ends the session (when going back to the homebrew menu). */
++void greeny_end(void);
++
++#ifdef __cplusplus
++}
++#endif
++
++#ifdef GREENY_IMPLEMENTATION
++#include <stdio.h>
++#include <string.h>
++#include <sys/stat.h>
++
++#ifndef GREENY_ROOT /* only for tests on PC */
++#define GREENY_ROOT "sdmc:/config/greeny"
++#endif
++#define GREENY__DIR GREENY_ROOT
++#define GREENY__INBOX GREENY__DIR "/sdk"
++
++static char greeny__file[256];
++static bool greeny__on;
++
++static bool greeny__valid(const char *s, size_t max) {
++    size_t n = 0;
++    for (; s && s[n]; n++)
++        if (!((s[n] >= 'a' && s[n] <= 'z') || (s[n] >= '0' && s[n] <= '9') || s[n] == '_')) return false;
++    return n > 0 && n <= max;
++}
++
++static void greeny__write(const char *verb, const char *name, uint32_t value) {
++    if (!greeny__on || !greeny__valid(name, 31)) return;
++    /* one whole line (64 bytes max) written at once, and the file is closed right away:
++     * Greeny only reads a file it could rename, so it never sees half a line */
++    char line[64];
++    int n = snprintf(line, sizeof(line), "%s %s %lu\n", verb, name, (unsigned long)value);
++    if (n <= 0 || n >= (int)sizeof(line)) return;
++    FILE *f = fopen(greeny__file, "a");
++    if (!f) return;
++    fwrite(line, 1, (size_t)n, f);
++    fclose(f);
++}
++
++bool greeny_begin(const char *port_id) {
++    struct stat st;
++    greeny__on = false;
++    if (!port_id || strlen(port_id) != 16 || stat(GREENY__DIR, &st) != 0) return false; /* no Greeny: nothing */
++    for (int i = 0; i < 16; i++) {
++        char c = port_id[i];
++        if (!((c >= '0' && c <= '9') || (c >= 'A' && c <= 'F') || (c >= 'a' && c <= 'f'))) return false;
++    }
++    mkdir(GREENY__INBOX, 0777);
++    snprintf(greeny__file, sizeof(greeny__file), GREENY__INBOX "/%.16s.txt", port_id);
++    greeny__on = true;
++    greeny__write("begin", "session", GREENY_SDK_VERSION);
++    return true;
++}
++
++void greeny_stat(const char *name, uint32_t value) { greeny__write("set", name, value); }
++void greeny_event(const char *name) { greeny__write("add", name, 1); }
++void greeny_add(const char *name, uint32_t amount) { if (amount) greeny__write("add", name, amount); }
++void greeny_end(void) { greeny__write("end", "session", 0); greeny__on = false; }
++#endif /* GREENY_IMPLEMENTATION */
++
++#endif /* GREENY_SDK_H */
+diff --git a/src/pc/greeny_sm64.c b/src/pc/greeny_sm64.c
+new file mode 100644
+index 0000000..eda4181
+--- /dev/null
++++ b/src/pc/greeny_sm64.c
+@@ -0,0 +1,141 @@
++/*
++ * Greeny achievements for sm64ex (Switch port). MIT license.
++ *
++ * Reads the save file and Mario's state twice a second and tells Greeny only what changed.
++ * The achievements themselves (names, points, images) live in Greeny's catalog.
++ * Without Greeny installed this does nothing.
++ *
++ * Hook it from src/pc/pc_main.c:
++ *   greeny_sm64_begin();   after the game starts
++ *   greeny_sm64_update();  once per frame, after game_loop_one_iteration()
++ *   greeny_sm64_end();     in game_deinit()
++ */
++#define GREENY_IMPLEMENTATION
++#include "greeny.h"
++
++#include <ultra64.h>
++#include "sm64.h"
++#include "course_table.h"
++#include "level_table.h"
++#include "game/area.h"
++#include "game/level_update.h"
++#include "game/object_list_processor.h"
++#include "game/save_file.h"
++
++#define GREENY_SM64_ID "0500000000000001"
++
++enum { S_STARS, S_COURSES, S_COIN_STARS, S_SECRET, S_TOADS, S_BOWSER1, S_BOWSER2,
++       S_WING, S_METAL, S_VANISH, S_LIVES, S_MOAT, S_DOOR50, S_LOST_CAP, S_COUNT };
++
++static const char *const sNames[S_COUNT] = {
++    "stars", "courses_done", "coin_stars", "secret_stars", "toad_stars", "bowser_1", "bowser_2",
++    "wing_cap", "metal_cap", "vanish_cap", "lives", "moat_drained", "door_50", "lost_cap",
++};
++
++/* Moves counted as events (each time Mario starts one). */
++static const struct { u32 action; const char *name; } sMoves[] = {
++    { ACT_TRIPLE_JUMP, "triple_jumps" }, { ACT_LONG_JUMP, "long_jumps" }, { ACT_WALL_KICK_AIR, "wall_kicks" },
++    { ACT_BACKFLIP, "backflips" }, { ACT_GROUND_POUND, "ground_pounds" }, { ACT_LAVA_BOOST, "lava" },
++};
++
++static u32 sLast[S_COUNT];
++static s16 sFile;          /* save file the values above belong to (0 = none yet) */
++static s16 sLastCoins;
++static s8 sLastLives = -100; /* -100 = not seen yet */
++static u32 sLastAction;
++static u32 sFrame;
++static u8 sGrandStar, sEnding, sYoshi;
++
++static u32 count_bits(u32 v) {
++    u32 n = 0;
++    for (; v; v &= v - 1) n++;
++    return n;
++}
++
++void greeny_sm64_begin(void) {
++    greeny_begin(GREENY_SM64_ID);
++}
++
++void greeny_sm64_end(void) {
++    greeny_end();
++}
++
++/* Current value of every stat that lives in the save file (or in Mario). */
++static void read_stats(u32 out[S_COUNT]) {
++    s32 file = gCurrSaveFileNum - 1;
++    u32 flags = save_file_get_flags();
++    u32 courses = 0, coinStars = 0;
++
++    for (s32 c = COURSE_MIN - 1; c < COURSE_STAGES_MAX; c++) { /* the 15 main courses */
++        u32 f = save_file_get_star_flags(file, c);
++        if ((f & 0x7F) == 0x7F) courses++;
++        if (f & 0x40) coinStars++; /* star 7 = 100 coins */
++    }
++    out[S_STARS] = save_file_get_total_star_count(file, COURSE_MIN - 1, COURSE_MAX - 1);
++    out[S_COURSES] = courses;
++    out[S_COIN_STARS] = coinStars;
++    /* bonus stages + castle secret stars (this call already adds the castle ones) */
++    out[S_SECRET] = save_file_get_total_star_count(file, COURSE_BONUS_STAGES - 1, COURSE_MAX - 1);
++    out[S_TOADS] = count_bits(save_file_get_star_flags(file, -1) & 0x07); /* 0x08 / 0x10 are MIPS */
++    out[S_BOWSER1] = (flags & (SAVE_FLAG_HAVE_KEY_1 | SAVE_FLAG_UNLOCKED_BASEMENT_DOOR)) != 0;
++    out[S_BOWSER2] = (flags & (SAVE_FLAG_HAVE_KEY_2 | SAVE_FLAG_UNLOCKED_UPSTAIRS_DOOR)) != 0;
++    out[S_WING] = (flags & SAVE_FLAG_HAVE_WING_CAP) != 0;
++    out[S_METAL] = (flags & SAVE_FLAG_HAVE_METAL_CAP) != 0;
++    out[S_VANISH] = (flags & SAVE_FLAG_HAVE_VANISH_CAP) != 0;
++    out[S_LIVES] = gMarioState->numLives > 0 ? (u32)gMarioState->numLives : 0;
++    out[S_MOAT] = (flags & SAVE_FLAG_MOAT_DRAINED) != 0;
++    out[S_DOOR50] = (flags & SAVE_FLAG_UNLOCKED_50_STAR_DOOR) != 0;
++    /* the cap is somewhere else: blown off, or taken by Klepto, Ukiki or Mr. Blizzard */
++    out[S_LOST_CAP] = (flags & (SAVE_FLAG_CAP_ON_GROUND | SAVE_FLAG_CAP_ON_KLEPTO | SAVE_FLAG_CAP_ON_UKIKI | SAVE_FLAG_CAP_ON_MR_BLIZZARD)) != 0;
++}
++
++void greeny_sm64_update(void) {
++    /* the ending (cake) screen has no Mario, so it is checked first */
++    u8 ending = gCurrLevelNum == LEVEL_ENDING;
++    if (ending && !sEnding) greeny_event("ending");
++    sEnding = ending;
++
++    /* the rest only while Mario is in a level (not on the title or file select screens) */
++    if (gMarioObject == NULL || gCurrSaveFileNum < 1) return;
++
++    /* coins: every frame, so no coin is missed. numCoins goes back to 0 in each new level. */
++    s16 coins = gMarioState->numCoins;
++    if (coins > sLastCoins && sFile == gCurrSaveFileNum) greeny_add("coins_total", (u32)(coins - sLastCoins));
++    sLastCoins = coins;
++
++    /* one-off moments that the save file doesn't keep */
++    u8 grand = gMarioState->action == ACT_JUMBO_STAR_CUTSCENE;
++    if (grand && !sGrandStar) greeny_event("bowser_3");
++    sGrandStar = grand;
++    /* deaths: a death takes exactly one life (other drops are a reset, like choosing the file again);
++     * going below 0 is a game over */
++    s8 lives = gMarioState->numLives;
++    if (sLastLives != -100 && sFile == gCurrSaveFileNum && lives == sLastLives - 1) {
++        greeny_event("deaths");
++        if (lives < 0) greeny_event("game_over");
++    }
++    sLastLives = lives;
++
++    /* moves: counted when Mario starts them */
++    u32 action = gMarioState->action;
++    if (action != sLastAction)
++        for (unsigned i = 0; i < sizeof(sMoves) / sizeof(sMoves[0]); i++)
++            if (action == sMoves[i].action) greeny_event(sMoves[i].name);
++    sLastAction = action;
++
++    u8 yoshi = gSpecialTripleJump != 0; /* only Yoshi on the roof turns this on */
++    if (yoshi && !sYoshi) greeny_event("yoshi");
++    sYoshi = yoshi;
++
++    if (++sFrame % 15) return; /* the rest, twice a second */
++
++    u32 now[S_COUNT];
++    read_stats(now);
++    /* another save file: send everything again, so what it already had counts as "already had" */
++    bool all = sFile != gCurrSaveFileNum;
++    for (int i = 0; i < S_COUNT; i++) {
++        if (all || now[i] != sLast[i]) greeny_stat(sNames[i], now[i]);
++        sLast[i] = now[i];
++    }
++    sFile = gCurrSaveFileNum;
++}
+diff --git a/src/pc/pc_main.c b/src/pc/pc_main.c
+index 923e7ea..0134fba 100644
+--- a/src/pc/pc_main.c
++++ b/src/pc/pc_main.c
+@@ -58,6 +58,11 @@ static struct GfxRenderingAPI *rendering_api;
+ 
+ extern void gfx_run(Gfx *commands);
+ extern void thread5_game_loop(void *arg);
++
++// Greeny achievements (src/pc/greeny_sm64.c)
++extern void greeny_sm64_begin(void);
++extern void greeny_sm64_update(void);
++extern void greeny_sm64_end(void);
+ extern void create_next_audio_buffer(s16 *samples, u32 num_samples);
+ void game_loop_one_iteration(void);
+ 
+@@ -92,6 +97,7 @@ void produce_one_frame(void) {
+     set_sequence_player_volume(SEQ_PLAYER_ENV, (f32)configEnvVolume / 127.0f * master_mod);
+ 
+     game_loop_one_iteration();
++    greeny_sm64_update();
+     thread6_rumble_loop(NULL);
+ 
+     int samples_left = audio_api->buffered();
+@@ -124,6 +130,7 @@ void game_deinit(void) {
+     discord_shutdown();
+ #endif
+     configfile_save(configfile_name());
++    greeny_sm64_end();
+     controller_shutdown();
+     audio_shutdown();
+     gfx_shutdown();
+@@ -237,6 +244,7 @@ void main_func(void) {
+     sound_init();
+ 
+     thread5_game_loop(NULL);
++    greeny_sm64_begin();
+ 
+     inited = true;
+ 

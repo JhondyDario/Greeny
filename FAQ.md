@@ -22,7 +22,7 @@ the achievement definitions and the code were public, faking achievements would 
 - the **Tesla overlay**, open source under GPL-2.0 (its source ships with every release);
 - the list of **third-party components** we use ([THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)).
 
-Soon an **open-source SDK** will let homebrew and ports add their own achievements.
+- the **[Greeny SDK](sdk/)**, MIT licensed, so homebrew and ports can add their own achievements.
 
 ### Why isn't it fully open yet?
 
@@ -36,7 +36,7 @@ Soon an **open-source SDK** will let homebrew and ports add their own achievemen
 
 ### Will it be opened in the future?
 
-That is the plan, step by step: first the **SDK** (open source), then more of Greeny as the anti-cheat checks
+That is the plan, step by step: first the **SDK** (already open, MIT), then more of Greeny as the anti-cheat checks
 and the community grow. The achievement definitions, the name and the artwork will stay protected.
 
 ### Can I contribute now?
@@ -47,11 +47,12 @@ report achievements that don't work, suggest ideas, translate, or build an integ
 
 ## Does it track achievements in homebrew (.nro) games?
 
-Not yet. Greeny is built around retail Switch games.
+Yes, if the game supports it. With the **[Greeny SDK](sdk/)** (one C file, MIT) a homebrew game or port reports
+what happens and Greeny shows the achievements as for any other game. The first one is the Switch port of
+sm64ex ([example](sdk/ejemplos/sm64ex)). These achievements show with a **Port** tag and don't add points to
+the global ranking.
 
-We are looking at a simple **integration for homebrew developers**, so a homebrew game or port can report its
-own achievements to Greeny. If you make homebrew and want this, tell us on
-[Discord](https://discord.gg/4KU8C9bEHy).
+If you make homebrew and want achievements, tell us on [Discord](https://discord.gg/4KU8C9bEHy).
 
 ## Can achievements unlock from my save file?
 
